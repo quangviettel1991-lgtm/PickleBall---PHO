@@ -76,6 +76,7 @@ export function addMember(newMember) {
     gender: newMember.gender || "Nam",
     joinDate: newMember.joinDate || new Date().toISOString().split("T")[0],
     elo: parseInt(newMember.elo) || 1200,
+    initialElo: parseInt(newMember.elo) || 1200,
     avatarColor: newMember.avatarColor || getRandomColor()
   };
   data.members.push(member);
@@ -210,9 +211,129 @@ export function recordMatch(matchData) {
   };
 
   data.matches.push(newMatch);
+  recalculateAllElos(data); // Đảm bảo tính toán Elo được cập nhật nhất quán
   saveClubData(data);
   return data;
 }
+
+/**
+ * Tự động tính toán lại toàn bộ lịch sử Elo của CLB từ điểm khởi đầu của các thành viên.
+ * Đảm bảo tính nhất quán tuyệt đối về mặt toán học khi sửa hoặc xóa trận đấu cũ.
+ */
+export function recalculateAllElos(data) {
+  // 1. Khôi phục điểm Elo của tất cả thành viên về điểm bắt đầu
+  const demoElos = {
+    m1: 1350,
+    m2: 1280,
+    m3: 1220,
+    m4: 1190,
+    m5: 1150,
+    m6: 1110,
+    m7: 1080,
+    m8: 1020
+  };
+
+  data.members = data.members.map(m => {
+    const baseElo = m.initialElo !== undefined ? m.initialElo : (demoElos[m.id] || 1200);
+    return {
+      ...m,
+      elo: baseElo,
+      initialElo: baseElo // Đảm bảo luôn lưu giữ trường này
+    };
+  });
+
+  // 2. Sắp xếp toàn bộ trận đấu theo dòng thời gian tăng dần
+  const sortedMatches = [...data.matches].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // 3. Giả lập phát lại từng trận đấu và cập nhật biến động Elo
+  const calculatedMatches = sortedMatches.map(match => {
+    const { type, teamA, teamB, scoreA, scoreB } = match;
+
+    // Bản đồ Elo của các người chơi ngay trước khi trận đấu này diễn ra
+    const runningElos = {};
+    data.members.forEach(m => {
+      runningElos[m.id] = m.elo;
+    });
+
+    let eloChanges = {};
+
+    if (type === "singles") {
+      const pAId = teamA[0];
+      const pBId = teamB[0];
+      const eloA = runningElos[pAId] || 1200;
+      const eloB = runningElos[pBId] || 1200;
+
+      const { changeA, changeB } = calculateSinglesElo(eloA, eloB, scoreA, scoreB);
+      eloChanges[pAId] = changeA;
+      eloChanges[pBId] = changeB;
+
+      // Cập nhật điểm Elo thực tế của hai người chơi
+      data.members = data.members.map(m => {
+        if (m.id === pAId) return { ...m, elo: Math.max(100, m.elo + changeA) };
+        if (m.id === pBId) return { ...m, elo: Math.max(100, m.elo + changeB) };
+        return m;
+      });
+
+    } else if (type === "doubles") {
+      const pA1 = teamA[0];
+      const pA2 = teamA[1];
+      const pB1 = teamB[0];
+      const pB2 = teamB[1];
+
+      const eloA1 = runningElos[pA1] || 1200;
+      const eloA2 = runningElos[pA2] || 1200;
+      const eloB1 = runningElos[pB1] || 1200;
+      const eloB2 = runningElos[pB2] || 1200;
+
+      const { changeA, changeB } = calculateDoublesElo([eloA1, eloA2], [eloB1, eloB2], scoreA, scoreB);
+      eloChanges[pA1] = changeA;
+      eloChanges[pA2] = changeA;
+      eloChanges[pB1] = changeB;
+      eloChanges[pB2] = changeB;
+
+      // Cập nhật điểm Elo thực tế của bốn người chơi
+      data.members = data.members.map(m => {
+        if (m.id === pA1 || m.id === pA2) return { ...m, elo: Math.max(100, m.elo + changeA) };
+        if (m.id === pB1 || m.id === pB2) return { ...m, elo: Math.max(100, m.elo + changeB) };
+        return m;
+      });
+    }
+
+    return {
+      ...match,
+      eloChanges
+    };
+  });
+
+  // Gán lại danh sách trận đấu đã được cập nhật Elo và sắp xếp lại theo thời gian
+  data.matches = calculatedMatches;
+  return data;
+}
+
+/**
+ * Cập nhật một trận đấu hiện có và tính lại toàn bộ Elo
+ */
+export function updateMatch(updatedMatch) {
+  const data = getClubData();
+  data.matches = data.matches.map(m => 
+    m.id === updatedMatch.id ? { ...m, ...updatedMatch } : m
+  );
+  recalculateAllElos(data);
+  saveClubData(data);
+  return data;
+}
+
+/**
+ * Xóa một trận đấu hiện có và tính lại toàn bộ Elo
+ */
+export function deleteMatch(matchId) {
+  const data = getClubData();
+  data.matches = data.matches.filter(m => m.id !== matchId);
+  recalculateAllElos(data);
+  saveClubData(data);
+  return data;
+}
+
 
 // Hỗ trợ sinh màu avatar ngẫu nhiên
 function getRandomColor() {

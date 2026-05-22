@@ -1,12 +1,23 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Swords, Calendar, Award, AlertCircle, Plus, Minus, Check, Lock } from "lucide-react";
-import { recordMatch } from "../utils/db";
+import { Swords, Calendar, Award, AlertCircle, Plus, Minus, Check, Lock, Search, Trash2, Edit2, X } from "lucide-react";
+import { recordMatch, updateMatch, deleteMatch } from "../utils/db";
 import { calculateSinglesElo, calculateDoublesElo } from "../utils/elo";
 
 export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, setIsAdmin }) {
   const { members, events } = data;
 
-  // Trạng thái Form
+  // Điều hướng sub-tabs: record (Ghi trận mới), history (Lịch sử đấu)
+  const [subTab, setSubTab] = useState("history");
+
+  // Trạng thái hiệu chỉnh trận đấu
+  const [editingMatchId, setEditingMatchId] = useState(null);
+
+  // Trạng thái Bộ lọc & Tìm kiếm Lịch sử đấu
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterEvent, setFilterEvent] = useState("");
+  const [filterType, setFilterType] = useState("");
+
+  // Trạng thái Form Ghi điểm
   const [matchType, setMatchType] = useState("singles"); // singles, doubles
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
@@ -24,7 +35,6 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   const [playerB2, setPlayerB2] = useState("");
 
   // Điểm số các Set
-  // format: [{a: 11, b: 9}, {a: 0, b: 0}, {a: 0, b: 0}]
   const [setsScore, setSetsScore] = useState([
     { a: 11, b: 9 },
     { a: 0, b: 0 },
@@ -33,6 +43,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
   // Trạng thái thông báo thành công
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Thiết lập ngày giờ mặc định khi render
   useEffect(() => {
@@ -46,16 +57,175 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
   // Reset form khi đổi thể thức Đơn / Đôi
   useEffect(() => {
+    if (!editingMatchId) {
+      setPlayerA1("");
+      setPlayerA2("");
+      setPlayerB1("");
+      setPlayerB2("");
+    }
+  }, [matchType, editingMatchId]);
+
+  // --- HÀM TRỢ GIÚP DỮ LIỆU ---
+
+  const getPlayerName = (id) => {
+    const player = members.find(m => m.id === id);
+    return player ? player.name : "Cựu thành viên";
+  };
+
+  const getPlayerAvatarColor = (id) => {
+    const player = members.find(m => m.id === id);
+    return player ? player.avatarColor : "#718096";
+  };
+
+  const getEventName = (eventId) => {
+    if (!eventId) return "Giao lưu tự do";
+    const event = events.find(e => e.id === eventId);
+    return event ? event.name : "Sự kiện khác";
+  };
+
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+
+  // --- LỌC VÀ TÌM KIẾM TRẬN ĐẤU ---
+
+  const filteredMatches = useMemo(() => {
+    if (!data.matches) return [];
+    
+    let result = [...data.matches].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // 1. Lọc theo Sự kiện
+    if (filterEvent !== "") {
+      result = result.filter(m => m.eventId === filterEvent);
+    }
+
+    // 2. Lọc theo Thể thức
+    if (filterType !== "") {
+      result = result.filter(m => m.type === filterType);
+    }
+
+    // 3. Tìm kiếm theo tên người chơi (Không dấu & case-insensitive)
+    if (searchQuery.trim() !== "") {
+      const q = searchQuery.toLowerCase().trim();
+      
+      const getMemberNameLower = (id) => {
+        const m = members.find(member => member.id === id);
+        return m ? m.name.toLowerCase() : "";
+      };
+
+      result = result.filter(m => {
+        const teamANames = m.teamA.map(id => getMemberNameLower(id));
+        const teamBNames = m.teamB.map(id => getMemberNameLower(id));
+        
+        return teamANames.some(name => name.includes(q)) || 
+               teamBNames.some(name => name.includes(q));
+      });
+    }
+
+    return result;
+  }, [data.matches, filterEvent, filterType, searchQuery, members]);
+
+  // --- DỌN SẠCH FORM ---
+
+  const clearForm = () => {
+    setMatchType("singles");
+    setEventId("");
+    const now = new Date();
+    setMatchDate(now.toISOString().split("T")[0]);
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    setMatchTime(`${hours}:${minutes}`);
+    setScoringMode("single");
     setPlayerA1("");
     setPlayerA2("");
     setPlayerB1("");
     setPlayerB2("");
-  }, [matchType]);
+    setSetsScore([
+      { a: 11, b: 9 },
+      { a: 0, b: 0 },
+      { a: 0, b: 0 }
+    ]);
+    setEditingMatchId(null);
+  };
+
+  // --- XỬ LÝ SỬA & XÓA ---
+
+  const handleEditClick = (match) => {
+    setEditingMatchId(match.id);
+    setMatchType(match.type);
+    setEventId(match.eventId || "");
+    
+    if (match.date) {
+      const parts = match.date.split("T");
+      setMatchDate(parts[0]);
+      if (parts[1]) {
+        setMatchTime(parts[1].slice(0, 5));
+      }
+    }
+    
+    if (match.sets && match.sets.length > 1) {
+      setScoringMode("bestOf3");
+    } else {
+      setScoringMode("single");
+    }
+
+    if (match.type === "singles") {
+      setPlayerA1(match.teamA[0] || "");
+      setPlayerB1(match.teamB[0] || "");
+      setPlayerA2("");
+      setPlayerB2("");
+    } else {
+      setPlayerA1(match.teamA[0] || "");
+      setPlayerA2(match.teamA[1] || "");
+      setPlayerB1(match.teamB[0] || "");
+      setPlayerB2(match.teamB[1] || "");
+    }
+
+    const tempScores = [
+      { a: 0, b: 0 },
+      { a: 0, b: 0 },
+      { a: 0, b: 0 }
+    ];
+    if (match.sets) {
+      match.sets.forEach((set, idx) => {
+        if (idx < 3) {
+          tempScores[idx] = { a: set.a, b: set.b };
+        }
+      });
+    }
+    setSetsScore(tempScores);
+
+    setSubTab("record");
+  };
+
+  const handleDeleteClick = (matchId) => {
+    if (window.confirm("Bạn có chắc chắn muốn xóa trận đấu này không? Hệ thống sẽ tự động tính toán lại toàn bộ lịch sử điểm Elo của tất cả thành viên liên quan để đảm bảo tính nhất quán tuyệt đối.")) {
+      const updatedData = deleteMatch(matchId);
+      setData(updatedData);
+      
+      setSuccessMessage("Đã Xóa Trận Đấu!");
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setSuccessMessage("");
+      }, 2000);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    clearForm();
+    setSubTab("history");
+  };
 
   // --- TỰ ĐỘNG TÍNH TOÁN KẾT QUẢ TỪ CÁC SET ---
 
   const matchOutcome = useMemo(() => {
-    // 1. Lọc danh sách người chơi hợp lệ
     const pA1 = members.find(m => m.id === playerA1);
     const pA2 = members.find(m => m.id === playerA2);
     const pB1 = members.find(m => m.id === playerB1);
@@ -70,7 +240,6 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
       return { isValid: false, reason: "Vui lòng chọn đầy đủ và phân biệt các người chơi." };
     }
 
-    // 2. Tính toán điểm số tổng hợp
     let finalScoreA = 0;
     let finalScoreB = 0;
     let activeSets = [];
@@ -84,21 +253,20 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
         return { isValid: false, reason: "Trận đấu Pickleball không thể có kết quả hòa." };
       }
     } else {
-      // Đấu 3 set thắng 2
       let setsWonA = 0;
       let setsWonB = 0;
 
-      // Đánh giá Set 1
+      // Set 1
       if (setsScore[0].a === setsScore[0].b) return { isValid: false, reason: "Set 1 không được có kết quả hòa." };
       setsScore[0].a > setsScore[0].b ? setsWonA++ : setsWonB++;
       activeSets.push(setsScore[0]);
 
-      // Đánh giá Set 2
+      // Set 2
       if (setsScore[1].a === setsScore[1].b) return { isValid: false, reason: "Set 2 không được có kết quả hòa." };
       setsScore[1].a > setsScore[1].b ? setsWonA++ : setsWonB++;
       activeSets.push(setsScore[1]);
 
-      // Đánh giá xem có cần chơi Set 3 không
+      // Có cần Set 3 không
       const isSet3Needed = setsWonA === 1 && setsWonB === 1;
       
       if (isSet3Needed) {
@@ -111,7 +279,6 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
       finalScoreB = setsWonB;
     }
 
-    // 3. Tính toán trước biến động ELO (LIVE PREVIEW)
     const eloPreview = {};
     if (matchType === "singles") {
       const eloA = pA1.elo;
@@ -143,7 +310,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     };
   }, [matchType, scoringMode, playerA1, playerA2, playerB1, playerB2, setsScore, members]);
 
-  // --- XỬ LÝ ĐIỂM SỐ CÁC SET ---
+  // --- XỬ LÝ ĐIỂM SỐ ---
 
   const handleScoreChange = (setIndex, team, value) => {
     const val = parseInt(value) || 0;
@@ -178,27 +345,44 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     const teamA = matchType === "singles" ? [playerA1] : [playerA1, playerA2];
     const teamB = matchType === "singles" ? [playerB1] : [playerB1, playerB2];
     
-    // Tạo ISO timestamp hoàn chỉnh từ ngày & giờ nhập
     const isoDateTime = `${matchDate}T${matchTime}:00`;
 
-    const updatedData = recordMatch({
-      type: matchType,
-      eventId,
-      teamA,
-      teamB,
-      scoreA: matchOutcome.scoreA,
-      scoreB: matchOutcome.scoreB,
-      sets: matchOutcome.activeSets,
-      date: isoDateTime
-    });
+    let updatedData;
+    if (editingMatchId) {
+      updatedData = updateMatch({
+        id: editingMatchId,
+        type: matchType,
+        eventId,
+        teamA,
+        teamB,
+        scoreA: matchOutcome.scoreA,
+        scoreB: matchOutcome.scoreB,
+        sets: matchOutcome.activeSets,
+        date: isoDateTime
+      });
+      setSuccessMessage("Đã Cập Nhật Trận Đấu!");
+    } else {
+      updatedData = recordMatch({
+        type: matchType,
+        eventId,
+        teamA,
+        teamB,
+        scoreA: matchOutcome.scoreA,
+        scoreB: matchOutcome.scoreB,
+        sets: matchOutcome.activeSets,
+        date: isoDateTime
+      });
+      setSuccessMessage("Ghi Nhận Thành Công!");
+    }
 
     setData(updatedData);
     setShowSuccess(true);
 
-    // Tự động tắt thông báo sau 3 giây và chuyển về trang tổng quan
     setTimeout(() => {
       setShowSuccess(false);
-      setActiveTab("dashboard");
+      setSuccessMessage("");
+      clearForm();
+      setSubTab("history"); // Quay lại tab lịch sử đấu
     }, 2500);
   };
 
@@ -217,16 +401,16 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     <div className="recorder-container animate-fade-in">
       <style dangerouslySetInnerHTML={{__html: `
         .recorder-container {
-          max-width: 800px;
+          max-width: 860px;
           margin: 0 auto;
           padding: 32px 24px;
         }
 
-        .recorder-header {
+        .recorder-header-main {
           display: flex;
           align-items: center;
           gap: 12px;
-          margin-bottom: 28px;
+          margin-bottom: 24px;
         }
 
         .recorder-title {
@@ -236,6 +420,42 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
         .recorder-title svg {
           color: var(--accent-neon-green);
+        }
+
+        /* Sub tabs */
+        .subtabs-container {
+          display: flex;
+          gap: 10px;
+          margin-bottom: 24px;
+          border-bottom: 1px solid var(--border-color);
+          padding-bottom: 10px;
+        }
+
+        .subtab-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 18px;
+          border-radius: 8px;
+          background: transparent;
+          border: 1px solid transparent;
+          color: var(--text-secondary);
+          font-weight: 600;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+          font-family: var(--font-primary);
+          font-size: 0.92rem;
+        }
+
+        .subtab-btn:hover {
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.02);
+        }
+
+        .subtab-btn.active {
+          color: var(--accent-neon-green);
+          background: rgba(212, 252, 52, 0.05);
+          border-color: rgba(212, 252, 52, 0.15);
         }
 
         .recorder-panel {
@@ -320,7 +540,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
           align-items: center;
           justify-content: center;
           gap: 20px;
-          margin-bottom: 14px;
+          margin-bottom: 16px;
         }
 
         .set-row:last-child {
@@ -338,20 +558,32 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
         .score-counter-container {
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 8px;
         }
 
         .score-input-mini {
-          width: 54px;
+          width: 80px;
+          height: 48px;
           text-align: center;
-          font-size: 1.15rem;
+          font-size: 1.5rem;
           font-weight: 800;
+          border-radius: 8px;
+          background: var(--bg-input);
+          border: 1px solid var(--border-color);
+          color: #fff;
+          font-family: var(--font-primary);
+        }
+
+        .score-input-mini:focus {
+          border-color: var(--accent-neon-green);
+          outline: none;
+          box-shadow: 0 0 10px rgba(212, 252, 52, 0.2);
         }
 
         .btn-score-adjust {
-          width: 28px;
-          height: 28px;
-          border-radius: 6px;
+          width: 38px;
+          height: 38px;
+          border-radius: 8px;
           border: 1px solid var(--border-color);
           background: rgba(255,255,255,0.03);
           color: #fff;
@@ -438,7 +670,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
           line-height: 1.5;
         }
 
-        /* Màn hình thông báo thành công */
+        /* Success Overlay */
         .success-overlay {
           position: fixed;
           inset: 0;
@@ -468,34 +700,6 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
           justify-content: center;
           margin: 0 auto 20px auto;
           box-shadow: 0 0 25px var(--accent-neon-green-glow-strong);
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-          .team-selection-grid {
-            grid-template-columns: 1fr;
-            gap: 16px;
-          }
-          .recorder-panel {
-            padding: 16px;
-          }
-          .recorder-meta-grid {
-            grid-template-columns: 1fr !important;
-            gap: 12px !important;
-          }
-          .btn-score-adjust {
-            width: 38px !important;
-            height: 38px !important;
-            border-radius: 8px;
-          }
-          .score-input-mini {
-            width: 60px !important;
-            height: 38px !important;
-            font-size: 1.3rem !important;
-          }
-          .set-row {
-            gap: 12px;
-          }
         }
 
         /* CSS MÀN HÌNH KHÓA GHI ĐIỂM */
@@ -563,6 +767,396 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
           font-weight: 600;
           margin-top: -4px;
         }
+
+        /* --- STYLES CHO PHẦN LỊCH SỬ ĐẤU --- */
+        .history-filters {
+          display: grid;
+          grid-template-columns: 2fr 1.2fr 1fr;
+          gap: 16px;
+          margin-bottom: 24px;
+        }
+
+        .search-input-wrapper {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 14px;
+          color: var(--text-muted);
+        }
+
+        .form-input-search {
+          padding-left: 42px !important;
+        }
+
+        .match-list-history {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .match-row-item {
+          background: rgba(255, 255, 255, 0.015);
+          border: 1px solid var(--border-color);
+          border-radius: 14px;
+          padding: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .match-row-item:hover {
+          background: rgba(255, 255, 255, 0.035);
+          border-color: rgba(255, 255, 255, 0.12);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .match-info-side {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          min-width: 150px;
+        }
+
+        .match-event-tag {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          background: rgba(255, 255, 255, 0.04);
+          padding: 3px 8px;
+          border-radius: 4px;
+          border: 1px solid rgba(255, 255, 255, 0.06);
+          display: inline-block;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 170px;
+        }
+
+        .match-type-badge {
+          display: inline-block;
+          font-size: 0.65rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          padding: 2px 6px;
+          border-radius: 4px;
+          margin-left: 8px;
+          white-space: nowrap;
+        }
+
+        .match-type-singles { background: rgba(0, 236, 255, 0.1); color: var(--accent-electric-blue); border: 1px solid rgba(0, 236, 255, 0.2); }
+        .match-type-doubles { background: rgba(212, 252, 52, 0.1); color: var(--accent-neon-green); border: 1px solid rgba(212, 252, 52, 0.2); }
+
+        .match-date {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+        }
+
+        .match-teams-score {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+          flex-grow: 1;
+          justify-content: center;
+        }
+
+        .match-team {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          width: 40%;
+        }
+
+        .match-team-a {
+          justify-content: flex-end;
+          text-align: right;
+        }
+
+        .match-team-b {
+          justify-content: flex-start;
+          text-align: left;
+        }
+
+        .match-team-players {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .match-player-name {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #fff;
+          white-space: nowrap;
+        }
+
+        .player-avatars-group {
+          display: flex;
+          gap: 4px;
+        }
+
+        .player-avatar-circle {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #000;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .match-score-section {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .match-score-pill {
+          background: rgba(0, 0, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 20px;
+          padding: 6px 16px;
+          font-weight: 800;
+          font-size: 1.15rem;
+          letter-spacing: 0.05em;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .score-winner { color: var(--accent-neon-green); text-shadow: 0 0 10px rgba(212, 252, 52, 0.2); }
+        .score-loser { color: var(--text-secondary); }
+
+        .match-sets-detail {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        .match-elo-exchanges {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 3px;
+          min-width: 120px;
+          font-size: 0.75rem;
+          border-left: 1px solid var(--border-color);
+          padding-left: 16px;
+        }
+
+        .elo-change-row {
+          display: flex;
+          justify-content: space-between;
+          width: 100%;
+          gap: 8px;
+        }
+
+        .elo-change-name {
+          color: var(--text-muted);
+          max-width: 70px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .elo-change-value {
+          font-weight: 700;
+        }
+        .elo-up { color: var(--color-success); }
+        .elo-down { color: var(--color-danger); }
+
+        .match-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border-left: 1px solid var(--border-color);
+          padding-left: 16px;
+        }
+
+        .btn-action-edit, .btn-action-delete {
+          width: 34px;
+          height: 34px;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.02);
+          color: var(--text-secondary);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .btn-action-edit:hover {
+          color: var(--accent-electric-blue);
+          background: rgba(0, 236, 255, 0.08);
+          border-color: rgba(0, 236, 255, 0.2);
+          box-shadow: 0 0 10px rgba(0, 236, 255, 0.15);
+        }
+
+        .btn-action-delete:hover {
+          color: var(--color-danger);
+          background: rgba(255, 71, 87, 0.08);
+          border-color: rgba(255, 71, 87, 0.2);
+          box-shadow: 0 0 10px rgba(255, 71, 87, 0.15);
+        }
+
+        /* Banner đang chỉnh sửa */
+        .editing-banner {
+          background: linear-gradient(90deg, rgba(0, 236, 255, 0.08) 0%, rgba(212, 252, 52, 0.02) 100%);
+          border: 1px dashed var(--accent-electric-blue);
+          border-radius: 12px;
+          padding: 16px 20px;
+          margin-bottom: 24px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .editing-banner-text {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-weight: 700;
+          color: var(--accent-electric-blue);
+          font-size: 0.95rem;
+        }
+
+        .btn-cancel-edit {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 6px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: #fff;
+          font-size: 0.8rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-cancel-edit:hover {
+          background: rgba(255, 71, 87, 0.1);
+          border-color: rgba(255, 71, 87, 0.2);
+          color: var(--color-danger);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .team-selection-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+          }
+          .recorder-panel {
+            padding: 16px;
+          }
+          .recorder-meta-grid {
+            grid-template-columns: 1fr !important;
+            gap: 12px !important;
+          }
+          .btn-score-adjust {
+            width: 44px !important;
+            height: 44px !important;
+            border-radius: 10px;
+          }
+          .score-input-mini {
+            width: 84px !important;
+            height: 44px !important;
+            font-size: 1.6rem !important;
+          }
+          .set-row {
+            gap: 12px;
+          }
+
+          /* Mobile History */
+          .history-filters {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .match-row-item {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 16px;
+            padding: 16px;
+          }
+
+          .match-info-side {
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+            min-width: 100%;
+          }
+
+          .match-teams-score {
+            justify-content: space-between;
+            width: 100%;
+            gap: 8px;
+          }
+
+          .match-team {
+            width: 38%;
+            gap: 6px;
+          }
+
+          .match-team-a {
+            flex-direction: column-reverse;
+            align-items: flex-end;
+          }
+
+          .match-team-b {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .match-player-name {
+            font-size: 0.8rem;
+          }
+
+          .match-score-pill {
+            padding: 4px 12px;
+            font-size: 0.95rem;
+          }
+
+          .match-elo-exchanges {
+            border-left: none;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-left: 0;
+            padding-top: 10px;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 8px 12px;
+            min-width: 100%;
+          }
+
+          .elo-change-row {
+            width: auto;
+          }
+
+          .match-actions {
+            border-left: none;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            padding-left: 0;
+            padding-top: 10px;
+            justify-content: flex-end;
+            min-width: 100%;
+          }
+        }
       `}} />
 
       {/* THÀNH CÔNG OVERLAY */}
@@ -572,328 +1166,531 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
             <div className="success-icon-circle">
               <Check size={36} strokeWidth={3} />
             </div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#fff", marginBottom: "10px" }}>Ghi Nhận Thành Công!</h2>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: "800", color: "#fff", marginBottom: "10px" }}>
+              {successMessage || "Thao Tác Thành Công!"}
+            </h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
-              Kết quả trận đấu đã được lưu. Bảng xếp hạng Elo của các người chơi đã tự động cập nhật ngay lập tức.
+              Hệ thống đã tự động tính toán lại toàn bộ lịch sử Elo của thành viên CLB để bảo đảm tính nhất quán tuyệt đối.
             </p>
           </div>
         </div>
       )}
 
-      <div className="recorder-header">
-        <Swords size={28} />
-        <h1 className="recorder-title">Ghi Nhận Trận Đấu Mới</h1>
+      {/* Tiêu đề chính */}
+      <div className="recorder-header-main">
+        <Swords size={28} style={{ color: "var(--accent-neon-green)" }} />
+        <h1 className="recorder-title">PICKLEBALL PHỞ RECORD</h1>
       </div>
 
-      {!isAdmin ? (
-        <div className="glass-panel recorder-lock-card glow-border-green animate-slide-up">
-          <div className="recorder-lock-icon-wrapper">
-            <Lock size={28} />
-          </div>
-          <div>
-            <h2 className="recorder-lock-title">Tính Năng Hạn Chế</h2>
-            <p className="recorder-lock-desc">
-              Ghi điểm và cập nhật Elo chỉ dành cho Ban Tổ Chức (BTC) của CLB.
-              Vui lòng nhập mã PIN bảo mật để tiếp tục.
-            </p>
-          </div>
+      {/* Thanh sub-tabs */}
+      <div className="subtabs-container">
+        <button 
+          className={`subtab-btn ${subTab === "history" ? "active" : ""}`}
+          onClick={() => setSubTab("history")}
+        >
+          <Calendar size={16} /> Lịch Sử Trận Đấu
+        </button>
+        <button 
+          className={`subtab-btn ${subTab === "record" ? "active" : ""}`}
+          onClick={() => setSubTab("record")}
+        >
+          <Plus size={16} /> {editingMatchId ? "Hiệu Chỉnh Trận Đấu" : "Ghi Trận Mới"}
+        </button>
+      </div>
 
-          <form onSubmit={handleLocalUnlock} className="recorder-pin-input-group">
-            <input 
-              type="password" 
-              maxLength={8}
-              className="form-input recorder-pin-input" 
-              placeholder="Mã PIN (Mặc định: 1234)" 
-              value={pinInput}
-              onChange={e => {
-                setPinInput(e.target.value);
-                setPinError("");
-              }}
-              autoFocus
-            />
-            {pinError && <div className="recorder-pin-error">{pinError}</div>}
-            
-            <button type="submit" className="btn-neon-green" style={{ width: "100%", justifyContent: "center", marginTop: "8px" }}>
-              Mở khóa Ghi điểm
-            </button>
-          </form>
-        </div>
-      ) : (
-        <div className="glass-panel recorder-panel">
-          <form onSubmit={handleSubmit}>
-            {/* Chọn thể thức Đơn hoặc Đôi */}
-            <div className="type-toggle-container">
-              <button 
-                type="button" 
-                className={`type-toggle-btn ${matchType === "singles" ? "active" : ""}`}
-                onClick={() => setMatchType("singles")}
-              >
-                Đánh Đơn (1v1)
-              </button>
-              <button 
-                type="button" 
-                className={`type-toggle-btn ${matchType === "doubles" ? "active" : ""}`}
-                onClick={() => setMatchType("doubles")}
-              >
-                Đánh Đôi (2v2)
-              </button>
-            </div>
+      {/* NỘI DUNG TỪNG SUB-TAB */}
+      {subTab === "history" ? (
+        <div className="history-container animate-fade-in">
+          {/* Bộ lọc */}
+          <div className="glass-panel" style={{ padding: "20px", marginBottom: "20px" }}>
+            <div className="history-filters">
+              <div className="search-input-wrapper">
+                <Search size={18} className="search-icon" />
+                <input 
+                  type="text" 
+                  className="form-input form-input-search" 
+                  placeholder="Tìm theo tên thành viên..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
 
-            {/* Chọn Sự kiện & Ngày giờ */}
-            <div className="recorder-meta-grid">
               <div>
-                <label className="form-label">Sự kiện / Giải đấu</label>
-                <select className="form-select" value={eventId} onChange={e => setEventId(e.target.value)}>
-                  <option value="">Giao lưu tự do (Không tính giải)</option>
+                <select className="form-select" value={filterEvent} onChange={e => setFilterEvent(e.target.value)}>
+                  <option value="">Tất cả sự kiện</option>
+                  <option value="free">Giao lưu tự do</option>
                   {events.map(ev => (
                     <option key={ev.id} value={ev.id}>{ev.name}</option>
                   ))}
                 </select>
               </div>
+
               <div>
-                <label className="form-label">Ngày chơi</label>
-                <input type="date" className="form-input" value={matchDate} onChange={e => setMatchDate(e.target.value)} required />
-              </div>
-              <div>
-                <label className="form-label">Giờ chơi</label>
-                <input type="time" className="form-input" value={matchTime} onChange={e => setMatchTime(e.target.value)} required />
-              </div>
-            </div>
-
-            {/* Chọn Đội / Người chơi */}
-            <div className="team-selection-grid">
-              {/* Đội A */}
-              <div className="team-side-panel">
-                <h3 className="team-side-title team-a-title">
-                  🔵 Đội A {matchType === "doubles" && "(Cặp đôi A)"}
-                </h3>
-                
-                <div style={{ marginBottom: matchType === "doubles" ? "12px" : 0 }}>
-                  <label className="form-label">Người chơi A1 *</label>
-                  <select className="form-select" value={playerA1} onChange={e => setPlayerA1(e.target.value)} required>
-                    <option value="">-- Chọn thành viên --</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
-                    ))}
-                  </select>
-                </div>
-
-                {matchType === "doubles" && (
-                  <div>
-                    <label className="form-label">Người chơi A2 *</label>
-                    <select className="form-select" value={playerA2} onChange={e => setPlayerA2(e.target.value)} required>
-                      <option value="">-- Chọn thành viên --</option>
-                      {members.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              {/* Đội B */}
-              <div className="team-side-panel">
-                <h3 className="team-side-title team-b-title">
-                  🟢 Đội B {matchType === "doubles" && "(Cặp đôi B)"}
-                </h3>
-
-                <div style={{ marginBottom: matchType === "doubles" ? "12px" : 0 }}>
-                  <label className="form-label">Người chơi B1 *</label>
-                  <select className="form-select" value={playerB1} onChange={e => setPlayerB1(e.target.value)} required>
-                    <option value="">-- Chọn thành viên --</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
-                    ))}
-                  </select>
-                </div>
-
-                {matchType === "doubles" && (
-                  <div>
-                    <label className="form-label">Người chơi B2 *</label>
-                    <select className="form-select" value={playerB2} onChange={e => setPlayerB2(e.target.value)} required>
-                      <option value="">-- Chọn thành viên --</option>
-                      {members.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <select className="form-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+                  <option value="">Cả hai thể thức</option>
+                  <option value="singles">Đánh Đơn</option>
+                  <option value="doubles">Đánh Đôi</option>
+                </select>
               </div>
             </div>
+          </div>
 
-            {/* Thiết lập kiểu tính điểm Set */}
-            <div style={{ marginBottom: "16px" }}>
-              <label className="form-label">Phương thức chấm điểm</label>
-              <div style={{ display: "flex", gap: "16px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.9rem" }}>
-                  <input 
-                    type="radio" 
-                    name="scoringMode" 
-                    value="single" 
-                    checked={scoringMode === "single"} 
-                    onChange={() => setScoringMode("single")} 
-                  />
-                  1 Set chạm điểm (VD: chạm 11 hoặc 15)
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.9rem" }}>
-                  <input 
-                    type="radio" 
-                    name="scoringMode" 
-                    value="bestOf3" 
-                    checked={scoringMode === "bestOf3"} 
-                    onChange={() => setScoringMode("bestOf3")} 
-                  />
-                  Đấu 3 Set thắng 2 (Best of 3)
-                </label>
-              </div>
-            </div>
-
-            {/* NHẬP ĐIỂM SỐ CÁC SET */}
-            <div className="sets-score-section">
-              <h3 className="team-side-title" style={{ justifyContent: "center", color: "#fff", marginBottom: "16px" }}>
-                Nhập Điểm Số Các Set Đấu
-              </h3>
-
-              {/* Set 1 */}
-              <div className="set-row">
-                <span className="set-label">Set 1</span>
-                
-                {/* Điểm đội A */}
-                <div className="score-counter-container">
-                  <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "a", -1)}><Minus size={12} /></button>
-                  <input 
-                    type="number" 
-                    className="form-input score-input-mini" 
-                    value={setsScore[0].a} 
-                    onChange={(e) => handleScoreChange(0, "a", e.target.value)} 
-                    min="0"
-                  />
-                  <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "a", 1)}><Plus size={12} /></button>
-                </div>
-
-                <span style={{ fontSize: "1.2rem", fontWeight: "700", color: "var(--text-muted)" }}>:</span>
-
-                {/* Điểm đội B */}
-                <div className="score-counter-container">
-                  <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "b", -1)}><Minus size={12} /></button>
-                  <input 
-                    type="number" 
-                    className="form-input score-input-mini" 
-                    value={setsScore[0].b} 
-                    onChange={(e) => handleScoreChange(0, "b", e.target.value)} 
-                    min="0"
-                  />
-                  <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "b", 1)}><Plus size={12} /></button>
-                </div>
-              </div>
-
-              {/* Set 2 (Hiển thị nếu chọn Đấu 3 Set) */}
-              {scoringMode === "bestOf3" && (
-                <div className="set-row">
-                  <span className="set-label">Set 2</span>
-                  <div className="score-counter-container">
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "a", -1)}><Minus size={12} /></button>
-                    <input 
-                      type="number" 
-                      className="form-input score-input-mini" 
-                      value={setsScore[1].a} 
-                      onChange={(e) => handleScoreChange(1, "a", e.target.value)} 
-                      min="0"
-                    />
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "a", 1)}><Plus size={12} /></button>
-                  </div>
-                  <span style={{ fontSize: "1.2rem", fontWeight: "700", color: "var(--text-muted)" }}>:</span>
-                  <div className="score-counter-container">
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "b", -1)}><Minus size={12} /></button>
-                    <input 
-                      type="number" 
-                      className="form-input score-input-mini" 
-                      value={setsScore[1].b} 
-                      onChange={(e) => handleScoreChange(1, "b", e.target.value)} 
-                      min="0"
-                    />
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "b", 1)}><Plus size={12} /></button>
-                  </div>
-                </div>
-              )}
-
-              {/* Set 3 (Hiển thị nếu chọn Đấu 3 Set và hai set đầu hòa nhau 1-1) */}
-              {scoringMode === "bestOf3" && (
-                <div className="set-row">
-                  <span className="set-label">Set 3 *</span>
-                  <div className="score-counter-container">
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "a", -1)}><Minus size={12} /></button>
-                    <input 
-                      type="number" 
-                      className="form-input score-input-mini" 
-                      value={setsScore[2].a} 
-                      onChange={(e) => handleScoreChange(2, "a", e.target.value)} 
-                      min="0"
-                    />
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "a", 1)}><Plus size={12} /></button>
-                  </div>
-                  <span style={{ fontSize: "1.2rem", fontWeight: "700", color: "var(--text-muted)" }}>:</span>
-                  <div className="score-counter-container">
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "b", -1)}><Minus size={12} /></button>
-                    <input 
-                      type="number" 
-                      className="form-input score-input-mini" 
-                      value={setsScore[2].b} 
-                      onChange={(e) => handleScoreChange(2, "b", e.target.value)} 
-                      min="0"
-                    />
-                    <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "b", 1)}><Plus size={12} /></button>
-                  </div>
-                </div>
-              )}
-              
-              {scoringMode === "bestOf3" && (
-                <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "12px" }}>
-                  * Note: Set 3 chỉ tự động tính nếu kết quả Set 1 và Set 2 là hòa nhau 1 - 1.
-                </div>
-              )}
-            </div>
-
-            {/* DỮ LIỆU LIVE ELO PREVIEW HOẶC THÔNG BÁO LỖI */}
-            {matchOutcome.isValid ? (
-              <div className="elo-preview-panel glow-border-green animate-slide-up">
-                <h4 className="elo-preview-title">
-                  <Award size={16} /> Live Elo Preview (Ước lượng biến động Elo)
-                </h4>
-                <div className="elo-preview-grid">
-                  {Object.entries(matchOutcome.eloPreview).map(([id, info]) => (
-                    <div key={id} className="elo-preview-card">
-                      <span className="preview-player-name">{info.name}</span>
-                      <span className="preview-elo-flow">
-                        {info.before} → <span style={{ color: "#fff", fontWeight: "600" }}>{info.after}</span>
-                      </span>
-                      <span className={`preview-elo-diff ${info.change > 0 ? "preview-diff-up" : "preview-diff-down"}`}>
-                        {info.change > 0 ? `+${info.change}` : info.change} Elo
-                      </span>
-                    </div>
-                  ))}
-                </div>
+          {/* Danh sách trận đấu */}
+          <div className="match-list-history">
+            {filteredMatches.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                Không tìm thấy trận đấu nào khớp với điều kiện lọc.
               </div>
             ) : (
-              <div className="invalid-alert-box animate-slide-up">
-                <AlertCircle size={18} style={{ flexShrink: 0 }} />
-                <span>{matchOutcome.reason}</span>
-              </div>
-            )}
+              filteredMatches.map(match => {
+                const teamAWin = match.scoreA > match.scoreB;
+                const teamBWin = match.scoreB > match.scoreA;
 
-            {/* Nút hành động */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "16px" }}>
-              <button type="button" className="btn-secondary" onClick={() => setActiveTab("dashboard")}>Hủy bỏ</button>
-              <button 
-                type="submit" 
-                className="btn-neon-green" 
-                disabled={!matchOutcome.isValid}
-                style={{ opacity: matchOutcome.isValid ? 1 : 0.4, cursor: matchOutcome.isValid ? "pointer" : "not-allowed" }}
-              >
-                <Swords size={18} /> Lưu trận đấu & Cập nhật ELO
-              </button>
+                return (
+                  <div key={match.id} className="match-row-item glass-panel">
+                    {/* Bên trái: Thông tin chung */}
+                    <div className="match-info-side">
+                      <div style={{ display: "flex", alignItems: "center" }}>
+                        <span className="match-event-tag">{getEventName(match.eventId)}</span>
+                        <span className={`match-type-badge ${match.type === "singles" ? "match-type-singles" : "match-type-doubles"}`}>
+                          {match.type === "singles" ? "Đơn" : "Đôi"}
+                        </span>
+                      </div>
+                      <span className="match-date">{formatDate(match.date)}</span>
+                    </div>
+
+                    {/* Giữa: Người chơi & Điểm số */}
+                    <div className="match-teams-score">
+                      {/* Đội A */}
+                      <div className="match-team match-team-a">
+                        <div className="match-team-players">
+                          {match.teamA.map(id => (
+                            <span key={id} className="match-player-name">{getPlayerName(id)}</span>
+                          ))}
+                        </div>
+                        <div className="player-avatars-group">
+                          {match.teamA.map(id => (
+                            <div 
+                              key={id} 
+                              className="player-avatar-circle"
+                              style={{ backgroundColor: getPlayerAvatarColor(id) }}
+                            >
+                              {getPlayerName(id).charAt(0)}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Tỷ số lớn & Sets chi tiết */}
+                      <div className="match-score-section">
+                        <div className="match-score-pill">
+                          <span className={teamAWin ? "score-winner" : "score-loser"}>{match.scoreA}</span>
+                          <span style={{ color: "var(--text-muted)" }}>:</span>
+                          <span className={teamBWin ? "score-winner" : "score-loser"}>{match.scoreB}</span>
+                        </div>
+                        <div className="match-sets-detail">
+                          {match.sets && match.sets.map((s, idx) => (
+                            <span key={idx}>
+                              {s.a}-{s.b}{idx < match.sets.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Đội B */}
+                      <div className="match-team match-team-b">
+                        <div className="player-avatars-group">
+                          {match.teamB.map(id => (
+                            <div 
+                              key={id} 
+                              className="player-avatar-circle"
+                              style={{ backgroundColor: getPlayerAvatarColor(id) }}
+                            >
+                              {getPlayerName(id).charAt(0)}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="match-team-players" style={{ alignItems: "flex-start" }}>
+                          {match.teamB.map(id => (
+                            <span key={id} className="match-player-name">{getPlayerName(id)}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Biến động Elo */}
+                    <div className="match-elo-exchanges">
+                      {Object.entries(match.eloChanges).map(([playerId, change]) => (
+                        <div key={playerId} className="elo-change-row">
+                          <span className="elo-change-name">{getPlayerName(playerId).split(" ").pop()}</span>
+                          <span className={`elo-change-value ${change > 0 ? "elo-up" : "elo-down"}`}>
+                            {change > 0 ? `+${change}` : change}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Hành động sửa / xóa cho Admin */}
+                    {isAdmin && (
+                      <div className="match-actions">
+                        <button 
+                          className="btn-action-edit" 
+                          title="Sửa trận đấu"
+                          onClick={() => handleEditClick(match)}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          className="btn-action-delete" 
+                          title="Xóa trận đấu"
+                          onClick={() => handleDeleteClick(match.id)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+        /* TAB GHI ĐIỂM / HIỆU CHỈNH TRẬN ĐẤU */
+        <div className="recorder-content-wrapper animate-fade-in">
+          {!isAdmin ? (
+            <div className="glass-panel recorder-lock-card glow-border-green animate-slide-up">
+              <div className="recorder-lock-icon-wrapper">
+                <Lock size={28} />
+              </div>
+              <div>
+                <h2 className="recorder-lock-title">Tính Năng Hạn Chế</h2>
+                <p className="recorder-lock-desc">
+                  Ghi điểm và cập nhật Elo chỉ dành cho Ban Tổ Chức (BTC) của CLB.
+                  Vui lòng nhập mã PIN bảo mật để tiếp tục.
+                </p>
+              </div>
+
+              <form onSubmit={handleLocalUnlock} className="recorder-pin-input-group">
+                <input 
+                  type="password" 
+                  maxLength={8}
+                  className="form-input recorder-pin-input" 
+                  placeholder="Mã PIN (Mặc định: 1234)" 
+                  value={pinInput}
+                  onChange={e => {
+                    setPinInput(e.target.value);
+                    setPinError("");
+                  }}
+                  autoFocus
+                />
+                {pinError && <div className="recorder-pin-error">{pinError}</div>}
+                
+                <button type="submit" className="btn-neon-green" style={{ width: "100%", justifyContent: "center", marginTop: "8px" }}>
+                  Mở khóa Ghi điểm
+                </button>
+              </form>
             </div>
-          </form>
+          ) : (
+            <div className="glass-panel recorder-panel animate-slide-up">
+              {/* Banner khi ở chế độ sửa */}
+              {editingMatchId && (
+                <div className="editing-banner">
+                  <div className="editing-banner-text">
+                    <Edit2 size={18} /> Đang hiệu chỉnh trận đấu #{editingMatchId.split("_")[1] || editingMatchId}
+                  </div>
+                  <button className="btn-cancel-edit" onClick={handleCancelEdit}>
+                    <X size={14} /> Hủy sửa
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit}>
+                {/* Chọn thể thức Đơn hoặc Đôi */}
+                <div className="type-toggle-container">
+                  <button 
+                    type="button" 
+                    className={`type-toggle-btn ${matchType === "singles" ? "active" : ""}`}
+                    disabled={!!editingMatchId} // Khóa đổi thể thức khi đang sửa để tránh sai lệch cấu trúc
+                    onClick={() => setMatchType("singles")}
+                    style={{ opacity: editingMatchId ? 0.6 : 1 }}
+                  >
+                    Đánh Đơn (1v1)
+                  </button>
+                  <button 
+                    type="button" 
+                    className={`type-toggle-btn ${matchType === "doubles" ? "active" : ""}`}
+                    disabled={!!editingMatchId} // Khóa đổi thể thức khi đang sửa
+                    onClick={() => setMatchType("doubles")}
+                    style={{ opacity: editingMatchId ? 0.6 : 1 }}
+                  >
+                    Đánh Đôi (2v2)
+                  </button>
+                </div>
+
+                {/* Chọn Sự kiện & Ngày giờ */}
+                <div className="recorder-meta-grid">
+                  <div>
+                    <label className="form-label">Sự kiện / Giải đấu</label>
+                    <select className="form-select" value={eventId} onChange={e => setEventId(e.target.value)}>
+                      <option value="">Giao lưu tự do (Không tính giải)</option>
+                      {events.map(ev => (
+                        <option key={ev.id} value={ev.id}>{ev.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="form-label">Ngày chơi</label>
+                    <input type="date" className="form-input" value={matchDate} onChange={e => setMatchDate(e.target.value)} required />
+                  </div>
+                  <div>
+                    <label className="form-label">Giờ chơi</label>
+                    <input type="time" className="form-input" value={matchTime} onChange={e => setMatchTime(e.target.value)} required />
+                  </div>
+                </div>
+
+                {/* Chọn Đội / Người chơi */}
+                <div className="team-selection-grid">
+                  {/* Đội A */}
+                  <div className="team-side-panel">
+                    <h3 className="team-side-title team-a-title">
+                      🔵 Đội A {matchType === "doubles" && "(Cặp đôi A)"}
+                    </h3>
+                    
+                    <div style={{ marginBottom: matchType === "doubles" ? "12px" : 0 }}>
+                      <label className="form-label">Người chơi A1 *</label>
+                      <select className="form-select" value={playerA1} onChange={e => setPlayerA1(e.target.value)} required>
+                        <option value="">-- Chọn thành viên --</option>
+                        {members.map(m => (
+                          <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {matchType === "doubles" && (
+                      <div>
+                        <label className="form-label">Người chơi A2 *</label>
+                        <select className="form-select" value={playerA2} onChange={e => setPlayerA2(e.target.value)} required>
+                          <option value="">-- Chọn thành viên --</option>
+                          {members.map(m => (
+                            <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Đội B */}
+                  <div className="team-side-panel">
+                    <h3 className="team-side-title team-b-title">
+                      🟢 Đội B {matchType === "doubles" && "(Cặp đôi B)"}
+                    </h3>
+
+                    <div style={{ marginBottom: matchType === "doubles" ? "12px" : 0 }}>
+                      <label className="form-label">Người chơi B1 *</label>
+                      <select className="form-select" value={playerB1} onChange={e => setPlayerB1(e.target.value)} required>
+                        <option value="">-- Chọn thành viên --</option>
+                        {members.map(m => (
+                          <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {matchType === "doubles" && (
+                      <div>
+                        <label className="form-label">Người chơi B2 *</label>
+                        <select className="form-select" value={playerB2} onChange={e => setPlayerB2(e.target.value)} required>
+                          <option value="">-- Chọn thành viên --</option>
+                          {members.map(m => (
+                            <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Thiết lập kiểu tính điểm Set */}
+                <div style={{ marginBottom: "20px" }}>
+                  <label className="form-label">Phương thức chấm điểm</label>
+                  <div style={{ display: "flex", gap: "24px" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.9rem" }}>
+                      <input 
+                        type="radio" 
+                        name="scoringMode" 
+                        value="single" 
+                        checked={scoringMode === "single"} 
+                        onChange={() => setScoringMode("single")} 
+                      />
+                      1 Set chạm điểm (VD: chạm 11 hoặc 15)
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "0.9rem" }}>
+                      <input 
+                        type="radio" 
+                        name="scoringMode" 
+                        value="bestOf3" 
+                        checked={scoringMode === "bestOf3"} 
+                        onChange={() => setScoringMode("bestOf3")} 
+                      />
+                      Đấu 3 Set thắng 2 (Best of 3)
+                    </label>
+                  </div>
+                </div>
+
+                {/* NHẬP ĐIỂM SỐ CÁC SET */}
+                <div className="sets-score-section">
+                  <h3 className="team-side-title" style={{ justifyContent: "center", color: "#fff", marginBottom: "20px" }}>
+                    Nhập Điểm Số Các Set Đấu (Siêu To Dễ Bấm)
+                  </h3>
+
+                  {/* Set 1 */}
+                  <div className="set-row">
+                    <span className="set-label">Set 1</span>
+                    
+                    {/* Điểm đội A */}
+                    <div className="score-counter-container">
+                      <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "a", -1)}><Minus size={16} /></button>
+                      <input 
+                        type="number" 
+                        className="score-input-mini" 
+                        value={setsScore[0].a} 
+                        onChange={(e) => handleScoreChange(0, "a", e.target.value)} 
+                        min="0"
+                      />
+                      <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "a", 1)}><Plus size={16} /></button>
+                    </div>
+
+                    <span style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-muted)" }}>:</span>
+
+                    {/* Điểm đội B */}
+                    <div className="score-counter-container">
+                      <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "b", -1)}><Minus size={16} /></button>
+                      <input 
+                        type="number" 
+                        className="score-input-mini" 
+                        value={setsScore[0].b} 
+                        onChange={(e) => handleScoreChange(0, "b", e.target.value)} 
+                        min="0"
+                      />
+                      <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "b", 1)}><Plus size={16} /></button>
+                    </div>
+                  </div>
+
+                  {/* Set 2 (Best of 3) */}
+                  {scoringMode === "bestOf3" && (
+                    <div className="set-row animate-fade-in">
+                      <span className="set-label">Set 2</span>
+                      <div className="score-counter-container">
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "a", -1)}><Minus size={16} /></button>
+                        <input 
+                          type="number" 
+                          className="score-input-mini" 
+                          value={setsScore[1].a} 
+                          onChange={(e) => handleScoreChange(1, "a", e.target.value)} 
+                          min="0"
+                        />
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "a", 1)}><Plus size={16} /></button>
+                      </div>
+                      <span style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-muted)" }}>:</span>
+                      <div className="score-counter-container">
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "b", -1)}><Minus size={16} /></button>
+                        <input 
+                          type="number" 
+                          className="score-input-mini" 
+                          value={setsScore[1].b} 
+                          onChange={(e) => handleScoreChange(1, "b", e.target.value)} 
+                          min="0"
+                        />
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "b", 1)}><Plus size={16} /></button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Set 3 (Best of 3 - Chỉ chơi nếu tỷ số 1-1) */}
+                  {scoringMode === "bestOf3" && (
+                    <div className="set-row animate-fade-in">
+                      <span className="set-label">Set 3 *</span>
+                      <div className="score-counter-container">
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "a", -1)}><Minus size={16} /></button>
+                        <input 
+                          type="number" 
+                          className="score-input-mini" 
+                          value={setsScore[2].a} 
+                          onChange={(e) => handleScoreChange(2, "a", e.target.value)} 
+                          min="0"
+                        />
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "a", 1)}><Plus size={16} /></button>
+                      </div>
+                      <span style={{ fontSize: "1.5rem", fontWeight: "700", color: "var(--text-muted)" }}>:</span>
+                      <div className="score-counter-container">
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "b", -1)}><Minus size={16} /></button>
+                        <input 
+                          type="number" 
+                          className="score-input-mini" 
+                          value={setsScore[2].b} 
+                          onChange={(e) => handleScoreChange(2, "b", e.target.value)} 
+                          min="0"
+                        />
+                        <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "b", 1)}><Plus size={16} /></button>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {scoringMode === "bestOf3" && (
+                    <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.78rem", marginTop: "12px" }}>
+                      * Lưu ý: Set 3 chỉ tự động tính nếu kết quả Set 1 và Set 2 là hòa nhau 1 - 1.
+                    </div>
+                  )}
+                </div>
+
+                {/* ELO PREVIEW HOẶC THÔNG BÁO LỖI */}
+                {matchOutcome.isValid ? (
+                  <div className="elo-preview-panel glow-border-green animate-slide-up">
+                    <h4 className="elo-preview-title">
+                      <Award size={16} /> Live Elo Preview (Tính toán biến động Elo ước tính)
+                    </h4>
+                    <div className="elo-preview-grid">
+                      {Object.entries(matchOutcome.eloPreview).map(([id, info]) => (
+                        <div key={id} className="elo-preview-card">
+                          <span className="preview-player-name">{info.name}</span>
+                          <span className="preview-elo-flow">
+                            {info.before} → <span style={{ color: "#fff", fontWeight: "600" }}>{info.after}</span>
+                          </span>
+                          <span className={`preview-elo-diff ${info.change > 0 ? "preview-diff-up" : "preview-diff-down"}`}>
+                            {info.change > 0 ? `+${info.change}` : info.change} Elo
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="invalid-alert-box animate-slide-up">
+                    <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                    <span>{matchOutcome.reason}</span>
+                  </div>
+                )}
+
+                {/* Nút hành động */}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "16px" }}>
+                  <button 
+                    type="button" 
+                    className="btn-secondary" 
+                    onClick={editingMatchId ? handleCancelEdit : () => setSubTab("history")}
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn-neon-green" 
+                    disabled={!matchOutcome.isValid}
+                    style={{ opacity: matchOutcome.isValid ? 1 : 0.4, cursor: matchOutcome.isValid ? "pointer" : "not-allowed" }}
+                  >
+                    <Swords size={18} /> {editingMatchId ? "Cập nhật trận đấu & recalculate Elo" : "Lưu trận đấu & Cập nhật ELO"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       )}
     </div>

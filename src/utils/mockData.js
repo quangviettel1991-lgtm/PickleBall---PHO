@@ -7,6 +7,7 @@ export const initialMembers = [
     gender: "Nam",
     joinDate: "2026-01-10",
     elo: 1350,
+    initialElo: 1350,
     avatarColor: "#ff4757", // Đỏ nổi bật
   },
   {
@@ -16,6 +17,7 @@ export const initialMembers = [
     gender: "Nam",
     joinDate: "2026-01-15",
     elo: 1280,
+    initialElo: 1280,
     avatarColor: "#2ed573", // Xanh lá
   },
   {
@@ -25,6 +27,7 @@ export const initialMembers = [
     gender: "Nữ",
     joinDate: "2026-02-01",
     elo: 1220,
+    initialElo: 1220,
     avatarColor: "#1e90ff", // Xanh dương
   },
   {
@@ -34,6 +37,7 @@ export const initialMembers = [
     gender: "Nam",
     joinDate: "2026-02-10",
     elo: 1190,
+    initialElo: 1190,
     avatarColor: "#ffa502", // Cam
   },
   {
@@ -43,6 +47,7 @@ export const initialMembers = [
     gender: "Nữ",
     joinDate: "2026-03-05",
     elo: 1150,
+    initialElo: 1150,
     avatarColor: "#9b59b6", // Tím
   },
   {
@@ -52,6 +57,7 @@ export const initialMembers = [
     gender: "Nam",
     joinDate: "2026-03-20",
     elo: 1110,
+    initialElo: 1110,
     avatarColor: "#1abc9c", // Teal
   },
   {
@@ -61,6 +67,7 @@ export const initialMembers = [
     gender: "Nam",
     joinDate: "2026-04-01",
     elo: 1080,
+    initialElo: 1080,
     avatarColor: "#e67e22", // Cam đậm
   },
   {
@@ -70,6 +77,7 @@ export const initialMembers = [
     gender: "Nữ",
     joinDate: "2026-04-12",
     elo: 1020,
+    initialElo: 1020,
     avatarColor: "#fd79a8", // Hồng
   }
 ];
