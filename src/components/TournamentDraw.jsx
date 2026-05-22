@@ -811,24 +811,24 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         }
 
         .round-box {
-          padding: 24px;
-          margin-bottom: 24px;
+          padding: 16px;
+          margin-bottom: 16px;
         }
 
         .round-title {
-          font-size: 1.2rem;
+          font-size: 1.05rem;
           font-weight: 800;
           color: var(--accent-neon-green);
-          margin-bottom: 16px;
+          margin-bottom: 12px;
           border-bottom: 1px solid var(--border-color);
-          padding-bottom: 8px;
+          padding-bottom: 6px;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
 
         .mixer-sitout-badge {
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           color: var(--text-muted);
           font-weight: 500;
         }
@@ -836,17 +836,17 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         .round-matches-list {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-          gap: 16px;
+          gap: 12px;
         }
 
         .match-draw-card {
-          padding: 20px;
-          background: rgba(255,255,255,0.01);
-          border: 1px solid rgba(255,255,255,0.03);
-          border-radius: 12px;
+          padding: 12px 14px;
+          background: rgba(255,255,255,0.015);
+          border: 1px solid rgba(255,255,255,0.04);
+          border-radius: 10px;
           display: flex;
           flex-direction: column;
-          gap: 14px;
+          gap: 8px;
           position: relative;
         }
 
@@ -868,41 +868,41 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         .draw-team-box {
           display: flex;
           flex-direction: column;
-          gap: 4px;
+          gap: 2px;
           flex: 1;
         }
 
         .draw-team-name {
           font-weight: 700;
-          font-size: 0.95rem;
+          font-size: 0.85rem;
           color: #fff;
         }
 
         .draw-team-members {
-          font-size: 0.76rem;
+          font-size: 0.75rem;
           color: var(--text-secondary);
         }
 
         .draw-score-box {
-          font-size: 1.5rem;
+          font-size: 1.35rem;
           font-weight: 850;
-          width: 32px;
+          width: 36px;
           text-align: center;
           color: var(--accent-neon-green);
         }
 
         .btn-draw-record {
           align-self: flex-end;
-          padding: 6px 12px;
-          font-size: 0.8rem;
+          padding: 4px 10px;
+          font-size: 0.75rem;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 4px;
         }
 
         .match-badge-played {
           font-size: 0.72rem;
-          padding: 4px 8px;
+          padding: 3px 6px;
           background: rgba(46, 213, 115, 0.08);
           border: 1px solid rgba(46, 213, 115, 0.2);
           color: var(--color-success);
@@ -1010,13 +1010,13 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           className={`scenario-btn ${activeScenario === "mixer" ? "active" : ""}`}
           onClick={() => { if (!drawGenerated) { setActiveScenario("mixer"); } else { alert("Vui lòng hủy lịch đấu hiện tại trước khi đổi thể thức."); } }}
         >
-          Kịch bản 2: Giao Lưu Xoay Tua
+          Kịch bản 1: Xoay Tua
         </button>
         <button 
           className={`scenario-btn ${activeScenario === "roundrobin" ? "active" : ""}`}
           onClick={() => { if (!drawGenerated) { setActiveScenario("roundrobin"); } else { alert("Vui lòng hủy lịch đấu hiện tại trước khi đổi thể thức."); } }}
         >
-          Kịch bản 1: Vòng Tròn
+          Kịch bản 2: Vòng Tròn
         </button>
         <button 
           className={`scenario-btn ${activeScenario === "elimination" ? "active" : ""}`}
@@ -1044,7 +1044,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               </select>
             </div>
 
-            {/* --- Cấu hình Mixer (Kịch bản 2) --- */}
+            {/* --- Cấu hình Mixer (Kịch bản 1) --- */}
             {activeScenario === "mixer" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }} className="animate-fade-in">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -1058,6 +1058,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                       value={mixerCourts} 
                       onChange={e => setMixerCourts(Math.max(1, parseInt(e.target.value) || 1))}
                     />
+                    {selectedMemberIds.length < mixerCourts * 4 && (
+                      <div style={{ fontSize: "0.75rem", color: "var(--accent-electric-blue)", marginTop: "4px", lineHeight: "1.4" }}>
+                        ⚠️ Cần chọn ít nhất {mixerCourts * 4} người chơi để đấu đủ {mixerCourts} sân (hiện đang chọn {selectedMemberIds.length} người).
+                      </div>
+                    )}
                   </div>
                   <div className="form-group">
                     <label className="form-label">Số lượt trận muốn sinh</label>
@@ -1072,12 +1077,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   </div>
                 </div>
                 <div style={{ padding: "14px", background: "rgba(0,236,255,0.03)", border: "1px solid rgba(0,236,255,0.1)", borderRadius: "8px", fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: "1.5" }}>
-                  💡 <strong>Kịch bản Giao lưu Xoay tua:</strong> Cực kỳ thích hợp cho các buổi sinh hoạt CLB. Thuật toán sẽ tự động chia cặp sao cho <strong>ai cũng được đổi bạn đánh cùng/đối thủ liên tục</strong>, số trận ra sân bằng nhau tối đa và không ai phải ngồi ngoài nghỉ 2 trận liên tục.
+                  💡 <strong>Kịch bản Xoay Tua:</strong> Cực kỳ thích hợp cho các buổi sinh hoạt CLB. Thuật toán sẽ tự động chia cặp sao cho <strong>ai cũng được đổi bạn đánh cùng/đối thủ liên tục</strong>, số trận ra sân bằng nhau tối đa và không ai phải ngồi ngoài nghỉ 2 trận liên tục.
                 </div>
               </div>
             )}
 
-            {/* --- Cấu hình Vòng tròn (Kịch bản 1) --- */}
+            {/* --- Cấu hình Vòng tròn (Kịch bản 2) --- */}
             {activeScenario === "roundrobin" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }} className="animate-fade-in">
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
@@ -1287,8 +1292,8 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <span style={{ fontStyle: "italic", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                 Thể thức: <strong>
-                  {activeScenario === "mixer" && "Kịch bản 2 - Giao Lưu Xoay Tua"}
-                  {activeScenario === "roundrobin" && "Kịch bản 1 - Đấu Vòng Tròn"}
+                  {activeScenario === "mixer" && "Kịch bản 1 - Xoay Tua"}
+                  {activeScenario === "roundrobin" && "Kịch bản 2 - Vòng Tròn"}
                   {activeScenario === "elimination" && "Kịch bản 3 - Loại Trực Tiếp"}
                 </strong>
               </span>
@@ -1303,7 +1308,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           </div>
 
           {/* =======================================================
-              HIỂN THỊ KỊCH BẢN 2: SOCIAL MIXER (DANH SÁCH CÁC LƯỢT ĐẤU) 
+              HIỂN THỊ KỊCH BẢN 1: XOAY TUA (DANH SÁCH CÁC LƯỢT ĐẤU) 
               ======================================================= */}
           {activeScenario === "mixer" && drawData.map((round) => (
             <div key={round.roundIndex} className="glass-panel round-box animate-fade-in">
@@ -1319,13 +1324,21 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               <div className="round-matches-list">
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
-                    <div className="match-court-header">Sân thi đấu {match.courtIndex}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "6px", marginBottom: "4px" }}>
+                      <div className="match-court-header" style={{ marginBottom: 0 }}>Sân thi đấu {match.courtIndex}</div>
+                      {match.played ? (
+                        <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
+                      ) : (
+                        <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
+                          <Swords size={10} /> Nhập kết quả
+                        </button>
+                      )}
+                    </div>
                     
                     <div className="match-teams-score-row">
                       {/* Đội A */}
                       <div className="draw-team-box">
-                        <span className="draw-team-name">Đội A</span>
-                        <span className="draw-team-members">
+                        <span className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff" }}>
                           {match.teamA.map(p => getPlayerName(p)).join(" + ")}
                         </span>
                       </div>
@@ -1336,26 +1349,16 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           {match.scoreA} : {match.scoreB}
                         </div>
                       ) : (
-                        <div className="draw-score-box" style={{ fontSize: "1rem", color: "var(--text-muted)" }}>VS</div>
+                        <div className="draw-score-box" style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>VS</div>
                       )}
 
                       {/* Đội B */}
                       <div className="draw-team-box" style={{ textAlign: "right" }}>
-                        <span className="draw-team-name">Đội B</span>
-                        <span className="draw-team-members">
+                        <span className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff" }}>
                           {match.teamB.map(p => getPlayerName(p)).join(" + ")}
                         </span>
                       </div>
                     </div>
-
-                    {/* Nút nhập kết quả */}
-                    {match.played ? (
-                      <span className="match-badge-played"><Check size={12} /> Đã ghi điểm</span>
-                    ) : (
-                      <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)}>
-                        <Swords size={12} /> Nhập kết quả
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1363,7 +1366,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           ))}
 
           {/* =======================================================
-              HIỂN THỊ KỊCH BẢN 1: ROUND ROBIN (ĐẤU VÒNG TRÒN) 
+              HIỂN THỊ KỊCH BẢN 2: VÒNG TRÒN (ĐẤU VÒNG TRÒN) 
               ======================================================= */}
           {activeScenario === "roundrobin" && drawData.rounds.map((round) => (
             <div key={round.roundIndex} className="glass-panel round-box animate-fade-in">
@@ -1372,13 +1375,26 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               <div className="round-matches-list">
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "6px", marginBottom: "4px" }}>
+                      <div className="match-court-header" style={{ marginBottom: 0 }}>Trận đấu</div>
+                      {match.played ? (
+                        <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
+                      ) : (
+                        <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
+                          <Swords size={10} /> Nhập kết quả
+                        </button>
+                      )}
+                    </div>
+
                     <div className="match-teams-score-row">
                       {/* Đội A */}
                       <div className="draw-team-box">
-                        <span className="draw-team-name">{match.teamAName}</span>
-                        <span className="draw-team-members">
-                          {match.teamA.map(p => getPlayerName(p)).join(" + ")}
-                        </span>
+                        <span className="draw-team-name" style={{ fontSize: "0.85rem", color: "#fff" }}>{match.teamAName}</span>
+                        {match.teamA && match.teamA.length > 0 && (
+                          <span className="draw-team-members" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                            ({match.teamA.map(p => getPlayerNameShort(p)).join(" + ")})
+                          </span>
+                        )}
                       </div>
                       
                       {/* Điểm số */}
@@ -1387,26 +1403,19 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           {match.scoreA} : {match.scoreB}
                         </div>
                       ) : (
-                        <div className="draw-score-box" style={{ fontSize: "1rem", color: "var(--text-muted)" }}>VS</div>
+                        <div className="draw-score-box" style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>VS</div>
                       )}
 
                       {/* Đội B */}
                       <div className="draw-team-box" style={{ textAlign: "right" }}>
-                        <span className="draw-team-name">{match.teamBName}</span>
-                        <span className="draw-team-members">
-                          {match.teamB.map(p => getPlayerName(p)).join(" + ")}
-                        </span>
+                        <span className="draw-team-name" style={{ fontSize: "0.85rem", color: "#fff" }}>{match.teamBName}</span>
+                        {match.teamB && match.teamB.length > 0 && (
+                          <span className="draw-team-members" style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                            ({match.teamB.map(p => getPlayerNameShort(p)).join(" + ")})
+                          </span>
+                        )}
                       </div>
                     </div>
-
-                    {/* Nút nhập kết quả */}
-                    {match.played ? (
-                      <span className="match-badge-played"><Check size={12} /> Đã ghi điểm</span>
-                    ) : (
-                      <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)}>
-                        <Swords size={12} /> Nhập kết quả
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
