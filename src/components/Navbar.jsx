@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, X } from "lucide-react";
+import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, X, Shuffle } from "lucide-react";
 
 export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,6 +28,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
     { id: "recorder", label: "Ghi Điểm", icon: Swords },
     { id: "members", label: "Thành Viên", icon: Users },
     { id: "events", label: "Sự Kiện", icon: Calendar },
+    { id: "draw", label: "Bốc Thăm", icon: Shuffle },
     { id: "backup", label: "CSDL", icon: Database },
   ];
 
@@ -157,7 +158,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
           .navbar-menu {
             width: 100%;
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(7, 1fr);
             gap: 0;
             padding: 4px 6px;
           }

@@ -6,6 +6,7 @@ import MatchRecorder from "./components/MatchRecorder";
 import Members from "./components/Members";
 import Events from "./components/Events";
 import BackupRestore from "./components/BackupRestore";
+import TournamentDraw from "./components/TournamentDraw";
 import { getClubData } from "./utils/db";
 import { fetchRemoteData, updateRemoteData } from "./utils/supabase";
 
@@ -107,6 +108,8 @@ export default function App() {
         return <Members data={data} setData={setData} isAdmin={isAdmin} />;
       case "events":
         return <Events data={data} setData={setData} isAdmin={isAdmin} />;
+      case "draw":
+        return <TournamentDraw data={data} setData={setData} isAdmin={isAdmin} />;
       case "backup":
         return <BackupRestore data={data} setData={setData} isAdmin={isAdmin} />;
       default:
