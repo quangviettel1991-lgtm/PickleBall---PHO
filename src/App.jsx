@@ -7,7 +7,7 @@ import Members from "./components/Members";
 import Events from "./components/Events";
 import BackupRestore from "./components/BackupRestore";
 import { getClubData } from "./utils/db";
-import { fetchRemoteData } from "./utils/supabase";
+import { fetchRemoteData, updateRemoteData } from "./utils/supabase";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -30,10 +30,24 @@ export default function App() {
     // 2. Đồng bộ bất đồng bộ từ đám mây Supabase
     fetchRemoteData().then(remoteResult => {
       if (remoteResult && remoteResult.data) {
-        console.log("Đồng bộ dữ liệu thành công từ đám mây Supabase!");
-        setData(remoteResult.data);
-        // Lưu lại localStorage
-        localStorage.setItem("pickleball_club_data", JSON.stringify(remoteResult.data));
+        const remoteMatchesCount = remoteResult.data.matches ? remoteResult.data.matches.length : 0;
+        const localMatchesCount = clubData.matches ? clubData.matches.length : 0;
+
+        if (localMatchesCount > remoteMatchesCount) {
+          console.log("Dữ liệu cục bộ có nhiều trận đấu hơn, tự động tải lên Supabase để đồng bộ!");
+          updateRemoteData(clubData);
+        } else {
+          console.log("Đồng bộ dữ liệu thành công từ đám mây Supabase!");
+          setData(remoteResult.data);
+          // Lưu lại localStorage
+          localStorage.setItem("pickleball_club_data", JSON.stringify(remoteResult.data));
+        }
+      } else {
+        // Nếu kết nối được Supabase nhưng chưa có dữ liệu (Supabase trống), khởi tạo bằng dữ liệu local hiện tại
+        if (clubData && (clubData.members.length > 0 || clubData.matches.length > 0)) {
+          console.log("Khởi tạo dữ liệu đám mây Supabase từ LocalStorage...");
+          updateRemoteData(clubData);
+        }
       }
     });
   }, []);
