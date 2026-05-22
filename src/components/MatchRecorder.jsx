@@ -18,7 +18,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   const [filterType, setFilterType] = useState("");
 
   // Trạng thái Form Ghi điểm
-  const [matchType, setMatchType] = useState("singles"); // singles, doubles
+  const [matchType, setMatchType] = useState("doubles"); // singles, doubles
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [eventId, setEventId] = useState("");
