@@ -615,7 +615,7 @@ export default function Dashboard({ data, setData, setActiveTab }) {
       <div className="dashboard-main">
         {/* Banner chào mừng */}
         <div className="welcome-banner">
-          <h1 className="welcome-title">Xin chào, <span>Pickleball Club!</span></h1>
+          <h1 className="welcome-title">Xin chào, <span>Pickleball Phở!</span></h1>
           <p className="welcome-subtitle">
             Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.
           </p>

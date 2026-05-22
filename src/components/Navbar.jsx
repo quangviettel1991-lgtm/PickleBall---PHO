@@ -412,7 +412,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
         `}} />
         <div className="mobile-header-brand">
           <div className="mobile-header-logo">PB</div>
-          <span className="mobile-header-text">PICKLEBALL CLUB PRO RANK</span>
+          <span className="mobile-header-text">PICKLEBALL PHỞ PRO RANK</span>
         </div>
         
         {/* Nút Admin Lock trên di động */}
@@ -424,11 +424,11 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
           {isAdmin ? <Unlock size={16} /> : <Lock size={16} />}
         </button>
       </div>
-
+ 
       <div className="navbar-content">
         <div className="navbar-brand" onClick={() => setActiveTab("dashboard")}>
           <div className="navbar-brand-logo">PB</div>
-          <span className="navbar-brand-text">PICKLEBALL CLUB</span>
+          <span className="navbar-brand-text">PICKLEBALL PHỞ</span>
           <span className="navbar-brand-tag">PRO RANK</span>
         </div>
         <div className="navbar-menu">

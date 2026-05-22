@@ -106,7 +106,7 @@ export default function App() {
       {/* Chân trang (Footer) */}
       <footer className="app-footer">
         <div className="footer-brand">
-          PICKLEBALL CLUB <span>PRO RANK</span>
+          PICKLEBALL PHỞ <span>PRO RANK</span>
         </div>
         <div>
           Hệ thống Quản lý và Xếp hạng Thành viên chuyên nghiệp. Thiết kế bởi Antigravity AI.
