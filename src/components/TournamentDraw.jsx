@@ -1,18 +1,57 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Shuffle, Users, Calendar, Trophy, Play, Check, HelpCircle, Plus, Trash2, Swords, Award } from "lucide-react";
-import { recordMatch } from "../utils/db";
+import { recordMatch, recalculateAllElos, saveClubData } from "../utils/db";
 
 export default function TournamentDraw({ data, setData, isAdmin }) {
   const { members, events } = data;
 
   // --- TRẠNG THÁI CHÍNH ---
-  const [activeScenario, setActiveScenario] = useState("mixer"); // mixer (mặc định), roundrobin, elimination
-  const [selectedEventId, setSelectedEventId] = useState("");
-  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const [activeScenario, setActiveScenario] = useState(() => {
+    return localStorage.getItem("draw_active_scenario") || "mixer";
+  });
+  const [selectedEventId, setSelectedEventId] = useState(() => {
+    return localStorage.getItem("draw_selected_event_id") || "";
+  });
+  const [selectedMemberIds, setSelectedMemberIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("draw_selected_member_ids")) || [];
+    } catch (e) {
+      return [];
+    }
+  });
   
   // Trạng thái bốc thăm
-  const [drawGenerated, setDrawGenerated] = useState(false);
-  const [drawData, setDrawData] = useState(null); // Lưu kết quả bốc thăm của kịch bản đang chọn
+  const [drawGenerated, setDrawGenerated] = useState(() => {
+    return localStorage.getItem("draw_generated") === "true";
+  });
+  const [drawData, setDrawData] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("draw_data")) || null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // --- LƯU TRỮ BỀN BỈ TRÊN MOBILE (LOCALSTORAGE) ---
+  useEffect(() => {
+    localStorage.setItem("draw_active_scenario", activeScenario);
+  }, [activeScenario]);
+
+  useEffect(() => {
+    localStorage.setItem("draw_selected_event_id", selectedEventId);
+  }, [selectedEventId]);
+
+  useEffect(() => {
+    localStorage.setItem("draw_selected_member_ids", JSON.stringify(selectedMemberIds));
+  }, [selectedMemberIds]);
+
+  useEffect(() => {
+    localStorage.setItem("draw_generated", drawGenerated ? "true" : "false");
+  }, [drawGenerated]);
+
+  useEffect(() => {
+    localStorage.setItem("draw_data", JSON.stringify(drawData));
+  }, [drawData]);
   
   // Trạng thái cấu hình phụ cho từng kịch bản
   // 1. Kịch bản Mixer
@@ -578,29 +617,15 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     }
 
     const { matchId, teamA, teamB, teamAName, teamBName } = activeScoringMatch;
+    const playedDate = new Date().toISOString();
     
-    // Ghi trận đấu lên database/localStorage ELO CLB
-    const recorded = recordMatch({
-      type: teamA.length === 1 ? "singles" : "doubles",
-      eventId: selectedEventId,
-      teamA,
-      teamB,
-      scoreA,
-      scoreB,
-      sets: [{ a: scoreA, b: scoreB }],
-      date: new Date().toISOString()
-    });
-
-    // Cập nhật state CLB chung
-    setData(recorded);
-
     // Cập nhật trạng thái trận đấu trong Draw dữ liệu nội bộ
     if (activeScenario === "mixer") {
       setDrawData(prev => 
         prev.map(round => ({
           ...round,
           matches: round.matches.map(m => 
-            m.matchId === matchId ? { ...m, scoreA, scoreB, played: true } : m
+            m.matchId === matchId ? { ...m, scoreA, scoreB, played: true, date: playedDate } : m
           )
         }))
       );
@@ -610,7 +635,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         rounds: prev.rounds.map(round => ({
           ...round,
           matches: round.matches.map(m => 
-            m.matchId === matchId ? { ...m, scoreA, scoreB, played: true } : m
+            m.matchId === matchId ? { ...m, scoreA, scoreB, played: true, date: playedDate } : m
           )
         }))
       }));
@@ -624,7 +649,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           // 1. Cập nhật trận vừa đấu ở vòng này
           const nextMatches = round.matches.map(m => {
             if (m.matchId === matchId) {
-              return { ...m, scoreA, scoreB, played: true, winner: winnerName, winnerPlayers };
+              return { ...m, scoreA, scoreB, played: true, date: playedDate, winner: winnerName, winnerPlayers };
             }
             return m;
           });
@@ -659,6 +684,144 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     // Đóng giao diện nhập điểm
     setActiveScoringMatch(null);
     setScoringError("");
+  };
+
+  const handleDeleteMatch = (matchId) => {
+    if (!isAdmin) {
+      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để xóa trận đấu.");
+      return;
+    }
+    if (!window.confirm("Bạn có chắc muốn xóa trận đấu này khỏi lịch thi đấu bốc thăm?")) return;
+    
+    if (activeScenario === "mixer") {
+      setDrawData(prev => {
+        if (!prev) return null;
+        return prev.map(round => ({
+          ...round,
+          matches: round.matches.filter(m => m.matchId !== matchId)
+        }));
+      });
+    } else if (activeScenario === "roundrobin") {
+      setDrawData(prev => {
+        if (!prev || !prev.rounds) return null;
+        return {
+          ...prev,
+          rounds: prev.rounds.map(round => ({
+            ...round,
+            matches: round.matches.filter(m => m.matchId !== matchId)
+          }))
+        };
+      });
+    } else if (activeScenario === "elimination") {
+      setDrawData(prev => {
+        if (!prev || !prev.rounds) return null;
+        return {
+          ...prev,
+          rounds: prev.rounds.map(round => ({
+            ...round,
+            matches: round.matches.filter(m => m.matchId !== matchId)
+          }))
+        };
+      });
+    }
+  };
+
+  const handleFinalizeDraw = () => {
+    if (!isAdmin) {
+      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để chốt kết quả bốc thăm.");
+      return;
+    }
+
+    if (!selectedEventId) {
+      alert("Vui lòng liên kết với một Sự kiện / Giải đấu trước khi chốt kết quả.");
+      return;
+    }
+
+    let playedMatches = [];
+    
+    if (activeScenario === "mixer") {
+      if (drawData) {
+        drawData.forEach(round => {
+          round.matches.forEach(m => {
+            if (m.played) playedMatches.push(m);
+          });
+        });
+      }
+    } else if (activeScenario === "roundrobin") {
+      if (drawData && drawData.rounds) {
+        drawData.rounds.forEach(round => {
+          round.matches.forEach(m => {
+            if (m.played) playedMatches.push(m);
+          });
+        });
+      }
+    } else if (activeScenario === "elimination") {
+      if (drawData && drawData.rounds) {
+        drawData.rounds.forEach(round => {
+          round.matches.forEach(m => {
+            if (m.played && !m.isByeMatch) playedMatches.push(m);
+          });
+        });
+      }
+    }
+
+    if (playedMatches.length === 0) {
+      alert("Không có trận đấu nào đã được ghi kết quả để đồng bộ. Vui lòng nhập điểm cho ít nhất 1 trận.");
+      return;
+    }
+
+    const eventName = events.find(ev => ev.id === selectedEventId)?.name || "sự kiện đã chọn";
+
+    if (!window.confirm(`Bạn có chắc chắn muốn chốt kết quả bốc thăm và đồng bộ ${playedMatches.length} trận đấu đã đấu vào sự kiện "${eventName}"? Hệ thống sẽ ghi nhận kết quả và tự động tính toán lại điểm Elo xếp hạng cho toàn CLB.`)) {
+      return;
+    }
+
+    // Định dạng các trận đấu theo chuẩn của database
+    const formattedMatches = playedMatches.map(m => {
+      // Đảm bảo id của trận đấu bốc thăm có dạng match_draw_<matchId> để không trùng và có thể cập nhật
+      const syncId = m.matchId.startsWith("match_") ? `match_draw_${m.matchId.substring(6)}` : `match_draw_${m.matchId}`;
+      return {
+        id: syncId,
+        eventId: selectedEventId,
+        type: m.teamA.length === 1 ? "singles" : "doubles",
+        date: m.date || new Date().toISOString(),
+        teamA: m.teamA,
+        teamB: m.teamB,
+        scoreA: parseInt(m.scoreA) || 0,
+        scoreB: parseInt(m.scoreB) || 0,
+        sets: [{ a: parseInt(m.scoreA) || 0, b: parseInt(m.scoreB) || 0 }],
+        played: true
+      };
+    });
+
+    // Sao chép dữ liệu hiện tại
+    const updatedData = { ...data };
+    if (!updatedData.matches) updatedData.matches = [];
+
+    // Nhập các trận đấu vào danh sách chung, cập nhật nếu đã tồn tại
+    let newCount = 0;
+    let updateCount = 0;
+
+    formattedMatches.forEach(newMatch => {
+      const idx = updatedData.matches.findIndex(m => m.id === newMatch.id);
+      if (idx !== -1) {
+        updatedData.matches[idx] = {
+          ...updatedData.matches[idx],
+          ...newMatch
+        };
+        updateCount++;
+      } else {
+        updatedData.matches.push(newMatch);
+        newCount++;
+      }
+    });
+
+    // Tính toán lại Elo và lưu dữ liệu toàn cục
+    const finalData = recalculateAllElos(updatedData);
+    saveClubData(finalData);
+    setData(finalData);
+
+    alert(`🎉 Đồng bộ thành công!\n- Đã ghi nhận ${newCount} trận đấu mới.\n- Cập nhật ${updateCount} trận đấu cũ.\nVào sự kiện "${eventName}". Điểm Elo đã được cập nhật chính xác!`);
   };
 
   return (
@@ -1288,7 +1451,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       {/* --- GIAO DIỆN HIỂN THỊ LỊCH ĐẤU SAU KHI ĐÃ BỐC THĂM --- */}
       {drawGenerated && drawData && (
         <div className="draw-results-container animate-fade-in">
-          <div className="draw-actions-top">
+          <div className="draw-actions-top" style={{ flexWrap: "wrap", gap: "12px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               <span style={{ fontStyle: "italic", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                 Thể thức: <strong>
@@ -1302,9 +1465,21 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               </span>
             </div>
             
-            <button className="btn-secondary" onClick={handleClearDraw} style={{ borderColor: "rgba(255, 71, 87, 0.2)", color: "var(--color-danger)" }}>
-              <Trash2 size={16} /> Hủy Lịch Đấu / Bốc Thăm Lại
-            </button>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              {isAdmin ? (
+                <button className="btn-neon-green" onClick={handleFinalizeDraw} style={{ boxShadow: "0 0 15px rgba(212, 252, 52, 0.25)" }}>
+                  <Check size={16} /> Chốt Kết Quả Lịch Đấu
+                </button>
+              ) : (
+                <button className="btn-neon-green" onClick={() => alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để chốt kết quả bốc thăm.")} style={{ opacity: 0.55 }}>
+                  <Check size={16} /> Chốt Kết Quả Lịch Đấu (Yêu cầu Admin)
+                </button>
+              )}
+              
+              <button className="btn-secondary" onClick={handleClearDraw} style={{ borderColor: "rgba(255, 71, 87, 0.2)", color: "var(--color-danger)" }}>
+                <Trash2 size={16} /> Hủy Lịch Đấu / Bốc Thăm Lại
+              </button>
+            </div>
           </div>
 
           {/* =======================================================
@@ -1326,13 +1501,36 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   <div key={match.matchId} className="match-draw-card">
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "6px", marginBottom: "4px" }}>
                       <div className="match-court-header" style={{ marginBottom: 0 }}>Sân thi đấu {match.courtIndex}</div>
-                      {match.played ? (
-                        <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
-                      ) : (
-                        <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
-                          <Swords size={10} /> Nhập kết quả
-                        </button>
-                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        {match.played ? (
+                          <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
+                        ) : (
+                          <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
+                            <Swords size={10} /> Nhập kết quả
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => handleDeleteMatch(match.matchId)} 
+                            style={{ 
+                              background: "transparent", 
+                              border: "none", 
+                              color: "var(--color-danger)", 
+                              cursor: "pointer", 
+                              display: "flex", 
+                              alignItems: "center", 
+                              padding: "4px",
+                              transition: "transform 0.15s ease",
+                              borderRadius: "4px"
+                            }}
+                            title="Xóa trận đấu"
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="match-teams-score-row">
@@ -1377,13 +1575,36 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   <div key={match.matchId} className="match-draw-card">
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "6px", marginBottom: "4px" }}>
                       <div className="match-court-header" style={{ marginBottom: 0 }}>Trận đấu</div>
-                      {match.played ? (
-                        <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
-                      ) : (
-                        <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
-                          <Swords size={10} /> Nhập kết quả
-                        </button>
-                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        {match.played ? (
+                          <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
+                        ) : (
+                          <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
+                            <Swords size={10} /> Nhập kết quả
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button 
+                            onClick={() => handleDeleteMatch(match.matchId)} 
+                            style={{ 
+                              background: "transparent", 
+                              border: "none", 
+                              color: "var(--color-danger)", 
+                              cursor: "pointer", 
+                              display: "flex", 
+                              alignItems: "center", 
+                              padding: "4px",
+                              transition: "transform 0.15s ease",
+                              borderRadius: "4px"
+                            }}
+                            title="Xóa trận đấu"
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="match-teams-score-row">
@@ -1448,7 +1669,31 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                             borderColor: match.winner ? "rgba(46, 213, 115, 0.2)" : "rgba(255,255,255,0.03)"
                           }}
                         >
-                          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                          {isAdmin && !match.isByeMatch && (
+                            <button 
+                              onClick={() => handleDeleteMatch(match.matchId)} 
+                              style={{ 
+                                position: "absolute",
+                                top: "8px",
+                                right: "8px",
+                                background: "transparent", 
+                                border: "none", 
+                                color: "var(--color-danger)", 
+                                cursor: "pointer", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                padding: "4px",
+                                transition: "transform 0.15s ease",
+                                zIndex: 10
+                              }}
+                              title="Xóa trận đấu"
+                              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                          <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingRight: (isAdmin && !match.isByeMatch) ? "14px" : "0" }}>
                             {/* Team A */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <div style={{ display: "flex", flexDirection: "column" }}>
