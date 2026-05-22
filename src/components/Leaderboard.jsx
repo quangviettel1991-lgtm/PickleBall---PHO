@@ -677,7 +677,6 @@ export default function Leaderboard({ data }) {
                           </div>
                           <div className="player-info-details">
                             <span className="player-name-cell">{member.name}</span>
-                            <span className="player-gender-cell hide-on-mobile">{member.gender}</span>
                           </div>
                         </div>
                       </td>

@@ -329,14 +329,19 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
       return { isValid: false, reason: "Vui lòng chọn đầy đủ và phân biệt các người chơi." };
     }
 
+    const sanitizedSetsScore = setsScore.map(s => ({
+      a: s.a === "" ? 0 : (parseInt(s.a, 10) || 0),
+      b: s.b === "" ? 0 : (parseInt(s.b, 10) || 0)
+    }));
+
     let finalScoreA = 0;
     let finalScoreB = 0;
     let activeSets = [];
 
     if (scoringMode === "single") {
-      finalScoreA = setsScore[0].a;
-      finalScoreB = setsScore[0].b;
-      activeSets = [setsScore[0]];
+      finalScoreA = sanitizedSetsScore[0].a;
+      finalScoreB = sanitizedSetsScore[0].b;
+      activeSets = [sanitizedSetsScore[0]];
       
       if (finalScoreA === finalScoreB) {
         return { isValid: false, reason: "Trận đấu Pickleball không thể có kết quả hòa." };
@@ -346,22 +351,22 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
       let setsWonB = 0;
 
       // Set 1
-      if (setsScore[0].a === setsScore[0].b) return { isValid: false, reason: "Set 1 không được có kết quả hòa." };
-      setsScore[0].a > setsScore[0].b ? setsWonA++ : setsWonB++;
-      activeSets.push(setsScore[0]);
+      if (sanitizedSetsScore[0].a === sanitizedSetsScore[0].b) return { isValid: false, reason: "Set 1 không được có kết quả hòa." };
+      sanitizedSetsScore[0].a > sanitizedSetsScore[0].b ? setsWonA++ : setsWonB++;
+      activeSets.push(sanitizedSetsScore[0]);
 
       // Set 2
-      if (setsScore[1].a === setsScore[1].b) return { isValid: false, reason: "Set 2 không được có kết quả hòa." };
-      setsScore[1].a > setsScore[1].b ? setsWonA++ : setsWonB++;
-      activeSets.push(setsScore[1]);
+      if (sanitizedSetsScore[1].a === sanitizedSetsScore[1].b) return { isValid: false, reason: "Set 2 không được có kết quả hòa." };
+      sanitizedSetsScore[1].a > sanitizedSetsScore[1].b ? setsWonA++ : setsWonB++;
+      activeSets.push(sanitizedSetsScore[1]);
 
       // Có cần Set 3 không
       const isSet3Needed = setsWonA === 1 && setsWonB === 1;
       
       if (isSet3Needed) {
-        if (setsScore[2].a === setsScore[2].b) return { isValid: false, reason: "Set 3 quyết định không được có kết quả hòa." };
-        setsScore[2].a > setsScore[2].b ? setsWonA++ : setsWonB++;
-        activeSets.push(setsScore[2]);
+        if (sanitizedSetsScore[2].a === sanitizedSetsScore[2].b) return { isValid: false, reason: "Set 3 quyết định không được có kết quả hòa." };
+        sanitizedSetsScore[2].a > sanitizedSetsScore[2].b ? setsWonA++ : setsWonB++;
+        activeSets.push(sanitizedSetsScore[2]);
       }
 
       finalScoreA = setsWonA;
@@ -402,27 +407,50 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   // --- XỬ LÝ ĐIỂM SỐ ---
 
   const handleScoreChange = (setIndex, team, value) => {
-    const val = parseInt(value) || 0;
-    setSetsScore(prev => {
-      const newScores = [...prev];
-      newScores[setIndex] = {
-        ...newScores[setIndex],
-        [team]: val
-      };
-      return newScores;
-    });
+    if (value === "") {
+      setSetsScore(prev => {
+        const newScores = [...prev];
+        newScores[setIndex] = {
+          ...newScores[setIndex],
+          [team]: ""
+        };
+        return newScores;
+      });
+      return;
+    }
+
+    const val = parseInt(value, 10);
+    if (!isNaN(val)) {
+      setSetsScore(prev => {
+        const newScores = [...prev];
+        newScores[setIndex] = {
+          ...newScores[setIndex],
+          [team]: val
+        };
+        return newScores;
+      });
+    }
   };
 
   const handleScoreAdjust = (setIndex, team, amount) => {
     setSetsScore(prev => {
       const newScores = [...prev];
-      const currentVal = newScores[setIndex][team];
+      const val = prev[setIndex][team];
+      const currentVal = val === "" ? 0 : (parseInt(val, 10) || 0);
       newScores[setIndex] = {
         ...newScores[setIndex],
         [team]: Math.max(0, currentVal + amount)
       };
       return newScores;
     });
+  };
+
+  const handleInputFocus = (e) => {
+    if (window.innerWidth <= 768) {
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
   };
 
   // --- SUBMIT FORM ---
@@ -1266,6 +1294,9 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
         /* Responsive */
         @media (max-width: 768px) {
+          .recorder-container {
+            padding-bottom: 250px !important;
+          }
           .team-selection-grid {
             grid-template-columns: 1fr;
             gap: 16px;
@@ -1822,6 +1853,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                         className="score-input-mini" 
                         value={setsScore[0].a} 
                         onChange={(e) => handleScoreChange(0, "a", e.target.value)} 
+                        onFocus={handleInputFocus}
                         min="0"
                       />
                       <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "a", 1)}><Plus size={16} /></button>
@@ -1837,6 +1869,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                         className="score-input-mini" 
                         value={setsScore[0].b} 
                         onChange={(e) => handleScoreChange(0, "b", e.target.value)} 
+                        onFocus={handleInputFocus}
                         min="0"
                       />
                       <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(0, "b", 1)}><Plus size={16} /></button>
@@ -1854,6 +1887,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                           className="score-input-mini" 
                           value={setsScore[1].a} 
                           onChange={(e) => handleScoreChange(1, "a", e.target.value)} 
+                          onFocus={handleInputFocus}
                           min="0"
                         />
                         <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "a", 1)}><Plus size={16} /></button>
@@ -1866,6 +1900,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                           className="score-input-mini" 
                           value={setsScore[1].b} 
                           onChange={(e) => handleScoreChange(1, "b", e.target.value)} 
+                          onFocus={handleInputFocus}
                           min="0"
                         />
                         <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(1, "b", 1)}><Plus size={16} /></button>
@@ -1884,6 +1919,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                           className="score-input-mini" 
                           value={setsScore[2].a} 
                           onChange={(e) => handleScoreChange(2, "a", e.target.value)} 
+                          onFocus={handleInputFocus}
                           min="0"
                         />
                         <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "a", 1)}><Plus size={16} /></button>
@@ -1896,6 +1932,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                           className="score-input-mini" 
                           value={setsScore[2].b} 
                           onChange={(e) => handleScoreChange(2, "b", e.target.value)} 
+                          onFocus={handleInputFocus}
                           min="0"
                         />
                         <button type="button" className="btn-score-adjust" onClick={() => handleScoreAdjust(2, "b", 1)}><Plus size={16} /></button>
