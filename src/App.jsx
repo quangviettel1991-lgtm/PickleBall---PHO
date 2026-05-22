@@ -8,7 +8,7 @@ import Events from "./components/Events";
 import BackupRestore from "./components/BackupRestore";
 import TournamentDraw from "./components/TournamentDraw";
 import { getClubData } from "./utils/db";
-import { fetchRemoteData, updateRemoteData } from "./utils/supabase";
+import { fetchRemoteData, updateRemoteData, fetchRemoteTimestamp, supabase } from "./utils/supabase";
 import { Lock } from "lucide-react";
 
 export default function App() {
@@ -37,65 +37,118 @@ export default function App() {
     return !(hasRealMembers || hasRealEvents || hasRealMatches);
   };
 
-  // Tải dữ liệu ban đầu khi ứng dụng khởi chạy
+  // Tải dữ liệu ban đầu khi ứng dụng khởi chạy và thiết lập các bộ lắng nghe đồng bộ
   useEffect(() => {
     // 1. Tải từ localStorage trước để hiển thị ngay lập tức
     const clubData = getClubData();
     setData(clubData);
 
-    // 2. Đồng bộ bất đồng bộ từ đám mây Supabase
+    // Lấy nhãn thời gian cục bộ (nếu chưa có thì coi như cực kỳ cũ)
+    let localUpdatedAt = localStorage.getItem("pickleball_club_data_updated_at");
+    if (!localUpdatedAt) {
+      localUpdatedAt = new Date(0).toISOString();
+      localStorage.setItem("pickleball_club_data_updated_at", localUpdatedAt);
+    }
+
+    // 2. Đồng bộ bất đồng bộ từ đám mây Supabase ngay khi mở ứng dụng
     fetchRemoteData().then(remoteResult => {
       if (remoteResult && remoteResult.data) {
-        const remoteIsMock = isMockData(remoteResult.data);
-        const localIsMock = isMockData(clubData);
+        const remoteUpdatedAt = remoteResult.updated_at || new Date(0).toISOString();
+        
+        console.log(`Đồng bộ ban đầu - Local updated_at: ${localUpdatedAt}, Remote updated_at: ${remoteUpdatedAt}`);
 
-        const remoteMatchesCount = remoteResult.data.matches ? remoteResult.data.matches.length : 0;
-        const localMatchesCount = clubData.matches ? clubData.matches.length : 0;
-
-        let shouldUpload = false;
-        let shouldDownload = false;
-
-        if (remoteIsMock && !localIsMock) {
-          // Trường hợp 1: Trên mây đang là dữ liệu mẫu, dưới local đã có dữ liệu thực tế -> Ưu tiên tải lên mây
-          console.log("Phát hiện dữ liệu cục bộ là dữ liệu thực tế, dữ liệu trên đám mây là dữ liệu mẫu. Tự động tải lên Supabase!");
-          shouldUpload = true;
-        } else if (!remoteIsMock && localIsMock) {
-          // Trường hợp 2: Trên mây đã có dữ liệu thực tế, dưới local vẫn là dữ liệu mẫu -> Ưu tiên tải về máy
-          console.log("Phát hiện dữ liệu đám mây là dữ liệu thực tế, dưới máy là dữ liệu mẫu. Tự động tải về máy!");
-          shouldDownload = true;
-        } else {
-          // Trường hợp 3: Cả hai đều là dữ liệu thật hoặc đều là dữ liệu mẫu -> So sánh số lượng trận đấu
-          if (localMatchesCount > remoteMatchesCount) {
-            shouldUpload = true;
-          } else if (remoteMatchesCount > localMatchesCount) {
-            shouldDownload = true;
-          } else {
-            // Số trận bằng nhau, kiểm tra xem local có trống không để đồng bộ
-            if (localMatchesCount === 0 && remoteResult.data.members && remoteResult.data.members.length > 0) {
-              shouldDownload = true;
-            }
-          }
-        }
-
-        if (shouldUpload) {
-          console.log("Tải dữ liệu lên Supabase...");
-          updateRemoteData(clubData);
-        } else if (shouldDownload) {
-          console.log("Tải dữ liệu từ Supabase về thiết bị...");
+        if (new Date(remoteUpdatedAt) > new Date(localUpdatedAt)) {
+          // Trường hợp 1: Trên đám mây mới hơn -> Tải về thiết bị
+          console.log("Dữ liệu đám mây mới hơn dữ liệu cục bộ. Tự động tải về thiết bị!");
           setData(remoteResult.data);
-          // Lưu lại localStorage
           localStorage.setItem("pickleball_club_data", JSON.stringify(remoteResult.data));
+          localStorage.setItem("pickleball_club_data_updated_at", remoteUpdatedAt);
+        } else if (new Date(localUpdatedAt) > new Date(remoteUpdatedAt)) {
+          // Trường hợp 2: Dưới máy cục bộ mới hơn -> Đẩy lên đám mây
+          console.log("Dữ liệu cục bộ mới hơn dữ liệu đám mây. Tự động tải lên Supabase!");
+          updateRemoteData(clubData, localUpdatedAt);
         } else {
-          console.log("Dữ liệu trên máy và trên đám mây đã đồng nhất!");
+          console.log("Dữ liệu cục bộ và đám mây đã đồng nhất!");
         }
       } else {
         // Nếu kết nối được Supabase nhưng chưa có dữ liệu (Supabase trống), khởi tạo bằng dữ liệu local hiện tại
         if (clubData && (clubData.members.length > 0 || clubData.matches.length > 0)) {
           console.log("Khởi tạo dữ liệu đám mây Supabase từ LocalStorage...");
-          updateRemoteData(clubData);
+          updateRemoteData(clubData, localUpdatedAt);
         }
       }
     });
+
+    // 3. Đăng ký kênh Realtime để nhận thông báo thay đổi tức thời từ Supabase
+    let subscription = null;
+    if (supabase) {
+      console.log("Đang thiết lập Supabase Realtime channel cho bảng pickleball_club...");
+      subscription = supabase
+        .channel("pickleball_club_changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "pickleball_club",
+            filter: "id=eq.1"
+          },
+          (payload) => {
+            console.log("Nhận được thay đổi realtime từ Supabase:", payload);
+            const remoteUpdatedAt = payload.new.updated_at;
+            const currentLocalUpdatedAt = localStorage.getItem("pickleball_club_data_updated_at") || new Date(0).toISOString();
+
+            if (remoteUpdatedAt && new Date(remoteUpdatedAt) > new Date(currentLocalUpdatedAt)) {
+              if (payload.new.data) {
+                console.log("Cập nhật dữ liệu từ thông báo Realtime...");
+                setData(payload.new.data);
+                localStorage.setItem("pickleball_club_data", JSON.stringify(payload.new.data));
+                localStorage.setItem("pickleball_club_data_updated_at", remoteUpdatedAt);
+              } else {
+                // Đề phòng data không đi kèm trong payload, gọi fetch full data
+                console.log("Realtime: Đang tải toàn bộ dữ liệu do payload thiếu trường data...");
+                fetchRemoteData().then(res => {
+                  if (res && res.data) {
+                    setData(res.data);
+                    localStorage.setItem("pickleball_club_data", JSON.stringify(res.data));
+                    localStorage.setItem("pickleball_club_data_updated_at", res.updated_at);
+                  }
+                });
+              }
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log("Trạng thái kết nối Realtime channel:", status);
+        });
+    }
+
+    // 4. Cơ chế Polling ngầm nhẹ mỗi 10 giây để kiểm tra chéo (Đề phòng Realtime bị tắt hoặc lỗi)
+    const pollInterval = setInterval(() => {
+      const currentLocalUpdatedAt = localStorage.getItem("pickleball_club_data_updated_at") || new Date(0).toISOString();
+      
+      fetchRemoteTimestamp().then(remoteUpdatedAt => {
+        if (remoteUpdatedAt && new Date(remoteUpdatedAt) > new Date(currentLocalUpdatedAt)) {
+          console.log(`Polling phát hiện dữ liệu đám mây mới hơn (${remoteUpdatedAt} > ${currentLocalUpdatedAt}). Tiến hành tải dữ liệu...`);
+          fetchRemoteData().then(res => {
+            if (res && res.data) {
+              setData(res.data);
+              localStorage.setItem("pickleball_club_data", JSON.stringify(res.data));
+              localStorage.setItem("pickleball_club_data_updated_at", res.updated_at);
+              console.log("Đã cập nhật dữ liệu mới nhất từ Polling thành công!");
+            }
+          });
+        }
+      });
+    }, 10000);
+
+    // Dọn dẹp subscription và interval khi unmount
+    return () => {
+      if (subscription && supabase) {
+        supabase.removeChannel(subscription);
+      }
+      clearInterval(pollInterval);
+    };
   }, []);
 
   const renderActiveTab = () => {

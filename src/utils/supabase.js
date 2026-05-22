@@ -46,19 +46,45 @@ export async function fetchRemoteData() {
 }
 
 /**
+ * Lấy chỉ mốc thời gian cập nhật của dữ liệu trên Supabase
+ * @returns {Promise<string | null>}
+ */
+export async function fetchRemoteTimestamp() {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from("pickleball_club")
+      .select("updated_at")
+      .eq("id", 1)
+      .single();
+
+    if (error) {
+      console.error("Lỗi khi tải timestamp từ Supabase:", error.message);
+      return null;
+    }
+    return data ? data.updated_at : null;
+  } catch (err) {
+    console.error("Lỗi kết nối khi tải timestamp Supabase:", err);
+    return null;
+  }
+}
+
+/**
  * Cập nhật dữ liệu lên bảng pickleball_club trên Supabase
  * @param {object} clubData - Toàn bộ dữ liệu { members, events, matches }
+ * @param {string} [customTimestamp] - Mốc thời gian cập nhật tùy chọn để đồng bộ thời gian thực nhất quán
  * @returns {Promise<boolean>} - Trạng thái thành công hay thất bại
  */
-export async function updateRemoteData(clubData) {
+export async function updateRemoteData(clubData, customTimestamp = null) {
   if (!supabase) return false;
   try {
+    const timestamp = customTimestamp || new Date().toISOString();
     const { error } = await supabase
       .from("pickleball_club")
       .upsert({
         id: 1,
         data: clubData,
-        updated_at: new Date().toISOString()
+        updated_at: timestamp
       });
 
     if (error) {

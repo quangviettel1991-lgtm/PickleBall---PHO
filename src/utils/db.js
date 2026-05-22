@@ -33,9 +33,11 @@ export function getClubData() {
 
 // Lưu dữ liệu vào localStorage
 export function saveClubData(data) {
+  const timestamp = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem("pickleball_club_data_updated_at", timestamp);
   // Đồng bộ ngầm lên đám mây Supabase
-  updateRemoteData(data).then(success => {
+  updateRemoteData(data, timestamp).then(success => {
     if (success) {
       console.log("Đồng bộ đám mây Supabase thành công!");
     }
