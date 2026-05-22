@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://wnmatztyaowvudlellha.supabase.co";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubWF0enR5YW93dnVkbGVsbGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MDg5MDcsImV4cCI6MjA5NDk4NDkwN30.l6jV2IMlYg08oz90TtaX5U-Vuineov84hNPTGut3Kns";
 
 // Kiểm tra xem đã điền đầy đủ và đúng thông tin cấu hình chưa
 const isConfigured = 
