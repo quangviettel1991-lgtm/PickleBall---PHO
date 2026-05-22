@@ -70,7 +70,7 @@ export default function Leaderboard({ data }) {
 
   // Tính toán thống kê xếp hạng của từng thành viên dựa trên các trận đấu đã lọc
   const leaderboardData = useMemo(() => {
-    return members.map(member => {
+    const list = members.map(member => {
       let played = 0;
       let won = 0;
       let lost = 0;
@@ -115,7 +115,14 @@ export default function Leaderboard({ data }) {
         scoreDiff
       };
     });
-  }, [members, filteredMatches]);
+
+    // Nếu đang lọc theo một giải đấu/sự kiện cụ thể, loại bỏ thành viên chưa đấu trận nào trong giải đấu đó
+    if (filterEvent !== "all") {
+      return list.filter(member => member.played > 0);
+    }
+
+    return list;
+  }, [members, filteredMatches, filterEvent]);
 
   // Sắp xếp dữ liệu bảng xếp hạng
   const sortedLeaderboard = useMemo(() => {
