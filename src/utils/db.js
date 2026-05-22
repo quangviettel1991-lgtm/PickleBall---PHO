@@ -8,27 +8,30 @@ const STORAGE_KEY = "pickleball_club_data";
 export function getClubData() {
   const dataStr = localStorage.getItem(STORAGE_KEY);
   if (!dataStr) {
-    // Nếu chưa có dữ liệu, khởi tạo bằng dữ liệu mẫu
+    // Nếu chưa có dữ liệu, khởi tạo bằng dữ liệu mẫu cục bộ nhưng với nhãn thời gian cực kỳ cũ (epoch)
+    // để dữ liệu đám mây Supabase (nếu có) luôn được ưu tiên tải về ghi đè lên dữ liệu cục bộ.
     const defaultData = {
       members: initialMembers,
       events: initialEvents,
       matches: initialMatches,
       transactions: initialTransactions
     };
-    saveClubData(defaultData);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+    localStorage.setItem("pickleball_club_data_updated_at", new Date(0).toISOString());
     return defaultData;
   }
   try {
     return JSON.parse(dataStr);
   } catch (e) {
-    console.error("Lỗi parse dữ liệu từ localStorage, thiết lập lại dữ liệu mẫu", e);
+    console.error("Lỗi parse dữ liệu từ localStorage, thiết lập lại dữ liệu mẫu cục bộ", e);
     const defaultData = {
       members: initialMembers,
       events: initialEvents,
       matches: initialMatches,
       transactions: initialTransactions
     };
-    saveClubData(defaultData);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+    localStorage.setItem("pickleball_club_data_updated_at", new Date(0).toISOString());
     return defaultData;
   }
 }

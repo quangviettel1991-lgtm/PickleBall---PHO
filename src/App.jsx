@@ -58,7 +58,13 @@ export default function App() {
         
         console.log(`Đồng bộ ban đầu - Local updated_at: ${localUpdatedAt}, Remote updated_at: ${remoteUpdatedAt}`);
 
-        if (new Date(remoteUpdatedAt) > new Date(localUpdatedAt)) {
+        if (isMockData(remoteResult.data) && !isMockData(clubData)) {
+          // Trường hợp đặc biệt: Trên đám mây là dữ liệu mẫu (mock), dưới máy là dữ liệu thực tế -> Ưu tiên đẩy dữ liệu thực tế lên mây!
+          console.log("Phát hiện dữ liệu trên đám mây là dữ liệu mẫu, trong khi dữ liệu cục bộ là thực tế. Tự động khôi phục dữ liệu thực tế lên đám mây!");
+          const newTimestamp = new Date().toISOString();
+          localStorage.setItem("pickleball_club_data_updated_at", newTimestamp);
+          updateRemoteData(clubData, newTimestamp);
+        } else if (new Date(remoteUpdatedAt) > new Date(localUpdatedAt)) {
           // Trường hợp 1: Trên đám mây mới hơn -> Tải về thiết bị
           console.log("Dữ liệu đám mây mới hơn dữ liệu cục bộ. Tự động tải về thiết bị!");
           setData(remoteResult.data);
@@ -66,15 +72,22 @@ export default function App() {
           localStorage.setItem("pickleball_club_data_updated_at", remoteUpdatedAt);
         } else if (new Date(localUpdatedAt) > new Date(remoteUpdatedAt)) {
           // Trường hợp 2: Dưới máy cục bộ mới hơn -> Đẩy lên đám mây
-          console.log("Dữ liệu cục bộ mới hơn dữ liệu đám mây. Tự động tải lên Supabase!");
-          updateRemoteData(clubData, localUpdatedAt);
+          if (!isMockData(clubData)) {
+            console.log("Dữ liệu cục bộ mới hơn dữ liệu đám mây. Tự động tải lên Supabase!");
+            updateRemoteData(clubData, localUpdatedAt);
+          } else {
+            console.log("Dữ liệu cục bộ là dữ liệu mẫu, tự động tải ngược dữ liệu thực tế từ đám mây về.");
+            setData(remoteResult.data);
+            localStorage.setItem("pickleball_club_data", JSON.stringify(remoteResult.data));
+            localStorage.setItem("pickleball_club_data_updated_at", remoteUpdatedAt);
+          }
         } else {
           console.log("Dữ liệu cục bộ và đám mây đã đồng nhất!");
         }
       } else {
-        // Nếu kết nối được Supabase nhưng chưa có dữ liệu (Supabase trống), khởi tạo bằng dữ liệu local hiện tại
-        if (clubData && (clubData.members.length > 0 || clubData.matches.length > 0)) {
-          console.log("Khởi tạo dữ liệu đám mây Supabase từ LocalStorage...");
+        // Nếu kết nối được Supabase nhưng chưa có dữ liệu (Supabase trống), khởi tạo bằng dữ liệu local hiện tại (chỉ khi là dữ liệu thực)
+        if (clubData && !isMockData(clubData)) {
+          console.log("Khởi tạo dữ liệu đám mây Supabase từ LocalStorage thực tế...");
           updateRemoteData(clubData, localUpdatedAt);
         }
       }
@@ -101,18 +114,34 @@ export default function App() {
 
             if (remoteUpdatedAt && new Date(remoteUpdatedAt) > new Date(currentLocalUpdatedAt)) {
               if (payload.new.data) {
-                console.log("Cập nhật dữ liệu từ thông báo Realtime...");
-                setData(payload.new.data);
-                localStorage.setItem("pickleball_club_data", JSON.stringify(payload.new.data));
-                localStorage.setItem("pickleball_club_data_updated_at", remoteUpdatedAt);
+                const currentLocalData = getClubData();
+                if (isMockData(payload.new.data) && !isMockData(currentLocalData)) {
+                  console.log("Realtime: Phát hiện đám mây chứa dữ liệu mẫu, nhưng local có dữ liệu thực tế. Bỏ qua ghi đè, tự động khôi phục đám mây...");
+                  const newTimestamp = new Date().toISOString();
+                  localStorage.setItem("pickleball_club_data_updated_at", newTimestamp);
+                  updateRemoteData(currentLocalData, newTimestamp);
+                } else {
+                  console.log("Cập nhật dữ liệu từ thông báo Realtime...");
+                  setData(payload.new.data);
+                  localStorage.setItem("pickleball_club_data", JSON.stringify(payload.new.data));
+                  localStorage.setItem("pickleball_club_data_updated_at", remoteUpdatedAt);
+                }
               } else {
                 // Đề phòng data không đi kèm trong payload, gọi fetch full data
                 console.log("Realtime: Đang tải toàn bộ dữ liệu do payload thiếu trường data...");
                 fetchRemoteData().then(res => {
                   if (res && res.data) {
-                    setData(res.data);
-                    localStorage.setItem("pickleball_club_data", JSON.stringify(res.data));
-                    localStorage.setItem("pickleball_club_data_updated_at", res.updated_at);
+                    const currentLocalData = getClubData();
+                    if (isMockData(res.data) && !isMockData(currentLocalData)) {
+                      console.log("Realtime (Fetch): Phát hiện đám mây chứa dữ liệu mẫu, nhưng local có dữ liệu thực tế. Tự động khôi phục đám mây...");
+                      const newTimestamp = new Date().toISOString();
+                      localStorage.setItem("pickleball_club_data_updated_at", newTimestamp);
+                      updateRemoteData(currentLocalData, newTimestamp);
+                    } else {
+                      setData(res.data);
+                      localStorage.setItem("pickleball_club_data", JSON.stringify(res.data));
+                      localStorage.setItem("pickleball_club_data_updated_at", res.updated_at);
+                    }
                   }
                 });
               }
@@ -133,10 +162,18 @@ export default function App() {
           console.log(`Polling phát hiện dữ liệu đám mây mới hơn (${remoteUpdatedAt} > ${currentLocalUpdatedAt}). Tiến hành tải dữ liệu...`);
           fetchRemoteData().then(res => {
             if (res && res.data) {
-              setData(res.data);
-              localStorage.setItem("pickleball_club_data", JSON.stringify(res.data));
-              localStorage.setItem("pickleball_club_data_updated_at", res.updated_at);
-              console.log("Đã cập nhật dữ liệu mới nhất từ Polling thành công!");
+              const currentLocalData = getClubData();
+              if (isMockData(res.data) && !isMockData(currentLocalData)) {
+                console.log("Polling: Phát hiện đám mây chứa dữ liệu mẫu, nhưng local có dữ liệu thực tế. Tự động khôi phục đám mây...");
+                const newTimestamp = new Date().toISOString();
+                localStorage.setItem("pickleball_club_data_updated_at", newTimestamp);
+                updateRemoteData(currentLocalData, newTimestamp);
+              } else {
+                setData(res.data);
+                localStorage.setItem("pickleball_club_data", JSON.stringify(res.data));
+                localStorage.setItem("pickleball_club_data_updated_at", res.updated_at);
+                console.log("Đã cập nhật dữ liệu mới nhất từ Polling thành công!");
+              }
             }
           });
         }
