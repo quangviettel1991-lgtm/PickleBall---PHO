@@ -108,6 +108,13 @@ export default function Modal({ isOpen, onClose, title, children }) {
           from { transform: translateY(20px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
+
+        @media (max-width: 768px) {
+          .modal-backdrop {
+            align-items: flex-start;
+            padding-top: 8dvh;
+          }
+        }
       `}} />
       
       <div className="modal-wrapper" onClick={(e) => e.stopPropagation()}>

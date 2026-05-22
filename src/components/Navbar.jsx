@@ -359,6 +359,10 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
           .admin-lock-btn {
             display: none;
           }
+          .admin-modal-overlay {
+            align-items: flex-start;
+            padding-top: 8dvh;
+          }
         }
       `}} />
 
