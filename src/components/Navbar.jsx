@@ -478,7 +478,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
                 type="password" 
                 maxLength={8}
                 className="form-input admin-pin-input" 
-                placeholder="Mã PIN (Mặc định: 1234)" 
+                placeholder="Mã PIN" 
                 value={pinInput}
                 onChange={e => setPinInput(e.target.value)}
                 autoFocus

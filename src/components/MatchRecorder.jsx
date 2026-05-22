@@ -1598,7 +1598,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                   type="password" 
                   maxLength={8}
                   className="form-input recorder-pin-input" 
-                  placeholder="Mã PIN (Mặc định: 1234)" 
+                  placeholder="Mã PIN" 
                   value={pinInput}
                   onChange={e => {
                     setPinInput(e.target.value);
