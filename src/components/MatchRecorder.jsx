@@ -7,7 +7,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   const { members, events } = data;
 
   // Điều hướng sub-tabs: record (Ghi trận mới), history (Lịch sử đấu)
-  const [subTab, setSubTab] = useState("history");
+  const [subTab, setSubTab] = useState("record");
 
   // Trạng thái hiệu chỉnh trận đấu
   const [editingMatchId, setEditingMatchId] = useState(null);
@@ -22,7 +22,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [eventId, setEventId] = useState("");
-  const [hasInitializedEvent, setHasInitializedEvent] = useState(false);
+  const [hasUserSelectedEvent, setHasUserSelectedEvent] = useState(false);
   const [matchDate, setMatchDate] = useState("");
   const [matchTime, setMatchTime] = useState("");
 
@@ -64,9 +64,10 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     setMatchTime(`${hours}:${minutes}`);
   }, []);
 
-  // Tự động chọn sự kiện mới nhất khi danh sách sự kiện được tải
+  // Tự động chọn sự kiện mới nhất khi danh sách sự kiện được tải hoặc thay đổi,
+  // chỉ khi người dùng chưa chủ động chọn thủ công sự kiện khác.
   useEffect(() => {
-    if (events && events.length > 0 && !hasInitializedEvent && !editingMatchId) {
+    if (events && events.length > 0 && !hasUserSelectedEvent && !editingMatchId) {
       const getVal = (item) => {
         if (item.id && item.id.includes("_")) {
           return parseInt(item.id.split("_")[1]) || 0;
@@ -80,12 +81,11 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
         return new Date(b.date || 0) - new Date(a.date || 0);
       });
       const latestId = sorted[0]?.id || "";
-      if (latestId) {
+      if (latestId && eventId !== latestId) {
         setEventId(latestId);
-        setHasInitializedEvent(true);
       }
     }
-  }, [events, hasInitializedEvent, editingMatchId]);
+  }, [events, hasUserSelectedEvent, editingMatchId, eventId]);
 
   // Reset form khi đổi thể thức Đơn / Đôi
   useEffect(() => {
@@ -167,6 +167,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
   const clearForm = () => {
     setMatchType("doubles");
+    setHasUserSelectedEvent(false);
     
     // Tìm sự kiện mới nhất để làm mặc định
     let latestId = "";
@@ -211,6 +212,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     setEditingMatchId(match.id);
     setMatchType(match.type);
     setEventId(match.eventId || "");
+    setHasUserSelectedEvent(true);
     
     if (match.date) {
       const parts = match.date.split("T");
@@ -1697,7 +1699,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                 <div className="recorder-meta-grid">
                   <div>
                     <label className="form-label">Sự kiện / Giải đấu</label>
-                    <select className="form-select" value={eventId} onChange={e => setEventId(e.target.value)}>
+                    <select className="form-select" value={eventId} onChange={e => { setEventId(e.target.value); setHasUserSelectedEvent(true); }}>
                       <option value="">Giao lưu tự do (Không tính giải)</option>
                       {events.map(ev => (
                         <option key={ev.id} value={ev.id}>{ev.name}</option>
