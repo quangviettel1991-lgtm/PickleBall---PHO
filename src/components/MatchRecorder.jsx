@@ -22,6 +22,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
   const [eventId, setEventId] = useState("");
+  const [hasInitializedEvent, setHasInitializedEvent] = useState(false);
   const [matchDate, setMatchDate] = useState("");
   const [matchTime, setMatchTime] = useState("");
 
@@ -36,7 +37,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
   // Điểm số các Set
   const [setsScore, setSetsScore] = useState([
-    { a: 11, b: 9 },
+    { a: 0, b: 0 },
     { a: 0, b: 0 },
     { a: 0, b: 0 }
   ]);
@@ -62,6 +63,29 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     const minutes = String(now.getMinutes()).padStart(2, "0");
     setMatchTime(`${hours}:${minutes}`);
   }, []);
+
+  // Tự động chọn sự kiện mới nhất khi danh sách sự kiện được tải
+  useEffect(() => {
+    if (events && events.length > 0 && !hasInitializedEvent && !editingMatchId) {
+      const getVal = (item) => {
+        if (item.id && item.id.includes("_")) {
+          return parseInt(item.id.split("_")[1]) || 0;
+        }
+        return parseInt(item?.id?.replace(/\D/g, "")) || 0;
+      };
+      const sorted = [...events].sort((a, b) => {
+        const valA = getVal(a);
+        const valB = getVal(b);
+        if (valB !== valA) return valB - valA;
+        return new Date(b.date || 0) - new Date(a.date || 0);
+      });
+      const latestId = sorted[0]?.id || "";
+      if (latestId) {
+        setEventId(latestId);
+        setHasInitializedEvent(true);
+      }
+    }
+  }, [events, hasInitializedEvent, editingMatchId]);
 
   // Reset form khi đổi thể thức Đơn / Đôi
   useEffect(() => {
@@ -142,8 +166,27 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   // --- DỌN SẠCH FORM ---
 
   const clearForm = () => {
-    setMatchType("singles");
-    setEventId("");
+    setMatchType("doubles");
+    
+    // Tìm sự kiện mới nhất để làm mặc định
+    let latestId = "";
+    if (events && events.length > 0) {
+      const getVal = (item) => {
+        if (item.id && item.id.includes("_")) {
+          return parseInt(item.id.split("_")[1]) || 0;
+        }
+        return parseInt(item?.id?.replace(/\D/g, "")) || 0;
+      };
+      const sorted = [...events].sort((a, b) => {
+        const valA = getVal(a);
+        const valB = getVal(b);
+        if (valB !== valA) return valB - valA;
+        return new Date(b.date || 0) - new Date(a.date || 0);
+      });
+      latestId = sorted[0]?.id || "";
+    }
+    setEventId(latestId);
+    
     const now = new Date();
     setMatchDate(now.toISOString().split("T")[0]);
     const hours = String(now.getHours()).padStart(2, "0");
@@ -155,7 +198,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     setPlayerB1("");
     setPlayerB2("");
     setSetsScore([
-      { a: 11, b: 9 },
+      { a: 0, b: 0 },
       { a: 0, b: 0 },
       { a: 0, b: 0 }
     ]);
