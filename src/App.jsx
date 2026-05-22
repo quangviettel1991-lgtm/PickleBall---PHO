@@ -9,6 +9,7 @@ import BackupRestore from "./components/BackupRestore";
 import TournamentDraw from "./components/TournamentDraw";
 import { getClubData } from "./utils/db";
 import { fetchRemoteData, updateRemoteData } from "./utils/supabase";
+import { Lock } from "lucide-react";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -16,6 +17,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem("pickleball_is_admin") === "true";
   });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const handleSetAdmin = (val) => {
     setIsAdmin(val);
@@ -97,6 +99,73 @@ export default function App() {
   }, []);
 
   const renderActiveTab = () => {
+    // Các tab được phép truy cập tự do không cần Admin key
+    const publicTabs = ["dashboard", "leaderboard"];
+    
+    // Nếu tab không phải là public và chưa có quyền Admin, hiển thị màn hình khóa
+    if (!publicTabs.includes(activeTab) && !isAdmin) {
+      return (
+        <div className="admin-lock-screen animate-fade-in">
+          <style dangerouslySetInnerHTML={{__html: `
+            .admin-lock-screen {
+              max-width: 480px;
+              margin: 80px auto;
+              padding: 40px 24px;
+              text-align: center;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 20px;
+            }
+            .lock-screen-icon {
+              width: 76px;
+              height: 76px;
+              border-radius: 50%;
+              background: rgba(255, 71, 87, 0.08);
+              border: 1px solid rgba(255, 71, 87, 0.2);
+              color: var(--color-danger);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              box-shadow: 0 0 20px rgba(255, 71, 87, 0.15);
+              margin-bottom: 8px;
+            }
+            .lock-screen-title {
+              font-size: 1.4rem;
+              font-weight: 800;
+              color: #fff;
+            }
+            .lock-screen-desc {
+              font-size: 0.9rem;
+              color: var(--text-secondary);
+              line-height: 1.6;
+              margin-bottom: 8px;
+            }
+            @media (max-width: 768px) {
+              .admin-lock-screen {
+                margin: 40px auto;
+                padding: 32px 16px;
+              }
+            }
+          `}} />
+          <div className="lock-screen-icon">
+            <Lock size={32} />
+          </div>
+          <h2 className="lock-screen-title">Quyền Admin Đã Khóa</h2>
+          <p className="lock-screen-desc">
+            Tính năng này yêu cầu quyền quản trị (Admin). Vui lòng nhấp nút bên dưới và nhập mã PIN để mở khóa toàn bộ hệ thống.
+          </p>
+          <button 
+            className="btn-neon-green" 
+            onClick={() => setIsAuthModalOpen(true)}
+            style={{ padding: "12px 28px", fontWeight: "700" }}
+          >
+            Nhập mã PIN
+          </button>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "dashboard":
         return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} />;
@@ -156,6 +225,8 @@ export default function App() {
         setActiveTab={setActiveTab} 
         isAdmin={isAdmin} 
         setIsAdmin={handleSetAdmin} 
+        isModalOpen={isAuthModalOpen}
+        setIsModalOpen={setIsAuthModalOpen}
       />
       
       {/* Nội dung trang hiện tại */}

@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, X, Shuffle } from "lucide-react";
 
-export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin }) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, isModalOpen, setIsModalOpen }) {
   const [pinInput, setPinInput] = useState("");
   const [error, setError] = useState("");
 
@@ -262,6 +261,8 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
           justify-content: center;
           z-index: 1000;
           padding: 16px;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .admin-modal-card {
@@ -269,6 +270,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
           max-width: 400px;
           padding: 28px;
           position: relative;
+          margin: auto; /* Centering helper that works beautifully with scrolling when screen size/keyboard reduces space */
         }
 
         .admin-modal-close {
@@ -361,8 +363,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin })
             display: none;
           }
           .admin-modal-overlay {
-            align-items: flex-start;
-            padding-top: 8dvh;
+            padding: 12px;
           }
         }
       `}} />
