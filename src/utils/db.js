@@ -88,7 +88,12 @@ export function updateMember(updatedMember) {
   const data = getClubData();
   data.members = data.members.map(m => 
     m.id === updatedMember.id 
-      ? { ...m, ...updatedMember, elo: parseInt(updatedMember.elo) } 
+      ? { 
+          ...m, 
+          ...updatedMember, 
+          elo: parseInt(updatedMember.elo), 
+          initialElo: parseInt(updatedMember.elo) 
+        } 
       : m
   );
   saveClubData(data);
