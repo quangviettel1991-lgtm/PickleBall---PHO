@@ -392,6 +392,17 @@ export default function Leaderboard({ data }) {
           flex-wrap: wrap;
         }
 
+        .show-on-mobile {
+          display: none;
+        }
+
+        .player-mobile-stats-subtext {
+          font-size: 0.68rem;
+          color: var(--text-muted);
+          margin-top: 2px;
+          font-weight: 500;
+        }
+
         /* Ẩn cột trên di động */
         .hide-on-mobile {
           display: table-cell;
@@ -439,6 +450,10 @@ export default function Leaderboard({ data }) {
             width: 26px !important;
             height: 26px !important;
             font-size: 0.72rem !important;
+          }
+
+          .show-on-mobile {
+            display: inline-block !important;
           }
         }
 
@@ -641,6 +656,10 @@ export default function Leaderboard({ data }) {
                           <div className="player-info-details">
                             <span className="player-name-cell">{member.name}</span>
                             <span className="player-gender-cell hide-on-mobile">{member.gender}</span>
+                            {/* Hiển thị tóm tắt thống kê trên di động để hiển thị đầy đủ thông tin */}
+                            <span className="player-mobile-stats-subtext show-on-mobile">
+                              {member.played} trận • {member.won}T-{member.lost}B • HS: {member.scoreDiff > 0 ? `+${member.scoreDiff}` : member.scoreDiff}
+                            </span>
                           </div>
                         </div>
                       </td>
