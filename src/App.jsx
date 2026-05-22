@@ -7,13 +7,14 @@ import Members from "./components/Members";
 import Events from "./components/Events";
 import BackupRestore from "./components/BackupRestore";
 import TournamentDraw from "./components/TournamentDraw";
+import Finance from "./components/Finance";
 import { getClubData } from "./utils/db";
 import { fetchRemoteData, updateRemoteData, fetchRemoteTimestamp, supabase } from "./utils/supabase";
 import { Lock } from "lucide-react";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [data, setData] = useState({ members: [], events: [], matches: [] });
+  const [data, setData] = useState({ members: [], events: [], matches: [], transactions: [] });
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem("pickleball_is_admin") === "true";
   });
@@ -233,6 +234,8 @@ export default function App() {
         return <Events data={data} setData={setData} isAdmin={isAdmin} />;
       case "draw":
         return <TournamentDraw data={data} setData={setData} isAdmin={isAdmin} />;
+      case "finance":
+        return <Finance data={data} setData={setData} isAdmin={isAdmin} />;
       case "backup":
         return <BackupRestore data={data} setData={setData} isAdmin={isAdmin} />;
       default:

@@ -300,3 +300,42 @@ export const initialMatches = [
     }
   }
 ];
+
+export const initialTransactions = [
+  {
+    id: "tx1",
+    type: "income",
+    amount: 500000,
+    category: "Đóng tiền quỹ",
+    description: "Nguyễn Hải Đăng đóng tiền quỹ tháng 5",
+    date: "2026-05-01",
+    performedBy: "Nguyễn Hải Đăng"
+  },
+  {
+    id: "tx2",
+    type: "expense",
+    amount: 350000,
+    category: "Mua bóng",
+    description: "Mua bóng Pickleball thi đấu (hộp 12 quả)",
+    date: "2026-05-05",
+    performedBy: "Trần Minh Quân"
+  },
+  {
+    id: "tx3",
+    type: "expense",
+    amount: 600000,
+    category: "Thuê sân",
+    description: "Thuê sân tập giao lưu tối thứ 7",
+    date: "2026-05-08",
+    performedBy: "Lê Hoàng Nam"
+  },
+  {
+    id: "tx4",
+    type: "income",
+    amount: 200000,
+    category: "Khác",
+    description: "Thu phí vãng lai buổi giao lưu tháng 5",
+    date: "2026-05-10",
+    performedBy: "Vũ Phương Thảo"
+  }
+];

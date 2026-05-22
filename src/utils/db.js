@@ -1,4 +1,4 @@
-import { initialMembers, initialEvents, initialMatches } from "./mockData";
+import { initialMembers, initialEvents, initialMatches, initialTransactions } from "./mockData";
 import { calculateSinglesElo, calculateDoublesElo } from "./elo";
 import { updateRemoteData } from "./supabase";
 
@@ -12,7 +12,8 @@ export function getClubData() {
     const defaultData = {
       members: initialMembers,
       events: initialEvents,
-      matches: initialMatches
+      matches: initialMatches,
+      transactions: initialTransactions
     };
     saveClubData(defaultData);
     return defaultData;
@@ -24,7 +25,8 @@ export function getClubData() {
     const defaultData = {
       members: initialMembers,
       events: initialEvents,
-      matches: initialMatches
+      matches: initialMatches,
+      transactions: initialTransactions
     };
     saveClubData(defaultData);
     return defaultData;
@@ -49,7 +51,8 @@ export function resetToDemoData() {
   const defaultData = {
     members: initialMembers,
     events: initialEvents,
-    matches: initialMatches
+    matches: initialMatches,
+    transactions: initialTransactions
   };
   saveClubData(defaultData);
   return defaultData;
@@ -60,7 +63,8 @@ export function clearAllData() {
   const emptyData = {
     members: [],
     events: [],
-    matches: []
+    matches: [],
+    transactions: []
   };
   saveClubData(emptyData);
   return emptyData;
@@ -378,4 +382,48 @@ function getRandomColor() {
     "#00bec4"  // cyan
   ];
   return colors[Math.floor(Math.random() * colors.length)];
+}
+
+// --- THAO TÁC THU CHI (QUỸ CLB) ---
+
+export function addTransaction(newTx) {
+  const data = getClubData();
+  if (!data.transactions) data.transactions = [];
+  const id = "tx_" + Date.now();
+  const tx = {
+    id,
+    type: newTx.type, // "income" hoặc "expense"
+    amount: parseInt(newTx.amount) || 0,
+    category: newTx.category || "Khác",
+    description: newTx.description || "",
+    date: newTx.date || new Date().toISOString().split("T")[0],
+    performedBy: newTx.performedBy || ""
+  };
+  data.transactions.push(tx);
+  saveClubData(data);
+  return data;
+}
+
+export function deleteTransaction(txId) {
+  const data = getClubData();
+  if (!data.transactions) data.transactions = [];
+  data.transactions = data.transactions.filter(t => t.id !== txId);
+  saveClubData(data);
+  return data;
+}
+
+export function updateTransaction(updatedTx) {
+  const data = getClubData();
+  if (!data.transactions) data.transactions = [];
+  data.transactions = data.transactions.map(t =>
+    t.id === updatedTx.id 
+      ? { 
+          ...t, 
+          ...updatedTx, 
+          amount: parseInt(updatedTx.amount) || 0 
+        } 
+      : t
+  );
+  saveClubData(data);
+  return data;
 }

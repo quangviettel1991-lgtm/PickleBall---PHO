@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, X, Shuffle } from "lucide-react";
+import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, X, Shuffle, MoreHorizontal, CreditCard } from "lucide-react";
 
 export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, isModalOpen, setIsModalOpen }) {
   const [pinInput, setPinInput] = useState("");
   const [error, setError] = useState("");
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const handleAuth = (e) => {
     e.preventDefault();
@@ -21,15 +22,21 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
     setIsAdmin(false);
   };
 
-  const navItems = [
+  const mainNavItems = [
     { id: "dashboard", label: "Tổng Quan", icon: LayoutDashboard },
     { id: "leaderboard", label: "Xếp Hạng", icon: Trophy },
     { id: "recorder", label: "Ghi Điểm", icon: Swords },
-    { id: "members", label: "Thành Viên", icon: Users },
     { id: "events", label: "Sự Kiện", icon: Calendar },
     { id: "draw", label: "Bốc Thăm", icon: Shuffle },
+  ];
+
+  const moreNavItems = [
+    { id: "members", label: "Thành Viên", icon: Users },
+    { id: "finance", label: "Thu Chi", icon: CreditCard },
     { id: "backup", label: "CSDL", icon: Database },
   ];
+
+  const isMoreActive = ["members", "finance", "backup"].includes(activeTab);
 
   return (
     <nav className="navbar-container">
@@ -157,7 +164,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
           .navbar-menu {
             width: 100%;
             display: grid;
-            grid-template-columns: repeat(7, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 0;
             padding: 4px 6px;
           }
@@ -366,6 +373,65 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
             padding: 12px;
           }
         }
+
+        /* Styling cho Dropdown Xem Thêm */
+        .navbar-more-trigger {
+          position: relative;
+          cursor: pointer;
+        }
+
+        .navbar-more-dropdown {
+          position: absolute;
+          bottom: auto;
+          top: calc(100% + 8px);
+          right: 0;
+          background: rgba(13, 17, 23, 0.96);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 8px;
+          min-width: 160px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+          z-index: 1000;
+        }
+
+        .dropdown-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border-radius: 6px;
+          color: var(--text-secondary);
+          font-size: 0.88rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .dropdown-item:hover {
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+        }
+
+        .dropdown-item.active {
+          background: rgba(46, 213, 115, 0.1);
+          color: var(--accent-neon-green);
+          font-weight: 700;
+        }
+
+        @media (max-width: 768px) {
+          .navbar-more-dropdown {
+            bottom: calc(100% + 8px);
+            top: auto;
+            right: 4px;
+            min-width: 140px;
+            box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.6);
+          }
+        }
       `}} />
 
       {/* Tiêu đề phụ hiển thị ở đỉnh màn hình di động (Do thanh điều hướng chính đã xuống dưới) */}
@@ -438,19 +504,53 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
           <span className="navbar-brand-tag">PRO RANK</span>
         </div>
         <div className="navbar-menu">
-          {navItems.map((item) => {
+          {mainNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <div
                 key={item.id}
                 className={`navbar-item ${activeTab === item.id ? "active" : ""}`}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setIsMoreOpen(false);
+                }}
               >
                 <Icon size={16} />
                 <span>{item.label}</span>
               </div>
             );
           })}
+
+          {/* Tab Xem Thêm */}
+          <div 
+            className={`navbar-item navbar-more-trigger ${isMoreActive ? "active" : ""} ${isMoreOpen ? "more-open" : ""}`}
+            onClick={() => setIsMoreOpen(!isMoreOpen)}
+          >
+            <MoreHorizontal size={16} />
+            <span>Xem Thêm</span>
+            
+            {isMoreOpen && (
+              <div className="navbar-more-dropdown glass-panel animate-slide-up">
+                {moreNavItems.map(item => {
+                  const SubIcon = item.icon;
+                  return (
+                    <div 
+                      key={item.id}
+                      className={`dropdown-item ${activeTab === item.id ? "active" : ""}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveTab(item.id);
+                        setIsMoreOpen(false);
+                      }}
+                    >
+                      <SubIcon size={16} />
+                      <span>{item.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           
           {/* Nút Admin Lock trên PC */}
           <button 

@@ -55,6 +55,9 @@ export default function BackupRestore({ data, setData, isAdmin }) {
           Array.isArray(parsedData.events) &&
           Array.isArray(parsedData.matches)
         ) {
+          if (!Array.isArray(parsedData.transactions)) {
+            parsedData.transactions = [];
+          }
           saveClubData(parsedData);
           setData(parsedData);
           showSuccess("Khôi phục cơ sở dữ liệu thành công! Ứng dụng đã đồng bộ.");
