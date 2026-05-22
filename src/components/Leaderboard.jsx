@@ -396,11 +396,12 @@ export default function Leaderboard({ data }) {
           display: none;
         }
 
-        .player-mobile-stats-subtext {
-          font-size: 0.68rem;
-          color: var(--text-muted);
-          margin-top: 2px;
-          font-weight: 500;
+        .show-text-on-mobile {
+          display: none;
+        }
+
+        .hide-text-on-mobile {
+          display: inline;
         }
 
         /* Ẩn cột trên di động */
@@ -411,6 +412,14 @@ export default function Leaderboard({ data }) {
         /* Responsive */
         @media (max-width: 768px) {
           .hide-on-mobile {
+            display: table-cell !important; /* Luôn hiển thị cột trên di động */
+          }
+
+          .show-text-on-mobile {
+            display: inline !important;
+          }
+
+          .hide-text-on-mobile {
             display: none !important;
           }
 
@@ -434,22 +443,25 @@ export default function Leaderboard({ data }) {
           }
 
           .custom-table td, .custom-table th {
-            padding: 10px 6px !important;
-            font-size: 0.82rem !important;
+            padding: 8px 3px !important; /* Rất bé như yêu cầu */
+            font-size: 0.7rem !important; /* Giảm font như yêu cầu */
           }
 
           .player-name-cell {
-            max-width: 105px;
+            max-width: 80px;
+            font-size: 0.72rem !important;
           }
 
           .rank-col {
-            width: 36px !important;
+            width: 24px !important;
           }
 
           .player-avatar-sm {
-            width: 26px !important;
-            height: 26px !important;
-            font-size: 0.72rem !important;
+            display: none !important; /* Ẩn avatar trên di động để nhường chỗ */
+          }
+
+          .player-info-cell {
+            gap: 4px !important;
           }
 
           .show-on-mobile {
@@ -573,9 +585,12 @@ export default function Leaderboard({ data }) {
           <table className="custom-table">
             <thead>
               <tr>
-                <th style={{ width: "60px", textAlign: "center" }}>Hạng</th>
-                <th>Thành viên</th>
-                <th style={{ width: "100px" }}>
+                <th style={{ width: "40px", textAlign: "center" }}>Hạng</th>
+                <th>
+                  <span className="hide-text-on-mobile">Thành viên</span>
+                  <span className="show-text-on-mobile">Tên</span>
+                </th>
+                <th style={{ width: "60px" }}>
                   <div 
                     className={`sort-header ${sortBy === "elo" ? "active" : ""}`}
                     onClick={() => toggleSort("elo")}
@@ -583,37 +598,44 @@ export default function Leaderboard({ data }) {
                     Elo <ArrowUpDown size={12} />
                   </div>
                 </th>
-                <th style={{ width: "110px", textAlign: "center" }}>
+                <th style={{ width: "65px", textAlign: "center" }}>
                   <div 
                     className={`sort-header ${sortBy === "eloChange" ? "active" : ""}`}
                     onClick={() => toggleSort("eloChange")}
                   >
-                    Biến động <ArrowUpDown size={12} />
+                    <span className="hide-text-on-mobile">Biến động</span>
+                    <span className="show-text-on-mobile">+/-</span> <ArrowUpDown size={12} />
                   </div>
                 </th>
-                <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">
+                <th style={{ width: "55px", textAlign: "center" }}>
                   <div 
                     className={`sort-header ${sortBy === "matchesPlayed" ? "active" : ""}`}
                     onClick={() => toggleSort("matchesPlayed")}
                   >
-                    Số trận <ArrowUpDown size={12} />
+                    <span className="hide-text-on-mobile">Số trận</span>
+                    <span className="show-text-on-mobile">Trận</span> <ArrowUpDown size={12} />
                   </div>
                 </th>
-                <th style={{ width: "110px", textAlign: "center" }} className="hide-on-mobile">
+                <th style={{ width: "65px", textAlign: "center" }}>
                   <div 
                     className={`sort-header ${sortBy === "won" ? "active" : ""}`}
                     onClick={() => toggleSort("won")}
                   >
-                    Thắng-Thua <ArrowUpDown size={12} />
+                    <span className="hide-text-on-mobile">Thắng-Thua</span>
+                    <span className="show-text-on-mobile">W-L</span> <ArrowUpDown size={12} />
                   </div>
                 </th>
-                <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">Hiệu số</th>
-                <th style={{ width: "100px", textAlign: "center" }}>
+                <th style={{ width: "55px", textAlign: "center" }}>
+                  <span className="hide-text-on-mobile">Hiệu số</span>
+                  <span className="show-text-on-mobile">HS</span>
+                </th>
+                <th style={{ width: "70px", textAlign: "center" }}>
                   <div 
                     className={`sort-header ${sortBy === "winRate" ? "active" : ""}`}
                     onClick={() => toggleSort("winRate")}
                   >
-                    % Thắng <ArrowUpDown size={12} />
+                    <span className="hide-text-on-mobile">% Thắng</span>
+                    <span className="show-text-on-mobile">%Win</span> <ArrowUpDown size={12} />
                   </div>
                 </th>
               </tr>
@@ -656,10 +678,6 @@ export default function Leaderboard({ data }) {
                           <div className="player-info-details">
                             <span className="player-name-cell">{member.name}</span>
                             <span className="player-gender-cell hide-on-mobile">{member.gender}</span>
-                            {/* Hiển thị tóm tắt thống kê trên di động để hiển thị đầy đủ thông tin */}
-                            <span className="player-mobile-stats-subtext show-on-mobile">
-                              {member.played} trận • {member.won}T-{member.lost}B • HS: {member.scoreDiff > 0 ? `+${member.scoreDiff}` : member.scoreDiff}
-                            </span>
                           </div>
                         </div>
                       </td>
@@ -686,20 +704,20 @@ export default function Leaderboard({ data }) {
                         )}
                       </td>
 
-                      {/* Cột Số trận - Ẩn trên di động */}
-                      <td style={{ textAlign: "center", fontWeight: "500" }} className="hide-on-mobile">
+                      {/* Cột Số trận */}
+                      <td style={{ textAlign: "center", fontWeight: "500" }}>
                         {member.played}
                       </td>
 
-                      {/* Cột Thắng - Thua - Ẩn trên di động */}
-                      <td style={{ textAlign: "center", fontSize: "0.85rem", color: "var(--text-secondary)" }} className="hide-on-mobile">
+                      {/* Cột Thắng - Thua */}
+                      <td style={{ textAlign: "center", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                         <span style={{ color: "var(--color-success)", fontWeight: "600" }}>{member.won}</span>
                         {"-"}
                         <span style={{ color: "var(--color-danger)", fontWeight: "600" }}>{member.lost}</span>
                       </td>
 
-                      {/* Cột Hiệu số - Ẩn trên di động */}
-                      <td style={{ textAlign: "center", fontWeight: "600" }} className="hide-on-mobile">
+                      {/* Cột Hiệu số */}
+                      <td style={{ textAlign: "center", fontWeight: "600" }}>
                         {member.scoreDiff > 0 ? (
                           <span style={{ color: "var(--accent-neon-green)" }}>+{member.scoreDiff}</span>
                         ) : member.scoreDiff < 0 ? (
