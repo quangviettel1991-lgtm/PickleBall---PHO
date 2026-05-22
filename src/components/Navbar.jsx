@@ -482,11 +482,20 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
             <form onSubmit={handleAuth} className="admin-modal-form">
               <input 
                 type="password" 
+                inputMode="numeric"
+                pattern="[0-9]*"
                 maxLength={8}
                 className="form-input admin-pin-input" 
                 placeholder="Mã PIN" 
                 value={pinInput}
-                onChange={e => setPinInput(e.target.value)}
+                onChange={e => setPinInput(e.target.value.replace(/\D/g, ""))}
+                onFocus={(e) => {
+                  if (window.innerWidth <= 768) {
+                    setTimeout(() => {
+                      e.target.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 300);
+                  }
+                }}
                 autoFocus
               />
               

@@ -3,11 +3,13 @@ import { Swords, Calendar, Award, AlertCircle, Plus, Minus, Check, Lock, Search,
 import { recordMatch, updateMatch, deleteMatch, deleteMatches } from "../utils/db";
 import { calculateSinglesElo, calculateDoublesElo } from "../utils/elo";
 
-export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, setIsAdmin }) {
+export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, setIsAdmin, subTab: externalSubTab, setSubTab: externalSetSubTab }) {
   const { members, events } = data;
 
   // Điều hướng sub-tabs: record (Ghi trận mới), history (Lịch sử đấu)
-  const [subTab, setSubTab] = useState("record");
+  const [localSubTab, setLocalSubTab] = useState("record");
+  const subTab = externalSubTab !== undefined ? externalSubTab : localSubTab;
+  const setSubTab = externalSetSubTab !== undefined ? externalSetSubTab : setLocalSubTab;
 
   // Trạng thái hiệu chỉnh trận đấu
   const [editingMatchId, setEditingMatchId] = useState(null);
@@ -1672,14 +1674,17 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
               <form onSubmit={handleLocalUnlock} className="recorder-pin-input-group">
                 <input 
                   type="password" 
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={8}
                   className="form-input recorder-pin-input" 
                   placeholder="Mã PIN" 
                   value={pinInput}
                   onChange={e => {
-                    setPinInput(e.target.value);
+                    setPinInput(e.target.value.replace(/\D/g, ""));
                     setPinError("");
                   }}
+                  onFocus={handleInputFocus}
                   autoFocus
                 />
                 {pinError && <div className="recorder-pin-error">{pinError}</div>}

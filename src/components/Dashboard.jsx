@@ -3,7 +3,7 @@ import { Users, Swords, Calendar, Trophy, ChevronRight, UserPlus, Play } from "l
 import Modal from "./Modal";
 import { addMember } from "../utils/db";
 
-export default function Dashboard({ data, setData, setActiveTab }) {
+export default function Dashboard({ data, setData, setActiveTab, setRecorderSubTab }) {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [memberName, setMemberName] = useState("");
   const [memberPhone, setMemberPhone] = useState("");
@@ -19,7 +19,7 @@ export default function Dashboard({ data, setData, setActiveTab }) {
   // Sắp xếp trận đấu theo thời gian gần nhất
   const recentMatches = [...matches]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5);
+    .slice(0, 2);
 
   const handleAddMemberSubmit = (e) => {
     e.preventDefault();
@@ -44,9 +44,9 @@ export default function Dashboard({ data, setData, setActiveTab }) {
 
   // Định nghĩa thứ tự hiển thị bục Podium: Hạng 2 -> Hạng 1 -> Hạng 3
   const podiumOrder = [];
-  if (top3[1]) podiumOrder.push({ player: top3[1], rank: 2, label: "2nd", color: "#a0aec0", height: "130px" });
-  if (top3[0]) podiumOrder.push({ player: top3[0], rank: 1, label: "1st", color: "var(--accent-neon-green)", height: "170px" });
-  if (top3[2]) podiumOrder.push({ player: top3[2], rank: 3, label: "3rd", color: "#cd7f32", height: "100px" });
+  if (top3[1]) podiumOrder.push({ player: top3[1], rank: 2, label: "2nd", color: "#a0aec0", height: "95px" });
+  if (top3[0]) podiumOrder.push({ player: top3[0], rank: 1, label: "1st", color: "var(--accent-neon-green)", height: "125px" });
+  if (top3[2]) podiumOrder.push({ player: top3[2], rank: 3, label: "3rd", color: "#cd7f32", height: "70px" });
 
   const getPlayerName = (id) => {
     const player = members.find(m => m.id === id);
@@ -194,7 +194,7 @@ export default function Dashboard({ data, setData, setActiveTab }) {
 
         /* Bục vinh danh Podium */
         .podium-container {
-          padding: 28px;
+          padding: 20px;
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -225,8 +225,8 @@ export default function Dashboard({ data, setData, setActiveTab }) {
           align-items: flex-end;
           justify-content: center;
           width: 100%;
-          padding-top: 50px;
-          min-height: 280px;
+          padding-top: 25px;
+          min-height: 220px;
         }
 
         .podium-column {
@@ -510,6 +510,9 @@ export default function Dashboard({ data, setData, setActiveTab }) {
         }
         
         @media (max-width: 768px) {
+          .welcome-subtitle {
+            display: none !important;
+          }
           .stats-grid {
             grid-template-columns: repeat(3, 1fr) !important;
             gap: 8px !important;
@@ -642,7 +645,10 @@ export default function Dashboard({ data, setData, setActiveTab }) {
             </div>
           </div>
 
-          <div className="glass-panel stat-card" onClick={() => setActiveTab("recorder")}>
+          <div className="glass-panel stat-card" onClick={() => {
+            if (setRecorderSubTab) setRecorderSubTab("history");
+            setActiveTab("recorder");
+          }}>
             <div className="stat-icon">
               <Swords size={24} />
             </div>
@@ -661,6 +667,52 @@ export default function Dashboard({ data, setData, setActiveTab }) {
               <div className="stat-label">Sự kiện đã tổ chức</div>
             </div>
           </div>
+        </div>
+
+        {/* Bục vinh danh Podium */}
+        <div className="glass-panel podium-container glow-border-green" style={{ marginBottom: "28px" }}>
+          <div className="podium-header">
+            <h2 className="podium-header-title">
+              <Trophy size={18} /> Top 3 Hiện Tại (Elo)
+            </h2>
+          </div>
+          {top3.length === 0 ? (
+            <p style={{ color: "var(--text-muted)", padding: "20px 0" }}>Chưa có BXH.</p>
+          ) : (
+            <div className="podium-stage">
+              {podiumOrder.map(({ player, rank, label, color, height }) => (
+                <div key={player.id} className="podium-column">
+                  <div className="podium-avatar-wrapper">
+                    {rank === 1 && <span className="podium-crown">👑</span>}
+                    <div 
+                      className="player-avatar player-avatar-lg" 
+                      style={{ 
+                        backgroundColor: player.avatarColor,
+                        border: `3px solid ${color}`,
+                        boxShadow: rank === 1 ? `0 0 20px ${varColorToGlow(color)}` : "none"
+                      }}
+                    >
+                      {player.name.charAt(0)}
+                    </div>
+                    <span className="podium-rank-badge" style={{ backgroundColor: color, color: "#000" }}>{rank}</span>
+                  </div>
+                  <div className="podium-player-name">{player.name}</div>
+                  <div className="podium-player-elo">{player.elo} Elo</div>
+                  <div 
+                    className="podium-block" 
+                    style={{ 
+                      height: height, 
+                      backgroundColor: "rgba(255,255,255,0.02)",
+                      borderColor: color,
+                      color: color
+                    }}
+                  >
+                    {label}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Lịch sử trận đấu gần đây */}
@@ -757,52 +809,6 @@ export default function Dashboard({ data, setData, setActiveTab }) {
       </div>
 
       <div className="dashboard-sidebar">
-        {/* Bục vinh danh Podium */}
-        <div className="glass-panel podium-container glow-border-green">
-          <div className="podium-header">
-            <h2 className="podium-header-title">
-              <Trophy size={18} /> Top 3 Hiện Tại (Elo)
-            </h2>
-          </div>
-          {top3.length === 0 ? (
-            <p style={{ color: "var(--text-muted)", padding: "20px 0" }}>Chưa có BXH.</p>
-          ) : (
-            <div className="podium-stage">
-              {podiumOrder.map(({ player, rank, label, color, height }) => (
-                <div key={player.id} className="podium-column">
-                  <div className="podium-avatar-wrapper">
-                    {rank === 1 && <span className="podium-crown">👑</span>}
-                    <div 
-                      className="player-avatar player-avatar-lg" 
-                      style={{ 
-                        backgroundColor: player.avatarColor,
-                        border: `3px solid ${color}`,
-                        boxShadow: rank === 1 ? `0 0 20px ${varColorToGlow(color)}` : "none"
-                      }}
-                    >
-                      {player.name.charAt(0)}
-                    </div>
-                    <span className="podium-rank-badge" style={{ backgroundColor: color, color: "#000" }}>{rank}</span>
-                  </div>
-                  <div className="podium-player-name">{player.name}</div>
-                  <div className="podium-player-elo">{player.elo} Elo</div>
-                  <div 
-                    className="podium-block" 
-                    style={{ 
-                      height: height, 
-                      backgroundColor: "rgba(255,255,255,0.02)",
-                      borderColor: color,
-                      color: color
-                    }}
-                  >
-                    {label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Lối tắt hành động nhanh */}
         <div className="glass-panel shortcuts-panel">
           <h2 className="panel-title" style={{ marginBottom: "20px" }}>Hành động nhanh</h2>

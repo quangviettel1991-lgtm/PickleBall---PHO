@@ -17,6 +17,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(() => {
     return localStorage.getItem("pickleball_is_admin") === "true";
   });
+  const [recorderSubTab, setRecorderSubTab] = useState("record");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const handleSetAdmin = (val) => {
@@ -221,11 +222,11 @@ export default function App() {
 
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} />;
+        return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} setRecorderSubTab={setRecorderSubTab} />;
       case "leaderboard":
         return <Leaderboard data={data} />;
       case "recorder":
-        return <MatchRecorder data={data} setData={setData} setActiveTab={setActiveTab} isAdmin={isAdmin} setIsAdmin={handleSetAdmin} />;
+        return <MatchRecorder data={data} setData={setData} setActiveTab={setActiveTab} isAdmin={isAdmin} setIsAdmin={handleSetAdmin} subTab={recorderSubTab} setSubTab={setRecorderSubTab} />;
       case "members":
         return <Members data={data} setData={setData} isAdmin={isAdmin} />;
       case "events":
@@ -235,7 +236,7 @@ export default function App() {
       case "backup":
         return <BackupRestore data={data} setData={setData} isAdmin={isAdmin} />;
       default:
-        return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} />;
+        return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} setRecorderSubTab={setRecorderSubTab} />;
     }
   };
 
