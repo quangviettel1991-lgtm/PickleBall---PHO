@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock, Edit2 } from "lucide-react";
+import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock, Edit2, ArrowUpDown } from "lucide-react";
 import Modal from "./Modal";
 import { addEvent, deleteEvent, updateEvent, updateMatch, deleteMatch } from "../utils/db";
 
@@ -8,6 +8,19 @@ export default function Events({ data, setData, isAdmin }) {
 
   // Trạng thái sự kiện được chọn để xem chi tiết
   const [selectedEvent, setSelectedEvent] = useState(null);
+
+  // Trạng thái Sắp xếp BXH giải đấu
+  const [eventSortBy, setEventSortBy] = useState("eloChange"); // eloChange, won
+  const [eventSortOrder, setEventSortOrder] = useState("desc"); // desc, asc
+
+  const toggleEventSort = (field) => {
+    if (eventSortBy === field) {
+      setEventSortOrder(prev => prev === "desc" ? "asc" : "desc");
+    } else {
+      setEventSortBy(field);
+      setEventSortOrder("desc");
+    }
+  };
   
   // Trạng thái Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -150,6 +163,7 @@ export default function Events({ data, setData, isAdmin }) {
         won: 0,
         lost: 0,
         eloChange: 0,
+        scoreDiff: 0,
       };
     });
 
@@ -173,20 +187,68 @@ export default function Events({ data, setData, isAdmin }) {
         } else {
           statsMap[pId].lost++;
         }
+
+        // Tính toán hiệu số điểm (Tổng điểm ghi được - Tổng điểm bị thua)
+        if (isTeamA) {
+          statsMap[pId].scoreDiff += (match.scoreA - match.scoreB);
+        } else {
+          statsMap[pId].scoreDiff += (match.scoreB - match.scoreA);
+        }
       });
     });
 
     // Lọc ra những người chơi có tham gia ít nhất 1 trận trong sự kiện này
     return Object.values(statsMap)
       .filter(p => p.played > 0)
-      // Sắp xếp theo hiệu số Elo Change giảm dần (ai tăng nhiều Elo nhất tại giải này xếp đầu)
-      .sort((a, b) => b.eloChange - a.eloChange)
+      .map(p => ({
+        ...p,
+        winRate: p.played > 0 ? Math.round((p.won / p.played) * 100) : 0
+      }))
+      .sort((a, b) => {
+        let valA, valB;
+        let tieBreakers = [];
+
+        if (eventSortBy === "eloChange") {
+          valA = a.eloChange;
+          valB = b.eloChange;
+          tieBreakers = [
+            [a.won, b.won],
+            [a.winRate, b.winRate],
+            [a.scoreDiff, b.scoreDiff]
+          ];
+        } else if (eventSortBy === "won") {
+          valA = a.won;
+          valB = b.won;
+          tieBreakers = [
+            [a.eloChange, b.eloChange],
+            [a.winRate, b.winRate],
+            [a.scoreDiff, b.scoreDiff]
+          ];
+        } else {
+          valA = a.eloChange;
+          valB = b.eloChange;
+        }
+
+        if (valA !== valB) {
+          return eventSortOrder === "desc" ? valB - valA : valA - valB;
+        }
+
+        // Áp dụng các tiêu chí phụ ưu tiên tiếp theo (tỷ lệ thắng, hiệu số, v.v.)
+        for (let i = 0; i < tieBreakers.length; i++) {
+          const [tbA, tbB] = tieBreakers[i];
+          if (tbA !== tbB) {
+            // Các tiêu chí phụ luôn ưu tiên sắp xếp giảm dần
+            return eventSortOrder === "desc" ? tbB - tbA : tbA - tbB;
+          }
+        }
+
+        return a.name.localeCompare(b.name);
+      })
       .map((p, index) => ({
         ...p,
-        eventRank: index + 1,
-        winRate: p.played > 0 ? Math.round((p.won / p.played) * 100) : 0
+        eventRank: index + 1
       }));
-  }, [selectedEvent, eventMatches, members]);
+  }, [selectedEvent, eventMatches, members, eventSortBy, eventSortOrder]);
 
   // --- XỬ LÝ SỰ KIỆN FORM ---
 
@@ -260,6 +322,24 @@ export default function Events({ data, setData, isAdmin }) {
           max-width: 1280px;
           margin: 0 auto;
           padding: 32px 24px;
+        }
+
+        .sort-header {
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          user-select: none;
+          transition: color 0.15s;
+        }
+
+        .sort-header:hover {
+          color: var(--accent-neon-green);
+        }
+
+        .sort-header.active {
+          color: var(--accent-neon-green);
+          font-weight: 700;
         }
 
         .events-header {
@@ -497,16 +577,31 @@ export default function Events({ data, setData, isAdmin }) {
                     <tr>
                       <th style={{ width: "60px", textAlign: "center" }}>Hạng</th>
                       <th>Thành viên</th>
-                      <th style={{ width: "130px", textAlign: "center" }}>Điểm giải đấu</th>
-                      <th style={{ width: "100px", textAlign: "center" }} className="hide-on-mobile">Số trận</th>
-                      <th style={{ width: "100px", textAlign: "center" }} className="hide-on-mobile">Thắng-Thua</th>
+                      <th style={{ width: "140px", textAlign: "center" }}>
+                        <div 
+                          className={`sort-header ${eventSortBy === "eloChange" ? "active" : ""}`}
+                          onClick={() => toggleEventSort("eloChange")}
+                        >
+                          Điểm giải đấu <ArrowUpDown size={12} />
+                        </div>
+                      </th>
+                      <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">Số trận</th>
+                      <th style={{ width: "115px", textAlign: "center" }} className="hide-on-mobile">
+                        <div 
+                          className={`sort-header ${eventSortBy === "won" ? "active" : ""}`}
+                          onClick={() => toggleEventSort("won")}
+                        >
+                          Thắng-Thua <ArrowUpDown size={12} />
+                        </div>
+                      </th>
+                      <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">Hiệu số</th>
                       <th style={{ width: "110px", textAlign: "center" }}>Tỷ lệ thắng</th>
                     </tr>
                   </thead>
                   <tbody>
                     {eventLeaderboard.length === 0 ? (
                       <tr>
-                        <td colSpan="6" style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>
+                        <td colSpan="7" style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>
                           Giải đấu chưa bắt đầu hoặc chưa có trận đấu nào được ghi nhận.
                         </td>
                       </tr>
@@ -564,6 +659,17 @@ export default function Events({ data, setData, isAdmin }) {
                             <span style={{ color: "var(--color-success)", fontWeight: "600" }}>{member.won}</span>
                             {" - "}
                             <span style={{ color: "var(--color-danger)", fontWeight: "600" }}>{member.lost}</span>
+                          </td>
+
+                          {/* Cột Hiệu số - Ẩn trên di động */}
+                          <td style={{ textAlign: "center", fontWeight: "600" }} className="hide-on-mobile">
+                            {member.scoreDiff > 0 ? (
+                              <span style={{ color: "var(--accent-neon-green)" }}>+{member.scoreDiff}</span>
+                            ) : member.scoreDiff < 0 ? (
+                              <span style={{ color: "var(--color-danger)" }}>{member.scoreDiff}</span>
+                            ) : (
+                              <span style={{ color: "var(--text-muted)" }}>0</span>
+                            )}
                           </td>
 
                           {/* Tỷ lệ thắng */}

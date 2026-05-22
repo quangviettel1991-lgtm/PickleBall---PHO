@@ -75,6 +75,7 @@ export default function Leaderboard({ data }) {
       let won = 0;
       let lost = 0;
       let eloChange = 0;
+      let scoreDiff = 0;
 
       // Quét qua các trận đấu đã lọc để tính toán
       filteredMatches.forEach(match => {
@@ -92,6 +93,13 @@ export default function Leaderboard({ data }) {
           } else {
             lost++;
           }
+
+          // Tính toán hiệu số điểm (Tổng điểm ghi được - Tổng điểm bị thua)
+          if (isTeamA) {
+            scoreDiff += (match.scoreA - match.scoreB);
+          } else if (isTeamB) {
+            scoreDiff += (match.scoreB - match.scoreA);
+          }
         }
       });
 
@@ -103,7 +111,8 @@ export default function Leaderboard({ data }) {
         won,
         lost,
         winRate,
-        eloChange
+        eloChange,
+        scoreDiff
       };
     });
   }, [members, filteredMatches]);
@@ -112,26 +121,69 @@ export default function Leaderboard({ data }) {
   const sortedLeaderboard = useMemo(() => {
     return [...leaderboardData].sort((a, b) => {
       let valA, valB;
+      let tieBreakers = [];
 
       if (sortBy === "elo") {
         valA = a.elo;
         valB = b.elo;
+        tieBreakers = [
+          [a.won, b.won],
+          [a.winRate, b.winRate],
+          [a.scoreDiff, b.scoreDiff]
+        ];
+      } else if (sortBy === "won") {
+        valA = a.won;
+        valB = b.won;
+        tieBreakers = [
+          [a.elo, b.elo],
+          [a.winRate, b.winRate],
+          [a.scoreDiff, b.scoreDiff]
+        ];
       } else if (sortBy === "eloChange") {
         valA = a.eloChange;
         valB = b.eloChange;
+        tieBreakers = [
+          [a.elo, b.elo],
+          [a.won, b.won],
+          [a.winRate, b.winRate],
+          [a.scoreDiff, b.scoreDiff]
+        ];
       } else if (sortBy === "winRate") {
         valA = a.winRate;
         valB = b.winRate;
+        tieBreakers = [
+          [a.elo, b.elo],
+          [a.won, b.won],
+          [a.scoreDiff, b.scoreDiff]
+        ];
       } else if (sortBy === "matchesPlayed") {
         valA = a.played;
         valB = b.played;
+        tieBreakers = [
+          [a.elo, b.elo],
+          [a.won, b.won],
+          [a.winRate, b.winRate],
+          [a.scoreDiff, b.scoreDiff]
+        ];
+      } else {
+        valA = a.elo;
+        valB = b.elo;
       }
 
-      if (valA === valB) {
-        return a.name.localeCompare(b.name);
+      if (valA !== valB) {
+        return sortOrder === "desc" ? valB - valA : valA - valB;
       }
 
-      return sortOrder === "desc" ? valB - valA : valA - valB;
+      // Áp dụng các tiêu chí phụ ưu tiên tiếp theo (tỷ lệ thắng, hiệu số, v.v.)
+      for (let i = 0; i < tieBreakers.length; i++) {
+        const [tbA, tbB] = tieBreakers[i];
+        if (tbA !== tbB) {
+          // Các tiêu chí phụ luôn ưu tiên sắp xếp giảm dần
+          return sortOrder === "desc" ? tbB - tbA : tbA - tbB;
+        }
+      }
+
+      return a.name.localeCompare(b.name);
     });
   }, [leaderboardData, sortBy, sortOrder]);
 
@@ -525,7 +577,15 @@ export default function Leaderboard({ data }) {
                     Số trận <ArrowUpDown size={12} />
                   </div>
                 </th>
-                <th style={{ width: "110px", textAlign: "center" }} className="hide-on-mobile">Thắng-Thua</th>
+                <th style={{ width: "110px", textAlign: "center" }} className="hide-on-mobile">
+                  <div 
+                    className={`sort-header ${sortBy === "won" ? "active" : ""}`}
+                    onClick={() => toggleSort("won")}
+                  >
+                    Thắng-Thua <ArrowUpDown size={12} />
+                  </div>
+                </th>
+                <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">Hiệu số</th>
                 <th style={{ width: "100px", textAlign: "center" }}>
                   <div 
                     className={`sort-header ${sortBy === "winRate" ? "active" : ""}`}
@@ -539,7 +599,7 @@ export default function Leaderboard({ data }) {
             <tbody>
               {sortedLeaderboard.length === 0 ? (
                 <tr>
-                  <td colSpan="7" style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>
+                  <td colSpan="8" style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>
                     Không tìm thấy thành viên nào khớp với bộ lọc.
                   </td>
                 </tr>
@@ -610,6 +670,17 @@ export default function Leaderboard({ data }) {
                         <span style={{ color: "var(--color-success)", fontWeight: "600" }}>{member.won}</span>
                         {"-"}
                         <span style={{ color: "var(--color-danger)", fontWeight: "600" }}>{member.lost}</span>
+                      </td>
+
+                      {/* Cột Hiệu số - Ẩn trên di động */}
+                      <td style={{ textAlign: "center", fontWeight: "600" }} className="hide-on-mobile">
+                        {member.scoreDiff > 0 ? (
+                          <span style={{ color: "var(--accent-neon-green)" }}>+{member.scoreDiff}</span>
+                        ) : member.scoreDiff < 0 ? (
+                          <span style={{ color: "var(--color-danger)" }}>{member.scoreDiff}</span>
+                        ) : (
+                          <span style={{ color: "var(--text-muted)" }}>0</span>
+                        )}
                       </td>
 
                       {/* Cột Tỷ lệ thắng */}
