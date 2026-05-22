@@ -588,10 +588,27 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   };
 
   const handleClearDraw = () => {
-    if (window.confirm("Bạn có chắc muốn hủy lịch đấu vừa bốc thăm?")) {
+    if (window.confirm("Bạn có chắc muốn hủy lịch đấu vừa bốc thăm? Tất cả các trận đấu đã ghi nhận điểm từ lịch đấu này cũng sẽ bị xóa khỏi hệ thống và tính lại Elo.")) {
       setDrawGenerated(false);
       setDrawData(null);
       setActiveScoringMatch(null);
+
+      // --- ĐỒNG BỘ XÓA TẤT CẢ TRẬN ĐẤU BỐC THĂM CỦA SỰ KIỆN NÀY ---
+      if (selectedEventId) {
+        const updatedData = { ...data };
+        if (updatedData.matches) {
+          const initialLength = updatedData.matches.length;
+          updatedData.matches = updatedData.matches.filter(
+            m => !(m.eventId === selectedEventId && m.id.startsWith("match_draw_"))
+          );
+
+          if (updatedData.matches.length !== initialLength) {
+            const finalData = recalculateAllElos(updatedData);
+            saveClubData(finalData);
+            setData(finalData);
+          }
+        }
+      }
     }
   };
 
@@ -681,6 +698,41 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       });
     }
 
+    // --- ĐỒNG BỘ TỨC THÌ VÀO DATABASE TOÀN CỤC CỦA CLB ---
+    if (selectedEventId && teamA && teamB && teamA.length > 0 && teamB.length > 0) {
+      const syncId = matchId.startsWith("match_") ? `match_draw_${matchId.substring(6)}` : `match_draw_${matchId}`;
+      const formattedMatch = {
+        id: syncId,
+        eventId: selectedEventId,
+        type: teamA.length === 1 ? "singles" : "doubles",
+        date: playedDate,
+        teamA,
+        teamB,
+        scoreA,
+        scoreB,
+        sets: [{ a: scoreA, b: scoreB }],
+        played: true
+      };
+
+      const updatedData = { ...data };
+      if (!updatedData.matches) updatedData.matches = [];
+
+      const idx = updatedData.matches.findIndex(m => m.id === syncId);
+      if (idx !== -1) {
+        updatedData.matches[idx] = {
+          ...updatedData.matches[idx],
+          ...formattedMatch
+        };
+      } else {
+        updatedData.matches.push(formattedMatch);
+      }
+
+      // Tính toán lại Elo và lưu dữ liệu toàn cục
+      const finalData = recalculateAllElos(updatedData);
+      saveClubData(finalData);
+      setData(finalData);
+    }
+
     // Đóng giao diện nhập điểm
     setActiveScoringMatch(null);
     setScoringError("");
@@ -723,6 +775,22 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           }))
         };
       });
+    }
+
+    // --- ĐỒNG BỘ XÓA TỨC THÌ VÀO DATABASE TOÀN CỤC CỦA CLB ---
+    if (selectedEventId) {
+      const syncId = matchId.startsWith("match_") ? `match_draw_${matchId.substring(6)}` : `match_draw_${matchId}`;
+      const updatedData = { ...data };
+      if (updatedData.matches) {
+        const initialLength = updatedData.matches.length;
+        updatedData.matches = updatedData.matches.filter(m => m.id !== syncId);
+        
+        if (updatedData.matches.length !== initialLength) {
+          const finalData = recalculateAllElos(updatedData);
+          saveClubData(finalData);
+          setData(finalData);
+        }
+      }
     }
   };
 
