@@ -132,6 +132,16 @@ export function deleteEvent(eventId) {
   return data;
 }
 
+export function updateEvent(updatedEvent) {
+  const data = getClubData();
+  data.events = data.events.map(e => 
+    e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e
+  );
+  saveClubData(data);
+  return data;
+}
+
+
 // --- GHI NHẬN TRẬN ĐẤU & CẬP NHẬT ELO ---
 
 /**

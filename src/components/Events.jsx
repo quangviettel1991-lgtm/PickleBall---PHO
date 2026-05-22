@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock } from "lucide-react";
+import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock, Edit2 } from "lucide-react";
 import Modal from "./Modal";
-import { addEvent, deleteEvent } from "../utils/db";
+import { addEvent, deleteEvent, updateEvent, updateMatch, deleteMatch } from "../utils/db";
 
 export default function Events({ data, setData, isAdmin }) {
   const { members, matches, events } = data;
@@ -18,6 +18,114 @@ export default function Events({ data, setData, isAdmin }) {
   const [eventDate, setEventDate] = useState("");
   const [eventDesc, setEventDesc] = useState("");
   const [eventIdToDelete, setEventIdToDelete] = useState("");
+
+  // Trạng thái Sửa Sự Kiện
+  const [isEditEventOpen, setIsEditEventOpen] = useState(false);
+  const [editEventName, setEditEventName] = useState("");
+  const [editEventDate, setEditEventDate] = useState("");
+  const [editEventDesc, setEditEventDesc] = useState("");
+
+  // Trạng thái Sửa Trận Đấu
+  const [isEditMatchOpen, setIsEditMatchOpen] = useState(false);
+  const [editingMatch, setEditingMatch] = useState(null);
+  const [editMatchScoreA, setEditMatchScoreA] = useState(0);
+  const [editMatchScoreB, setEditMatchScoreB] = useState(0);
+  const [editMatchTeamA, setEditMatchTeamA] = useState([]);
+  const [editMatchTeamB, setEditMatchTeamB] = useState([]);
+  const [editMatchDate, setEditMatchDate] = useState("");
+
+  // Trạng thái Xóa Trận Đấu
+  const [isDeleteMatchOpen, setIsDeleteMatchOpen] = useState(false);
+  const [matchIdToDelete, setMatchIdToDelete] = useState("");
+
+  // --- XỬ LÝ CHỈNH SỬA SỰ KIỆN & TRẬN ĐẤU ---
+
+  const handleOpenEditEvent = (event) => {
+    setEditEventName(event.name);
+    setEditEventDate(event.date);
+    setEditEventDesc(event.description || "");
+    setIsEditEventOpen(true);
+  };
+
+  const handleEditEventSubmit = (e) => {
+    e.preventDefault();
+    if (!editEventName.trim()) return;
+
+    const updatedData = updateEvent({
+      id: selectedEvent.id,
+      name: editEventName,
+      date: editEventDate,
+      description: editEventDesc
+    });
+    setData(updatedData);
+    
+    // Cập nhật lại sự kiện đang chọn trong state
+    const newSelected = updatedData.events.find(ev => ev.id === selectedEvent.id);
+    setSelectedEvent(newSelected);
+    setIsEditEventOpen(false);
+  };
+
+  const handleOpenEditMatch = (match) => {
+    setEditingMatch(match);
+    setEditMatchScoreA(match.scoreA);
+    setEditMatchScoreB(match.scoreB);
+    setEditMatchTeamA(match.teamA);
+    setEditMatchTeamB(match.teamB);
+    
+    // convert date string to local datetime string (YYYY-MM-DDTHH:mm)
+    const d = new Date(match.date);
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
+    setEditMatchDate(localISOTime);
+    
+    setIsEditMatchOpen(true);
+  };
+
+  const handleEditMatchSubmit = (e) => {
+    e.preventDefault();
+    if (!editingMatch) return;
+
+    // Kiểm tra trùng lặp người chơi giữa 2 đội
+    const hasDuplicate = editMatchTeamA.some(id => editMatchTeamB.includes(id));
+    if (hasDuplicate) {
+      alert("Lỗi: Người chơi không thể thuộc cả hai đội cùng một lúc!");
+      return;
+    }
+
+    // Đối với đấu đôi, 2 người chơi trong cùng 1 đội không được trùng nhau
+    if (editingMatch.type === "doubles") {
+      if (editMatchTeamA[0] === editMatchTeamA[1] || editMatchTeamB[0] === editMatchTeamB[1]) {
+        alert("Lỗi: Hai người chơi trong một đội phải khác nhau!");
+        return;
+      }
+    }
+
+    const updatedData = updateMatch({
+      id: editingMatch.id,
+      eventId: selectedEvent.id,
+      type: editingMatch.type,
+      teamA: editMatchTeamA,
+      teamB: editMatchTeamB,
+      scoreA: parseInt(editMatchScoreA) || 0,
+      scoreB: parseInt(editMatchScoreB) || 0,
+      date: new Date(editMatchDate).toISOString()
+    });
+
+    setData(updatedData);
+    setIsEditMatchOpen(false);
+  };
+
+  const handleOpenDeleteMatch = (matchId) => {
+    setMatchIdToDelete(matchId);
+    setIsDeleteMatchOpen(true);
+  };
+
+  const handleDeleteMatchSubmit = () => {
+    const updatedData = deleteMatch(matchIdToDelete);
+    setData(updatedData);
+    setIsDeleteMatchOpen(false);
+  };
+
 
   // --- PHÂN TÍCH CHI TIẾT SỰ KIỆN ---
   
@@ -353,15 +461,29 @@ export default function Events({ data, setData, isAdmin }) {
           </div>
 
           {/* Banner thông tin sự kiện */}
-          <div className="glass-panel event-detail-header-card glow-border-green">
+          <div className="glass-panel event-detail-header-card glow-border-green" style={{ position: "relative" }}>
             <div className="event-card-date">
               <Calendar size={14} /> <span>Bắt đầu: {formatDate(selectedEvent.date)}</span>
             </div>
-            <h1 className="welcome-title" style={{ margin: 0 }}>{selectedEvent.name}</h1>
-            <p className="welcome-subtitle" style={{ margin: 0, color: "var(--text-primary)" }}>
-              {selectedEvent.description || "Không có mô tả chi tiết."}
-            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+              <div style={{ flex: 1, minWidth: "260px" }}>
+                <h1 className="welcome-title" style={{ margin: 0 }}>{selectedEvent.name}</h1>
+                <p className="welcome-subtitle" style={{ margin: 0, color: "var(--text-primary)", marginTop: "8px" }}>
+                  {selectedEvent.description || "Không có mô tả chi tiết."}
+                </p>
+              </div>
+              {isAdmin && (
+                <button 
+                  className="btn-secondary" 
+                  onClick={() => handleOpenEditEvent(selectedEvent)}
+                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", alignSelf: "flex-start", cursor: "pointer", border: "1px solid var(--border-color)" }}
+                >
+                  <Edit2 size={14} /> Chỉnh sửa thông tin
+                </button>
+              )}
+            </div>
           </div>
+
 
           <div className="event-detail-grid">
             {/* CỘT TRÁI: BẢNG XẾP HẠNG CỦA GIẢI */}
@@ -482,12 +604,34 @@ export default function Events({ data, setData, isAdmin }) {
                     >
                       {/* Sub-header trận */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span className={`match-type-badge ${match.type === "singles" ? "match-type-singles" : "match-type-doubles"}`}>
-                          {match.type === "singles" ? "Đơn" : "Đôi"}
-                        </span>
-                        <span className="match-date" style={{ fontSize: "0.7rem" }}>
-                          {formatDateTime(match.date)}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span className={`match-type-badge ${match.type === "singles" ? "match-type-singles" : "match-type-doubles"}`}>
+                            {match.type === "singles" ? "Đơn" : "Đôi"}
+                          </span>
+                          <span className="match-date" style={{ fontSize: "0.7rem" }}>
+                            {formatDateTime(match.date)}
+                          </span>
+                        </div>
+                        {isAdmin && (
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button 
+                              className="event-action-delete" 
+                              onClick={() => handleOpenEditMatch(match)}
+                              title="Sửa trận đấu"
+                              style={{ padding: "3px", borderRadius: "4px", color: "var(--text-muted)", cursor: "pointer", transition: "all 0.2s" }}
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                            <button 
+                              className="event-action-delete" 
+                              onClick={() => handleOpenDeleteMatch(match.id)}
+                              title="Xóa trận đấu"
+                              style={{ padding: "3px", borderRadius: "4px", color: "var(--text-muted)", cursor: "pointer", transition: "all 0.2s" }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Tỷ số & Đội */}
@@ -649,6 +793,220 @@ export default function Events({ data, setData, isAdmin }) {
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
             <button type="button" className="btn-secondary" onClick={() => setIsDeleteOpen(false)}>Hủy</button>
             <button type="button" className="btn-neon-green" style={{ backgroundColor: "var(--color-danger)", color: "#fff" }} onClick={handleDeleteSubmit}>
+              Xác nhận Xóa
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* --- MODAL CHỈNH SỬA SỰ KIỆN --- */}
+      <Modal
+        isOpen={isEditEventOpen}
+        onClose={() => setIsEditEventOpen(false)}
+        title="Chỉnh Sửa Sự Kiện / Giải Đấu"
+      >
+        <form onSubmit={handleEditEventSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label className="form-label">Tên giải đấu / Sự kiện *</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="VD: Giải Pickleball Nội Bộ Tháng 5" 
+              value={editEventName} 
+              onChange={e => setEditEventName(e.target.value)} 
+              required
+            />
+          </div>
+
+          <div style={{ marginBottom: "16px" }}>
+            <label className="form-label">Ngày bắt đầu sự kiện</label>
+            <input 
+              type="date" 
+              className="form-input" 
+              value={editEventDate} 
+              onChange={e => setEditEventDate(e.target.value)} 
+            />
+          </div>
+
+          <div style={{ marginBottom: "24px" }}>
+            <label className="form-label">Mô tả chi tiết giải đấu</label>
+            <textarea 
+              className="form-textarea" 
+              placeholder="Nhập thông tin về thể thức thi đấu, giải thưởng..." 
+              value={editEventDesc} 
+              onChange={e => setEditEventDesc(e.target.value)} 
+              rows={4}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+            <button type="button" className="btn-secondary" onClick={() => setIsEditEventOpen(false)}>Hủy</button>
+            <button type="submit" className="btn-neon-green">Lưu Thay Đổi</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* --- MODAL CHỈNH SỬA TRẬN ĐẤU --- */}
+      <Modal
+        isOpen={isEditMatchOpen}
+        onClose={() => setIsEditMatchOpen(false)}
+        title={`Hiệu Chỉnh Trận Đấu #${editingMatch ? editingMatch.id.split("_")[1] : ""}`}
+      >
+        {editingMatch && (
+          <form onSubmit={handleEditMatchSubmit}>
+            {/* THÀNH VIÊN ĐỘI A */}
+            <div style={{ marginBottom: "16px" }}>
+              <label className="form-label" style={{ color: "var(--accent-electric-blue)", fontWeight: "700" }}>
+                Đội A {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
+              </label>
+              <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 1</label>
+                  <select 
+                    className="form-input"
+                    value={editMatchTeamA[0] || ""}
+                    onChange={e => {
+                      const newTeam = [...editMatchTeamA];
+                      newTeam[0] = e.target.value;
+                      setEditMatchTeamA(newTeam);
+                    }}
+                    required
+                  >
+                    <option value="" disabled>-- Chọn người chơi --</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                    ))}
+                  </select>
+                </div>
+                {editingMatch.type === "doubles" && (
+                  <div>
+                    <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 2</label>
+                    <select 
+                      className="form-input"
+                      value={editMatchTeamA[1] || ""}
+                      onChange={e => {
+                        const newTeam = [...editMatchTeamA];
+                        newTeam[1] = e.target.value;
+                        setEditMatchTeamA(newTeam);
+                      }}
+                      required
+                    >
+                      <option value="" disabled>-- Chọn người chơi --</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* THÀNH VIÊN ĐỘI B */}
+            <div style={{ marginBottom: "16px" }}>
+              <label className="form-label" style={{ color: "var(--accent-neon-green)", fontWeight: "700" }}>
+                Đội B {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
+              </label>
+              <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 1</label>
+                  <select 
+                    className="form-input"
+                    value={editMatchTeamB[0] || ""}
+                    onChange={e => {
+                      const newTeam = [...editMatchTeamB];
+                      newTeam[0] = e.target.value;
+                      setEditMatchTeamB(newTeam);
+                    }}
+                    required
+                  >
+                    <option value="" disabled>-- Chọn người chơi --</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                    ))}
+                  </select>
+                </div>
+                {editingMatch.type === "doubles" && (
+                  <div>
+                    <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 2</label>
+                    <select 
+                      className="form-input"
+                      value={editMatchTeamB[1] || ""}
+                      onChange={e => {
+                        const newTeam = [...editMatchTeamB];
+                        newTeam[1] = e.target.value;
+                        setEditMatchTeamB(newTeam);
+                      }}
+                      required
+                    >
+                      <option value="" disabled>-- Chọn người chơi --</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ĐIỂM SỐ */}
+            <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+              <div style={{ flex: 1 }}>
+                <label className="form-label">Điểm Đội A *</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  className="form-input" 
+                  value={editMatchScoreA} 
+                  onChange={e => setEditMatchScoreA(e.target.value)} 
+                  required
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="form-label">Điểm Đội B *</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  className="form-input" 
+                  value={editMatchScoreB} 
+                  onChange={e => setEditMatchScoreB(e.target.value)} 
+                  required
+                />
+              </div>
+            </div>
+
+            {/* THỜI GIAN */}
+            <div style={{ marginBottom: "24px" }}>
+              <label className="form-label">Ngày & Giờ đấu</label>
+              <input 
+                type="datetime-local" 
+                className="form-input" 
+                value={editMatchDate} 
+                onChange={e => setEditMatchDate(e.target.value)} 
+                required
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button type="button" className="btn-secondary" onClick={() => setIsEditMatchOpen(false)}>Hủy</button>
+              <button type="submit" className="btn-neon-green">Xác nhận Lưu</button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* --- MODAL XÁC NHẬN XÓA TRẬN ĐẤU --- */}
+      <Modal
+        isOpen={isDeleteMatchOpen}
+        onClose={() => setIsDeleteMatchOpen(false)}
+        title="Xác Nhận Xóa Trận Đấu"
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <p style={{ color: "var(--text-secondary)", lineHeight: "1.6" }}>
+            Bạn có chắc chắn muốn xóa trận đấu này? Thao tác này sẽ xóa vĩnh viễn trận đấu khỏi hệ thống và **tự động tính toán lại điểm Elo** của các thành viên liên quan.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+            <button type="button" className="btn-secondary" onClick={() => setIsDeleteMatchOpen(false)}>Hủy</button>
+            <button type="button" className="btn-neon-green" style={{ backgroundColor: "var(--color-danger)", color: "#fff" }} onClick={handleDeleteMatchSubmit}>
               Xác nhận Xóa
             </button>
           </div>
