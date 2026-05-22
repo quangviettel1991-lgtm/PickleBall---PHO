@@ -15,9 +15,8 @@ import { Lock } from "lucide-react";
 export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [data, setData] = useState({ members: [], events: [], matches: [], transactions: [] });
-  const [isAdmin, setIsAdmin] = useState(() => {
-    return localStorage.getItem("pickleball_is_admin") === "true";
-  });
+  // Tạm thời mặc định mở khóa toàn bộ quyền Admin theo yêu cầu của người dùng
+  const [isAdmin, setIsAdmin] = useState(true);
   const [recorderSubTab, setRecorderSubTab] = useState("record");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
