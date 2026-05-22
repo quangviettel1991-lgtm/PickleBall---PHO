@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Swords, Calendar, Award, AlertCircle, Plus, Minus, Check, Lock, Search, Trash2, Edit2, X } from "lucide-react";
-import { recordMatch, updateMatch, deleteMatch } from "../utils/db";
+import { recordMatch, updateMatch, deleteMatch, deleteMatches } from "../utils/db";
 import { calculateSinglesElo, calculateDoublesElo } from "../utils/elo";
 
 export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, setIsAdmin }) {
@@ -44,6 +44,14 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   // Trạng thái thông báo thành công
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+
+  // Trạng thái chọn nhiều trận để xóa
+  const [selectedMatchIds, setSelectedMatchIds] = useState([]);
+
+  // Reset việc chọn trận khi đổi tab hoặc đổi bộ lọc
+  useEffect(() => {
+    setSelectedMatchIds([]);
+  }, [subTab, filterEvent, filterType, searchQuery]);
 
   // Thiết lập ngày giờ mặc định khi render
   useEffect(() => {
@@ -215,6 +223,42 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
         setShowSuccess(false);
         setSuccessMessage("");
       }, 2000);
+    }
+  };
+
+  const handleSelectMatch = (matchId, checked) => {
+    setSelectedMatchIds(prev => {
+      if (checked) {
+        return [...prev, matchId];
+      } else {
+        return prev.filter(id => id !== matchId);
+      }
+    });
+  };
+
+  const handleSelectAllMatches = (checked) => {
+    if (checked) {
+      const filteredIds = filteredMatches.map(m => m.id);
+      setSelectedMatchIds(filteredIds);
+    } else {
+      setSelectedMatchIds([]);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedMatchIds.length === 0) return;
+    
+    if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedMatchIds.length} trận đấu đã chọn không? Hệ thống sẽ tự động tính toán lại toàn bộ lịch sử Elo của tất cả thành viên liên quan từ ban đầu để bảo đảm sự nhất quán toán học tuyệt đối.`)) {
+      const updatedData = deleteMatches(selectedMatchIds);
+      setData(updatedData);
+      setSelectedMatchIds([]);
+      
+      setSuccessMessage(`Đã Xóa ${selectedMatchIds.length} Trận Đấu!`);
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setSuccessMessage("");
+      }, 2500);
     }
   };
 
@@ -1054,6 +1098,127 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
           color: var(--color-danger);
         }
 
+        /* Styles cho Checkbox tự chọn và Xoá nhiều trận */
+        .match-checkbox-container {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding-right: 12px;
+          border-right: 1px solid var(--border-color);
+          margin-right: -4px;
+          height: 38px;
+        }
+
+        .custom-checkbox-label {
+          display: flex;
+          align-items: center;
+          cursor: pointer;
+          user-select: none;
+          position: relative;
+        }
+
+        .custom-checkbox-input {
+          position: absolute;
+          opacity: 0;
+          cursor: pointer;
+          height: 0;
+          width: 0;
+        }
+
+        .custom-checkbox-box {
+          height: 20px;
+          width: 20px;
+          background-color: rgba(255, 255, 255, 0.03);
+          border: 1.5px solid var(--border-color);
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all var(--transition-fast);
+        }
+
+        .custom-checkbox-label:hover .custom-checkbox-input ~ .custom-checkbox-box {
+          border-color: var(--accent-neon-green);
+          background-color: rgba(212, 252, 52, 0.05);
+        }
+
+        .custom-checkbox-input:checked ~ .custom-checkbox-box {
+          background-color: var(--accent-neon-green);
+          border-color: var(--accent-neon-green);
+          box-shadow: 0 0 10px var(--accent-neon-green-glow);
+        }
+
+        .custom-checkbox-box::after {
+          content: "";
+          display: none;
+          width: 5px;
+          height: 10px;
+          border: solid #000;
+          border-width: 0 2.5px 2.5px 0;
+          transform: rotate(45deg);
+          margin-bottom: 2px;
+        }
+
+        .custom-checkbox-input:checked ~ .custom-checkbox-box::after {
+          display: block;
+        }
+
+        .bulk-delete-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(18, 22, 32, 0.5);
+          border: 1px solid var(--border-color);
+          border-radius: 14px;
+          padding: 14px 20px;
+          margin-bottom: 20px;
+          backdrop-filter: blur(var(--glass-blur));
+          -webkit-backdrop-filter: blur(var(--glass-blur));
+        }
+
+        .bulk-delete-bar-left {
+          display: flex;
+          align-items: center;
+          gap: 20px;
+        }
+
+        .bulk-delete-info {
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          border-left: 1px solid var(--border-color);
+          padding-left: 16px;
+        }
+
+        .bulk-delete-info span {
+          color: var(--accent-neon-green);
+          font-weight: 800;
+          font-size: 1.05rem;
+          text-shadow: 0 0 10px var(--accent-neon-green-glow);
+        }
+
+        .btn-bulk-delete {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 18px;
+          background: rgba(255, 71, 87, 0.1);
+          border: 1px solid rgba(255, 71, 87, 0.25);
+          border-radius: 8px;
+          color: var(--color-danger);
+          font-weight: 700;
+          font-size: 0.85rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          font-family: var(--font-primary);
+        }
+
+        .btn-bulk-delete:hover {
+          background: var(--color-danger);
+          color: #fff;
+          box-shadow: 0 0 15px rgba(255, 71, 87, 0.4);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
           .team-selection-grid {
@@ -1082,6 +1247,16 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
           }
 
           /* Mobile History */
+          .match-checkbox-container {
+            border-right: none;
+            padding-right: 0;
+            margin-right: 0;
+            justify-content: flex-start;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            height: auto;
+          }
+
           .history-filters {
             grid-template-columns: 1fr;
             gap: 12px;
@@ -1235,6 +1410,38 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
             </div>
           </div>
 
+          {/* Thanh xoá nhiều trận cùng lúc (Chỉ hiện cho Admin khi có trận đấu) */}
+          {isAdmin && filteredMatches.length > 0 && (
+            <div className="bulk-delete-bar glass-panel glow-border-green animate-slide-up">
+              <div className="bulk-delete-bar-left">
+                <label className="custom-checkbox-label">
+                  <input 
+                    type="checkbox" 
+                    className="custom-checkbox-input"
+                    checked={filteredMatches.length > 0 && selectedMatchIds.length === filteredMatches.length}
+                    onChange={(e) => handleSelectAllMatches(e.target.checked)}
+                  />
+                  <span className="custom-checkbox-box"></span>
+                  <span style={{ marginLeft: "10px", fontSize: "0.9rem", fontWeight: "600", color: "#fff" }}>
+                    Chọn tất cả
+                  </span>
+                </label>
+                <div className="bulk-delete-info">
+                  Đang chọn <span>{selectedMatchIds.length}</span> trận đấu
+                </div>
+              </div>
+              
+              {selectedMatchIds.length > 0 && (
+                <button 
+                  className="btn-bulk-delete animate-fade-in"
+                  onClick={handleBulkDelete}
+                >
+                  <Trash2 size={15} /> Xoá các trận đã chọn
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Danh sách trận đấu */}
           <div className="match-list-history">
             {filteredMatches.length === 0 ? (
@@ -1247,7 +1454,22 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                 const teamBWin = match.scoreB > match.scoreA;
 
                 return (
-                  <div key={match.id} className="match-row-item glass-panel">
+                  <div key={match.id} className="match-row-item glass-panel animate-fade-in">
+                    {/* Hộp chọn nhiều để xóa cho Admin */}
+                    {isAdmin && (
+                      <div className="match-checkbox-container">
+                        <label className="custom-checkbox-label">
+                          <input 
+                            type="checkbox" 
+                            className="custom-checkbox-input"
+                            checked={selectedMatchIds.includes(match.id)}
+                            onChange={(e) => handleSelectMatch(match.id, e.target.checked)}
+                          />
+                          <span className="custom-checkbox-box"></span>
+                        </label>
+                      </div>
+                    )}
+
                     {/* Bên trái: Thông tin chung */}
                     <div className="match-info-side">
                       <div style={{ display: "flex", alignItems: "center" }}>

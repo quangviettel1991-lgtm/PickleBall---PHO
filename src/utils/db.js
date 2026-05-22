@@ -334,6 +334,17 @@ export function deleteMatch(matchId) {
   return data;
 }
 
+/**
+ * Xóa nhiều trận đấu cùng lúc và tính lại toàn bộ Elo
+ */
+export function deleteMatches(matchIds) {
+  const data = getClubData();
+  data.matches = data.matches.filter(m => !matchIds.includes(m.id));
+  recalculateAllElos(data);
+  saveClubData(data);
+  return data;
+}
+
 
 // Hỗ trợ sinh màu avatar ngẫu nhiên
 function getRandomColor() {

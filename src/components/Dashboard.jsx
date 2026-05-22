@@ -153,6 +153,15 @@ export default function Dashboard({ data, setData, setActiveTab }) {
           display: flex;
           align-items: center;
           gap: 20px;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .stat-card:hover {
+          transform: translateY(-3px);
+          background: rgba(255, 255, 255, 0.035);
+          border-color: rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
         }
 
         .stat-icon {
@@ -623,7 +632,7 @@ export default function Dashboard({ data, setData, setActiveTab }) {
 
         {/* Các chỉ số thống kê tổng quan */}
         <div className="stats-grid">
-          <div className="glass-panel stat-card">
+          <div className="glass-panel stat-card" onClick={() => setActiveTab("members")}>
             <div className="stat-icon">
               <Users size={24} />
             </div>
@@ -633,7 +642,7 @@ export default function Dashboard({ data, setData, setActiveTab }) {
             </div>
           </div>
 
-          <div className="glass-panel stat-card">
+          <div className="glass-panel stat-card" onClick={() => setActiveTab("recorder")}>
             <div className="stat-icon">
               <Swords size={24} />
             </div>
@@ -643,7 +652,7 @@ export default function Dashboard({ data, setData, setActiveTab }) {
             </div>
           </div>
 
-          <div className="glass-panel stat-card">
+          <div className="glass-panel stat-card" onClick={() => setActiveTab("events")}>
             <div className="stat-icon">
               <Calendar size={24} />
             </div>
