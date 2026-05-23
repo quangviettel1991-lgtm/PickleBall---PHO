@@ -3,6 +3,27 @@ import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock,
 import Modal from "./Modal";
 import { addEvent, deleteEvent, updateEvent, updateMatch, deleteMatch } from "../utils/db";
 
+const getMatchRoundText = (matchId) => {
+  if (!matchId) return "";
+  if (matchId.startsWith("match_draw_")) {
+    const parts = matchId.split("_");
+    if (parts.length >= 6) {
+      const type = parts[2]; // "mixer", "rr", "elim"
+      const roundNum = parseInt(parts[4]) + 1; // 0-indexed to 1-indexed
+      const courtNum = parseInt(parts[5]) + 1; // 0-indexed to 1-indexed
+      
+      if (type === "mixer") {
+        return `Vòng ${roundNum} - Sân ${courtNum}`;
+      } else if (type === "rr") {
+        return `Vòng ${roundNum} - Trận ${courtNum}`;
+      } else if (type === "elim") {
+        return `Vòng ${roundNum} - Trận ${courtNum}`;
+      }
+    }
+  }
+  return "";
+};
+
 export default function Events({ data, setData, isAdmin }) {
   const { members, matches, events } = data;
 
@@ -219,6 +240,16 @@ export default function Events({ data, setData, isAdmin }) {
           valA = a.eloChange;
           valB = b.eloChange;
           tieBreakers = [
+            [a.elo, b.elo],
+            [a.won, b.won],
+            [a.winRate, b.winRate],
+            [a.scoreDiff, b.scoreDiff]
+          ];
+        } else if (eventSortBy === "elo") {
+          valA = a.elo;
+          valB = b.elo;
+          tieBreakers = [
+            [a.eloChange, b.eloChange],
             [a.won, b.won],
             [a.winRate, b.winRate],
             [a.scoreDiff, b.scoreDiff]
@@ -228,12 +259,36 @@ export default function Events({ data, setData, isAdmin }) {
           valB = b.won;
           tieBreakers = [
             [a.eloChange, b.eloChange],
+            [a.elo, b.elo],
             [a.winRate, b.winRate],
+            [a.scoreDiff, b.scoreDiff]
+          ];
+        } else if (eventSortBy === "matchesPlayed") {
+          valA = a.played;
+          valB = b.played;
+          tieBreakers = [
+            [a.eloChange, b.eloChange],
+            [a.elo, b.elo],
+            [a.won, b.won],
+            [a.winRate, b.winRate]
+          ];
+        } else if (eventSortBy === "winRate") {
+          valA = a.winRate;
+          valB = b.winRate;
+          tieBreakers = [
+            [a.eloChange, b.eloChange],
+            [a.elo, b.elo],
+            [a.won, b.won],
             [a.scoreDiff, b.scoreDiff]
           ];
         } else {
           valA = a.eloChange;
           valB = b.eloChange;
+          tieBreakers = [
+            [a.elo, b.elo],
+            [a.won, b.won],
+            [a.winRate, b.winRate]
+          ];
         }
 
         if (valA !== valB) {
@@ -642,109 +697,167 @@ export default function Events({ data, setData, isAdmin }) {
                 <table className="custom-table">
                   <thead>
                     <tr>
-                      <th style={{ width: "60px", textAlign: "center" }}>Hạng</th>
-                      <th>Thành viên</th>
-                      <th style={{ width: "140px", textAlign: "center" }}>
+                      <th style={{ width: "40px", textAlign: "center" }}>Hạng</th>
+                      <th>
+                        <span className="hide-text-on-mobile">Thành viên</span>
+                        <span className="show-text-on-mobile">Tên</span>
+                      </th>
+                      <th style={{ width: "60px" }}>
+                        <div 
+                          className={`sort-header ${eventSortBy === "elo" ? "active" : ""}`}
+                          onClick={() => toggleEventSort("elo")}
+                        >
+                          Elo <ArrowUpDown size={12} />
+                        </div>
+                      </th>
+                      <th style={{ width: "65px", textAlign: "center" }}>
                         <div 
                           className={`sort-header ${eventSortBy === "eloChange" ? "active" : ""}`}
                           onClick={() => toggleEventSort("eloChange")}
                         >
-                          Điểm giải đấu <ArrowUpDown size={12} />
+                          <span className="hide-text-on-mobile">Biến động</span>
+                          <span className="show-text-on-mobile">+/-</span> <ArrowUpDown size={12} />
                         </div>
                       </th>
-                      <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">Số trận</th>
-                      <th style={{ width: "115px", textAlign: "center" }} className="hide-on-mobile">
+                      <th style={{ width: "55px", textAlign: "center" }} className="hide-on-mobile">
+                        <div 
+                          className={`sort-header ${eventSortBy === "matchesPlayed" ? "active" : ""}`}
+                          onClick={() => toggleEventSort("matchesPlayed")}
+                        >
+                          <span className="hide-text-on-mobile">Số trận</span>
+                          <span className="show-text-on-mobile">Trận</span> <ArrowUpDown size={12} />
+                        </div>
+                      </th>
+                      <th style={{ width: "65px", textAlign: "center" }} className="hide-on-mobile">
                         <div 
                           className={`sort-header ${eventSortBy === "won" ? "active" : ""}`}
                           onClick={() => toggleEventSort("won")}
                         >
-                          Thắng-Thua <ArrowUpDown size={12} />
+                          <span className="hide-text-on-mobile">Thắng-Thua</span>
+                          <span className="show-text-on-mobile">W-L</span> <ArrowUpDown size={12} />
                         </div>
                       </th>
-                      <th style={{ width: "90px", textAlign: "center" }} className="hide-on-mobile">Hiệu số</th>
-                      <th style={{ width: "110px", textAlign: "center" }}>Tỷ lệ thắng</th>
+                      <th style={{ width: "55px", textAlign: "center" }} className="hide-on-mobile">Hiệu số</th>
+                      <th style={{ width: "70px", textAlign: "center" }}>
+                        <div 
+                          className={`sort-header ${eventSortBy === "winRate" ? "active" : ""}`}
+                          onClick={() => toggleEventSort("winRate")}
+                        >
+                          <span className="hide-text-on-mobile">% Thắng</span>
+                          <span className="show-text-on-mobile">%Win</span> <ArrowUpDown size={12} />
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {eventLeaderboard.length === 0 ? (
                       <tr>
-                        <td colSpan="7" style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>
+                        <td colSpan="8" style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px" }}>
                           Giải đấu chưa bắt đầu hoặc chưa có trận đấu nào được ghi nhận.
                         </td>
                       </tr>
                     ) : (
-                      eventLeaderboard.map((member, index) => (
-                        <tr key={member.id}>
-                          {/* Hạng giải đấu */}
-                          <td className="rank-col">
-                            {index === 0 ? (
-                              <span className="rank-medal rank-1">🏆</span>
-                            ) : index === 1 ? (
-                              <span className="rank-medal rank-2">🥈</span>
-                            ) : index === 2 ? (
-                              <span className="rank-medal rank-3">🥉</span>
-                            ) : (
-                              <span style={{ color: "var(--text-muted)" }}>{index + 1}</span>
-                            )}
-                          </td>
+                      eventLeaderboard.map((member, index) => {
+                        const rank = index + 1;
+                        return (
+                          <tr key={member.id}>
+                            {/* Cột thứ hạng */}
+                            <td className="rank-col">
+                              {rank === 1 ? (
+                                <span className="rank-medal rank-1">🥇</span>
+                              ) : rank === 2 ? (
+                                <span className="rank-medal rank-2">🥈</span>
+                              ) : rank === 3 ? (
+                                <span className="rank-medal rank-3">🥉</span>
+                              ) : (
+                                <span style={{ color: "var(--text-muted)" }}>{rank}</span>
+                              )}
+                            </td>
 
-                          {/* Người chơi */}
-                          <td>
-                            <div className="player-info-cell">
-                              <div 
-                                className="player-avatar player-avatar-sm" 
-                                style={{ backgroundColor: member.avatarColor }}
-                              >
-                                {member.name.charAt(0)}
+                            {/* Cột người chơi */}
+                            <td>
+                              <div className="player-info-cell">
+                                <div 
+                                  className="player-avatar player-avatar-sm" 
+                                  style={{ backgroundColor: member.avatarColor }}
+                                >
+                                  {member.name.charAt(0)}
+                                </div>
+                                <div className="player-info-details">
+                                  <span className="player-name-cell">{member.name}</span>
+                                </div>
                               </div>
-                              <span className="player-name-cell">{member.name}</span>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* Lượng Elo thay đổi tại giải này (Điểm giải đấu) */}
-                          <td style={{ textAlign: "center" }}>
-                            {member.eloChange > 0 ? (
-                              <span className="elo-change-badge elo-change-up">
-                                +{member.eloChange} Elo
-                              </span>
-                            ) : member.eloChange < 0 ? (
-                              <span className="elo-change-badge elo-change-down">
-                                {member.eloChange} Elo
-                              </span>
-                            ) : (
-                              <span className="elo-change-badge elo-change-none">
-                                0 Elo
-                              </span>
-                            )}
-                          </td>
+                            {/* Cột Elo */}
+                            <td style={{ fontWeight: "700", color: "var(--accent-electric-blue)" }}>
+                              {member.elo}
+                            </td>
 
-                          {/* Số trận đã chơi */}
-                          <td style={{ textAlign: "center", fontWeight: "500" }} className="hide-on-mobile">{member.played}</td>
+                            {/* Cột Biến động Elo */}
+                            <td style={{ textAlign: "center" }}>
+                              {member.eloChange > 0 ? (
+                                <span className="elo-change-badge elo-change-up">
+                                  +{member.eloChange}
+                                </span>
+                              ) : member.eloChange < 0 ? (
+                                <span className="elo-change-badge elo-change-down">
+                                  {member.eloChange}
+                                </span>
+                              ) : (
+                                <span className="elo-change-badge elo-change-none">
+                                  0
+                                </span>
+                              )}
+                            </td>
 
-                          {/* Thắng-Thua */}
-                          <td style={{ textAlign: "center", fontSize: "0.85rem" }} className="hide-on-mobile">
-                            <span style={{ color: "var(--color-success)", fontWeight: "600" }}>{member.won}</span>
-                            {" - "}
-                            <span style={{ color: "var(--color-danger)", fontWeight: "600" }}>{member.lost}</span>
-                          </td>
+                            {/* Cột Số trận */}
+                            <td style={{ textAlign: "center", fontWeight: "500" }} className="hide-on-mobile">
+                              {member.played}
+                            </td>
 
-                          {/* Cột Hiệu số - Ẩn trên di động */}
-                          <td style={{ textAlign: "center", fontWeight: "600" }} className="hide-on-mobile">
-                            {member.scoreDiff > 0 ? (
-                              <span style={{ color: "var(--accent-neon-green)" }}>+{member.scoreDiff}</span>
-                            ) : member.scoreDiff < 0 ? (
-                              <span style={{ color: "var(--color-danger)" }}>{member.scoreDiff}</span>
-                            ) : (
-                              <span style={{ color: "var(--text-muted)" }}>0</span>
-                            )}
-                          </td>
+                            {/* Cột Thắng - Thua */}
+                            <td style={{ textAlign: "center", fontSize: "0.85rem", color: "var(--text-secondary)" }} className="hide-on-mobile">
+                              <span style={{ color: "var(--color-success)", fontWeight: "600" }}>{member.won}</span>
+                              {"-"}
+                              <span style={{ color: "var(--color-danger)", fontWeight: "600" }}>{member.lost}</span>
+                            </td>
 
-                          {/* Tỷ lệ thắng */}
-                          <td style={{ textAlign: "center", fontWeight: "700", color: "var(--accent-electric-blue)" }}>
-                            {member.winRate}%
-                          </td>
-                        </tr>
-                      ))
+                            {/* Cột Hiệu số */}
+                            <td style={{ textAlign: "center", fontWeight: "600" }} className="hide-on-mobile">
+                              {member.scoreDiff > 0 ? (
+                                <span style={{ color: "var(--accent-neon-green)" }}>+{member.scoreDiff}</span>
+                              ) : member.scoreDiff < 0 ? (
+                                <span style={{ color: "var(--color-danger)" }}>{member.scoreDiff}</span>
+                              ) : (
+                                <span style={{ color: "var(--text-muted)" }}>0</span>
+                              )}
+                            </td>
+
+                            {/* Cột Tỷ lệ thắng */}
+                            <td style={{ textAlign: "center", fontWeight: "700" }}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                                <span>{member.winRate}%</span>
+                                {/* Thanh progress bar mini */}
+                                <div style={{
+                                  width: "50px",
+                                  height: "3px",
+                                  background: "rgba(255,255,255,0.05)",
+                                  borderRadius: "2px",
+                                  marginTop: "3px",
+                                  overflow: "hidden"
+                                }}>
+                                  <div style={{
+                                    width: `${member.winRate}%`,
+                                    height: "100%",
+                                    background: member.winRate >= 50 ? "var(--accent-neon-green)" : "var(--color-danger)"
+                                  }} />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -762,7 +875,7 @@ export default function Events({ data, setData, isAdmin }) {
                     Chưa có trận đấu nào được ghi nhận cho giải này.
                   </p>
                 ) : (
-                  eventMatches.map(match => (
+                  eventMatches.map((match, index) => (
                     <div 
                       key={match.id} 
                       className="glass-card" 
@@ -776,6 +889,27 @@ export default function Events({ data, setData, isAdmin }) {
                         gap: "10px" 
                       }}
                     >
+                      {/* Số đếm ở từng hàng */}
+                      <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontWeight: "700", width: "16px", flexShrink: 0 }}>
+                        {index + 1}
+                      </span>
+
+                      {/* Cột Lượt trận (Vòng & Sân/Trận) */}
+                      <span style={{ 
+                        fontSize: "0.72rem", 
+                        color: "var(--accent-electric-blue)", 
+                        fontWeight: "600", 
+                        background: "rgba(0, 236, 255, 0.06)", 
+                        border: "1px solid rgba(0, 236, 255, 0.15)",
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        minWidth: "75px",
+                        textAlign: "center",
+                        flexShrink: 0
+                      }}>
+                        {getMatchRoundText(match.id) || "Giao hữu"}
+                      </span>
+
                       {/* Đội A */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", minWidth: "55px" }}>
                         {match.teamA.map(id => (
