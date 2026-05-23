@@ -35,17 +35,21 @@ export default function Modal({ isOpen, onClose, title, children }) {
           align-items: center;
           justify-content: center;
           padding: 16px;
+          overflow-y: auto;
           animation: fadeInBackdrop 0.2s ease-out forwards;
         }
 
         .modal-wrapper {
           width: 100%;
           max-width: 580px;
+          max-height: 90vh;
           background: #121620;
           border: 1px solid rgba(255, 255, 255, 0.08);
           border-radius: 16px;
           box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
           animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
           position: relative;
         }
@@ -66,6 +70,7 @@ export default function Modal({ isOpen, onClose, title, children }) {
           justify-content: space-between;
           padding: 20px 24px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+          flex-shrink: 0;
         }
 
         .modal-title {
@@ -95,8 +100,9 @@ export default function Modal({ isOpen, onClose, title, children }) {
 
         .modal-body {
           padding: 24px;
-          max-height: 80vh;
+          flex-grow: 1;
           overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         @keyframes fadeInBackdrop {

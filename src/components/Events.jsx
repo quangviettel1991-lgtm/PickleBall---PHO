@@ -515,6 +515,35 @@ export default function Events({ data, setData, isAdmin }) {
           padding: 24px;
         }
 
+        /* Nút hành động sửa/xóa trận đấu */
+        .event-action-btn-edit, .event-action-btn-delete {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-secondary);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .event-action-btn-edit:hover {
+          color: var(--accent-electric-blue);
+          background: rgba(0, 236, 255, 0.08);
+          border-color: rgba(0, 236, 255, 0.2);
+          box-shadow: 0 0 10px rgba(0, 236, 255, 0.15);
+        }
+
+        .event-action-btn-delete:hover {
+          color: var(--color-danger);
+          background: rgba(255, 71, 87, 0.08);
+          border-color: rgba(255, 71, 87, 0.2);
+          box-shadow: 0 0 10px rgba(255, 71, 87, 0.15);
+        }
+
         /* Responsive */
         @media (max-width: 900px) {
           .event-detail-grid {
@@ -720,22 +749,20 @@ export default function Events({ data, setData, isAdmin }) {
                           </span>
                         </div>
                         {isAdmin && (
-                          <div style={{ display: "flex", gap: "6px" }}>
+                          <div style={{ display: "flex", gap: "8px" }}>
                             <button 
-                              className="event-action-delete" 
+                              className="event-action-btn-edit" 
                               onClick={() => handleOpenEditMatch(match)}
                               title="Sửa trận đấu"
-                              style={{ padding: "3px", borderRadius: "4px", color: "var(--text-muted)", cursor: "pointer", transition: "all 0.2s" }}
                             >
-                              <Edit2 size={13} />
+                              <Edit2 size={16} />
                             </button>
                             <button 
-                              className="event-action-delete" 
+                              className="event-action-btn-delete" 
                               onClick={() => handleOpenDeleteMatch(match.id)}
                               title="Xóa trận đấu"
-                              style={{ padding: "3px", borderRadius: "4px", color: "var(--text-muted)", cursor: "pointer", transition: "all 0.2s" }}
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={16} />
                             </button>
                           </div>
                         )}
