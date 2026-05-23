@@ -954,7 +954,8 @@ export default function Events({ data, setData, isAdmin }) {
                       key={match.id} 
                       className="glass-card" 
                       style={{ 
-                        padding: "8px 12px", 
+                        padding: "10px 12px", 
+                        minHeight: "56px", 
                         background: "rgba(255,255,255,0.015)", 
                         borderRadius: "8px", 
                         display: "flex", 
