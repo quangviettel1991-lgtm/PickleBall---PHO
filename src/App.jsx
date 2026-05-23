@@ -267,7 +267,7 @@ export default function App() {
       case "members":
         return <Members data={data} setData={setData} isAdmin={isAdmin} />;
       case "events":
-        return <Events data={data} setData={setData} isAdmin={isAdmin} />;
+        return <Events data={data} setData={setData} isAdmin={isAdmin} setActiveTab={setActiveTab} />;
       case "draw":
         return <TournamentDraw data={data} setData={setData} isAdmin={isAdmin} />;
       case "finance":

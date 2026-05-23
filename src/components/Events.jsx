@@ -24,8 +24,16 @@ const getMatchRoundText = (matchId) => {
   return "";
 };
 
-export default function Events({ data, setData, isAdmin }) {
+export default function Events({ data, setData, isAdmin, setActiveTab }) {
   const { members, matches, events } = data;
+
+  // Điều hướng nhanh sang trang Bốc thăm & Lập lịch
+  const handleGoToDraw = (event) => {
+    localStorage.setItem("draw_selected_event_id", event.id);
+    if (setActiveTab) {
+      setActiveTab("draw");
+    }
+  };
 
   // Trạng thái sự kiện được chọn để xem chi tiết
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -756,13 +764,22 @@ export default function Events({ data, setData, isAdmin }) {
                 </p>
               </div>
               {isAdmin && (
-                <button 
-                  className="btn-secondary" 
-                  onClick={() => handleOpenEditEvent(selectedEvent)}
-                  style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", alignSelf: "flex-start", cursor: "pointer", border: "1px solid var(--border-color)" }}
-                >
-                  <Edit2 size={14} /> Chỉnh sửa thông tin
-                </button>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignSelf: "flex-start" }}>
+                  <button 
+                    className="btn-neon-green" 
+                    onClick={() => handleGoToDraw(selectedEvent)}
+                    style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: "pointer" }}
+                  >
+                    <Swords size={14} /> Bốc thăm & Lập lịch
+                  </button>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => handleOpenEditEvent(selectedEvent)}
+                    style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: "pointer", border: "1px solid var(--border-color)" }}
+                  >
+                    <Edit2 size={14} /> Chỉnh sửa thông tin
+                  </button>
+                </div>
               )}
             </div>
           </div>

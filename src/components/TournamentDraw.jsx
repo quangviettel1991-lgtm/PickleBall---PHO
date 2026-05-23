@@ -6,13 +6,27 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   const { members, events } = data;
 
   // --- TRẠNG THÁI CHÍNH ---
-  const [activeScenario, setActiveScenario] = useState(() => {
-    return localStorage.getItem("draw_active_scenario") || "mixer";
-  });
   const [selectedEventId, setSelectedEventId] = useState(() => {
     return localStorage.getItem("draw_selected_event_id") || "";
   });
+
+  const [activeScenario, setActiveScenario] = useState(() => {
+    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
+    if (defaultEventId) {
+      const val = localStorage.getItem(`draw_active_scenario_${defaultEventId}`);
+      if (val !== null) return val;
+    }
+    return localStorage.getItem("draw_active_scenario") || "mixer";
+  });
+
   const [selectedMemberIds, setSelectedMemberIds] = useState(() => {
+    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
+    if (defaultEventId) {
+      const val = localStorage.getItem(`draw_selected_member_ids_${defaultEventId}`);
+      if (val !== null) {
+        try { return JSON.parse(val) || []; } catch (e) {}
+      }
+    }
     try {
       return JSON.parse(localStorage.getItem("draw_selected_member_ids")) || [];
     } catch (e) {
@@ -22,9 +36,22 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   
   // Trạng thái bốc thăm
   const [drawGenerated, setDrawGenerated] = useState(() => {
+    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
+    if (defaultEventId) {
+      const val = localStorage.getItem(`draw_generated_${defaultEventId}`);
+      if (val !== null) return val === "true";
+    }
     return localStorage.getItem("draw_generated") === "true";
   });
+
   const [drawData, setDrawData] = useState(() => {
+    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
+    if (defaultEventId) {
+      const val = localStorage.getItem(`draw_data_${defaultEventId}`);
+      if (val !== null) {
+        try { return JSON.parse(val) || null; } catch (e) {}
+      }
+    }
     try {
       return JSON.parse(localStorage.getItem("draw_data")) || null;
     } catch (e) {
@@ -32,26 +59,85 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     }
   });
 
-  // --- LƯU TRỮ BỀN BỈ TRÊN MOBILE (LOCALSTORAGE) ---
+  const [loadedEventId, setLoadedEventId] = useState(() => {
+    return localStorage.getItem("draw_selected_event_id") || "";
+  });
+
+  // --- LƯU TRỮ BỀN BỈ & CÔ LẬP TRÊN MOBILE (LOCALSTORAGE) ---
   useEffect(() => {
-    localStorage.setItem("draw_active_scenario", activeScenario);
-  }, [activeScenario]);
+    if (selectedEventId && selectedEventId === loadedEventId) {
+      localStorage.setItem(`draw_active_scenario_${selectedEventId}`, activeScenario);
+      localStorage.setItem("draw_active_scenario", activeScenario);
+    }
+  }, [activeScenario, selectedEventId, loadedEventId]);
 
   useEffect(() => {
     localStorage.setItem("draw_selected_event_id", selectedEventId);
   }, [selectedEventId]);
 
   useEffect(() => {
-    localStorage.setItem("draw_selected_member_ids", JSON.stringify(selectedMemberIds));
-  }, [selectedMemberIds]);
+    if (selectedEventId && selectedEventId === loadedEventId) {
+      localStorage.setItem(`draw_selected_member_ids_${selectedEventId}`, JSON.stringify(selectedMemberIds));
+      localStorage.setItem("draw_selected_member_ids", JSON.stringify(selectedMemberIds));
+    }
+  }, [selectedMemberIds, selectedEventId, loadedEventId]);
 
   useEffect(() => {
-    localStorage.setItem("draw_generated", drawGenerated ? "true" : "false");
-  }, [drawGenerated]);
+    if (selectedEventId && selectedEventId === loadedEventId) {
+      localStorage.setItem(`draw_generated_${selectedEventId}`, drawGenerated ? "true" : "false");
+      localStorage.setItem("draw_generated", drawGenerated ? "true" : "false");
+    }
+  }, [drawGenerated, selectedEventId, loadedEventId]);
 
   useEffect(() => {
-    localStorage.setItem("draw_data", JSON.stringify(drawData));
-  }, [drawData]);
+    if (selectedEventId && selectedEventId === loadedEventId) {
+      localStorage.setItem(`draw_data_${selectedEventId}`, JSON.stringify(drawData));
+      localStorage.setItem("draw_data", JSON.stringify(drawData));
+    }
+  }, [drawData, selectedEventId, loadedEventId]);
+
+  // --- TẢI DỮ LIỆU RIÊNG CHO SỰ KIỆN KHI ĐỔI SỰ KIỆN ---
+  useEffect(() => {
+    if (!selectedEventId) {
+      setLoadedEventId("");
+      return;
+    }
+
+    let scenario = localStorage.getItem(`draw_active_scenario_${selectedEventId}`);
+    if (scenario === null) {
+      scenario = localStorage.getItem("draw_active_scenario") || "mixer";
+    }
+    setActiveScenario(scenario);
+
+    let membersVal = [];
+    const membersStr = localStorage.getItem(`draw_selected_member_ids_${selectedEventId}`);
+    if (membersStr !== null) {
+      try { membersVal = JSON.parse(membersStr) || []; } catch (e) {}
+    } else {
+      try { membersVal = JSON.parse(localStorage.getItem("draw_selected_member_ids")) || []; } catch (e) {}
+    }
+    setSelectedMemberIds(membersVal);
+
+    let gen = false;
+    const genStr = localStorage.getItem(`draw_generated_${selectedEventId}`);
+    if (genStr !== null) {
+      gen = genStr === "true";
+    } else {
+      gen = localStorage.getItem("draw_generated") === "true";
+    }
+    setDrawGenerated(gen);
+
+    let dData = null;
+    const dataStr = localStorage.getItem(`draw_data_${selectedEventId}`);
+    if (dataStr !== null) {
+      try { dData = JSON.parse(dataStr) || null; } catch (e) {}
+    } else {
+      try { dData = JSON.parse(localStorage.getItem("draw_data")) || null; } catch (e) {}
+    }
+    setDrawData(dData);
+
+    setLoadedEventId(selectedEventId);
+  }, [selectedEventId]);
   
   // Trạng thái cấu hình phụ cho từng kịch bản
   // 1. Kịch bản Mixer
