@@ -239,9 +239,20 @@ export default function Events({ data, setData, isAdmin }) {
         if (eventSortBy === "eloChange") {
           valA = a.eloChange;
           valB = b.eloChange;
+          
+          if (a.eloChange !== b.eloChange) {
+            return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
+          }
+          // Cùng Elo Change: Xem xét số trận thắng (won)
+          if (a.won !== b.won) {
+            return eventSortOrder === "desc" ? b.won - a.won : a.won - b.won;
+          }
+          // Cùng số trận thắng: Ưu tiên người có Elo tích lũy THẤP hơn (a.elo - b.elo)
+          if (a.elo !== b.elo) {
+            return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;
+          }
+          // Các tiêu chí phụ tiếp theo
           tieBreakers = [
-            [a.elo, b.elo],
-            [a.won, b.won],
             [a.winRate, b.winRate],
             [a.scoreDiff, b.scoreDiff]
           ];
@@ -257,9 +268,20 @@ export default function Events({ data, setData, isAdmin }) {
         } else if (eventSortBy === "won") {
           valA = a.won;
           valB = b.won;
+          
+          if (a.won !== b.won) {
+            return eventSortOrder === "desc" ? b.won - a.won : a.won - b.won;
+          }
+          // Nếu xếp theo thắng-thua, mà số trận thắng bằng nhau: xem mức tăng Elo
+          if (a.eloChange !== b.eloChange) {
+            return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
+          }
+          // Cùng thắng, cùng mức tăng Elo -> Ưu tiên người có Elo tích lũy THẤP hơn
+          if (a.elo !== b.elo) {
+            return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;
+          }
+          
           tieBreakers = [
-            [a.eloChange, b.eloChange],
-            [a.elo, b.elo],
             [a.winRate, b.winRate],
             [a.scoreDiff, b.scoreDiff]
           ];
@@ -284,9 +306,17 @@ export default function Events({ data, setData, isAdmin }) {
         } else {
           valA = a.eloChange;
           valB = b.eloChange;
+          
+          if (a.eloChange !== b.eloChange) {
+            return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
+          }
+          if (a.won !== b.won) {
+            return eventSortOrder === "desc" ? b.won - a.won : a.won - b.won;
+          }
+          if (a.elo !== b.elo) {
+            return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;
+          }
           tieBreakers = [
-            [a.elo, b.elo],
-            [a.won, b.won],
             [a.winRate, b.winRate]
           ];
         }
@@ -933,26 +963,25 @@ export default function Events({ data, setData, isAdmin }) {
                         gap: "10px" 
                       }}
                     >
-                      {/* Số đếm ở từng hàng */}
-                      <span style={{ color: "var(--text-muted)", fontSize: "0.8rem", fontWeight: "700", width: "16px", flexShrink: 0 }}>
-                        {index + 1}
-                      </span>
-
-                      {/* Cột Lượt trận (Vòng & Sân/Trận) */}
-                      <span style={{ 
-                        fontSize: "0.72rem", 
-                        color: "var(--accent-electric-blue)", 
-                        fontWeight: "600", 
-                        background: "rgba(0, 236, 255, 0.06)", 
-                        border: "1px solid rgba(0, 236, 255, 0.15)",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        minWidth: "75px",
-                        textAlign: "center",
-                        flexShrink: 0
-                      }}>
-                        {getMatchRoundText(match.id) || "Giao hữu"}
-                      </span>
+                      {/* Số thứ tự & Lượt trận xếp dọc trên dưới cực kỳ gọn để chống tràn ngang di động */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start", flexShrink: 0, minWidth: "72px" }}>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", fontWeight: "800", lineHeight: "1" }}>
+                          #{index + 1}
+                        </span>
+                        <span style={{ 
+                          fontSize: "0.65rem", 
+                          color: "var(--accent-electric-blue)", 
+                          fontWeight: "700", 
+                          background: "rgba(0, 236, 255, 0.06)", 
+                          border: "1px solid rgba(0, 236, 255, 0.12)",
+                          padding: "1px 4px",
+                          borderRadius: "3px",
+                          whiteSpace: "nowrap",
+                          lineHeight: "1.2"
+                        }}>
+                          {getMatchRoundText(match.id) || "Giao hữu"}
+                        </span>
+                      </div>
 
                       {/* Đội A */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", minWidth: "55px" }}>
