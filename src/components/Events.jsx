@@ -113,15 +113,21 @@ export default function Events({ data, setData, isAdmin }) {
       }
     }
 
+    const scoreA = parseInt(editMatchScoreA) || 0;
+    const scoreB = parseInt(editMatchScoreB) || 0;
+    const isPlayed = (scoreA > 0 || scoreB > 0);
+
     const updatedData = updateMatch({
       id: editingMatch.id,
       eventId: selectedEvent.id,
       type: editingMatch.type,
       teamA: editMatchTeamA,
       teamB: editMatchTeamB,
-      scoreA: parseInt(editMatchScoreA) || 0,
-      scoreB: parseInt(editMatchScoreB) || 0,
-      date: new Date(editMatchDate).toISOString()
+      scoreA: scoreA,
+      scoreB: scoreB,
+      sets: isPlayed ? [{ a: scoreA, b: scoreB }] : [],
+      played: isPlayed,
+      date: editingMatch.date
     });
 
     setData(updatedData);
@@ -544,6 +550,37 @@ export default function Events({ data, setData, isAdmin }) {
           box-shadow: 0 0 10px rgba(255, 71, 87, 0.15);
         }
 
+        .event-matches-scroll {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 480px;
+          overflow-y: auto;
+          padding-right: 10px;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar {
+          width: 12px;
+          display: block;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.45);
+          border: 2px solid rgba(0, 0, 0, 0.2);
+          border-radius: 6px;
+          transition: background-color 0.2s ease;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar-thumb:hover {
+          background: var(--accent-neon-green);
+          box-shadow: 0 0 10px var(--accent-neon-green);
+        }
+
         /* Responsive */
         @media (max-width: 900px) {
           .event-detail-grid {
@@ -719,7 +756,7 @@ export default function Events({ data, setData, isAdmin }) {
               <h2 className="event-section-title">
                 <Swords size={18} /> Trận Đấu Đang Diễn Ra ({eventMatches.length})
               </h2>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxHeight: "480px", overflowY: "auto", pr: "6px" }}>
+              <div className="event-matches-scroll">
                 {eventMatches.length === 0 ? (
                   <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "30px 0" }}>
                     Chưa có trận đấu nào được ghi nhận cho giải này.
@@ -730,77 +767,71 @@ export default function Events({ data, setData, isAdmin }) {
                       key={match.id} 
                       className="glass-card" 
                       style={{ 
-                        padding: "14px", 
-                        background: "rgba(255,255,255,0.01)", 
+                        padding: "8px 12px", 
+                        background: "rgba(255,255,255,0.015)", 
                         borderRadius: "8px", 
                         display: "flex", 
-                        flexDirection: "column", 
+                        alignItems: "center",
+                        justifyContent: "space-between",
                         gap: "10px" 
                       }}
                     >
-                      {/* Sub-header trận */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <span className={`match-type-badge ${match.type === "singles" ? "match-type-singles" : "match-type-doubles"}`}>
-                            {match.type === "singles" ? "Đơn" : "Đôi"}
+                      {/* Đội A */}
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", minWidth: "55px" }}>
+                        {match.teamA.map(id => (
+                          <span key={id} style={{ fontSize: "0.85rem", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {getPlayerName(id).split(" ").pop()}
                           </span>
-                          <span className="match-date" style={{ fontSize: "0.7rem" }}>
-                            {formatDateTime(match.date)}
-                          </span>
-                        </div>
-                        {isAdmin && (
-                          <div style={{ display: "flex", gap: "8px" }}>
-                            <button 
-                              className="event-action-btn-edit" 
-                              onClick={() => handleOpenEditMatch(match)}
-                              title="Sửa trận đấu"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button 
-                              className="event-action-btn-delete" 
-                              onClick={() => handleOpenDeleteMatch(match.id)}
-                              title="Xóa trận đấu"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        )}
+                        ))}
                       </div>
 
-                      {/* Tỷ số & Đội */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        {/* Đội A */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                          {match.teamA.map(id => (
-                            <span key={id} style={{ fontSize: "0.85rem", fontWeight: "600" }}>
-                              {getPlayerName(id).split(" ").pop()}
-                            </span>
-                          ))}
-                        </div>
-
-                        {/* Điểm số */}
+                      {/* Điểm số hoặc Trạng thái chưa đấu */}
+                      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
                         {match.played === false ? (
-                          <div className="match-unplayed-badge" style={{ fontSize: "0.75rem", padding: "4px 8px" }}>
+                          <div className="match-unplayed-badge" style={{ fontSize: "0.68rem", padding: "3px 6px" }}>
                             Chưa đấu
                           </div>
                         ) : (
-                          <div className="match-score-pill" style={{ padding: "4px 10px", fontSize: "0.95rem" }}>
+                          <div className="match-score-pill" style={{ padding: "3px 8px", fontSize: "0.85rem" }}>
                             <span className={match.scoreA > match.scoreB ? "score-winner" : "score-loser"}>{match.scoreA}</span>
                             <span style={{ color: "var(--text-muted)" }}>:</span>
                             <span className={match.scoreB > match.scoreA ? "score-winner" : "score-loser"}>{match.scoreB}</span>
                           </div>
                         )}
-
-                        {/* Đội B */}
-                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
-                          {match.teamB.map(id => (
-                            <span key={id} style={{ fontSize: "0.85rem", fontWeight: "600" }}>
-                              {getPlayerName(id).split(" ").pop()}
-                            </span>
-                          ))}
-                        </div>
                       </div>
+
+                      {/* Đội B */}
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", minWidth: "55px" }}>
+                        {match.teamB.map(id => (
+                          <span key={id} style={{ fontSize: "0.85rem", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {getPlayerName(id).split(" ").pop()}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Nút hành động cho Admin */}
+                      {isAdmin && (
+                        <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
+                          <button 
+                            className="event-action-btn-edit" 
+                            onClick={() => handleOpenEditMatch(match)}
+                            title="Sửa trận đấu"
+                            style={{ width: "28px", height: "28px", borderRadius: "5px" }}
+                            type="button"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <button 
+                            className="event-action-btn-delete" 
+                            onClick={() => handleOpenDeleteMatch(match.id)}
+                            title="Xóa trận đấu"
+                            style={{ width: "28px", height: "28px", borderRadius: "5px" }}
+                            type="button"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -1015,7 +1046,7 @@ export default function Events({ data, setData, isAdmin }) {
                       newTeam[0] = e.target.value;
                       setEditMatchTeamA(newTeam);
                     }}
-                    style={{ padding: "8px", fontSize: "0.82rem" }}
+                    style={{ padding: "8px", fontSize: "16px" }}
                     required
                   >
                     <option value="" disabled>-- Chọn người chơi 1 --</option>
@@ -1033,7 +1064,7 @@ export default function Events({ data, setData, isAdmin }) {
                         newTeam[1] = e.target.value;
                         setEditMatchTeamA(newTeam);
                       }}
-                      style={{ padding: "8px", fontSize: "0.82rem" }}
+                      style={{ padding: "8px", fontSize: "16px" }}
                       required
                     >
                       <option value="" disabled>-- Chọn người chơi 2 --</option>
@@ -1059,7 +1090,7 @@ export default function Events({ data, setData, isAdmin }) {
                       newTeam[0] = e.target.value;
                       setEditMatchTeamB(newTeam);
                     }}
-                    style={{ padding: "8px", fontSize: "0.82rem" }}
+                    style={{ padding: "8px", fontSize: "16px" }}
                     required
                   >
                     <option value="" disabled>-- Chọn người chơi 1 --</option>
@@ -1077,7 +1108,7 @@ export default function Events({ data, setData, isAdmin }) {
                         newTeam[1] = e.target.value;
                         setEditMatchTeamB(newTeam);
                       }}
-                      style={{ padding: "8px", fontSize: "0.82rem" }}
+                      style={{ padding: "8px", fontSize: "16px" }}
                       required
                     >
                       <option value="" disabled>-- Chọn người chơi 2 --</option>
@@ -1090,40 +1121,29 @@ export default function Events({ data, setData, isAdmin }) {
               </div>
             </div>
 
-            {/* ĐIỂM SỐ & THỜI GIAN TRONG HÀNG NGANG SIÊU GỌN */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "10px", marginBottom: "4px" }}>
+            {/* ĐIỂM SỐ TRONG HÀNG NGANG SIÊU GỌN - ĐÃ BỎ THỜI GIAN ĐẤU THEO YÊU CẦU */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "4px" }}>
               <div>
-                <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Điểm A *</label>
+                <label className="form-label" style={{ fontSize: "0.85rem", marginBottom: "4px" }}>Điểm A *</label>
                 <input 
                   type="number" 
                   min="0"
                   className="form-input" 
                   value={editMatchScoreA} 
                   onChange={e => setEditMatchScoreA(e.target.value)} 
-                  style={{ padding: "8px", fontSize: "0.82rem" }}
+                  style={{ padding: "8px", fontSize: "16px" }}
                   required
                 />
               </div>
               <div>
-                <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Điểm B *</label>
+                <label className="form-label" style={{ fontSize: "0.85rem", marginBottom: "4px" }}>Điểm B *</label>
                 <input 
                   type="number" 
                   min="0"
                   className="form-input" 
                   value={editMatchScoreB} 
                   onChange={e => setEditMatchScoreB(e.target.value)} 
-                  style={{ padding: "8px", fontSize: "0.82rem" }}
-                  required
-                />
-              </div>
-              <div>
-                <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Thời gian đấu</label>
-                <input 
-                  type="datetime-local" 
-                  className="form-input" 
-                  value={editMatchDate} 
-                  onChange={e => setEditMatchDate(e.target.value)} 
-                  style={{ padding: "8px", fontSize: "0.82rem" }}
+                  style={{ padding: "8px", fontSize: "16px" }}
                   required
                 />
               </div>
