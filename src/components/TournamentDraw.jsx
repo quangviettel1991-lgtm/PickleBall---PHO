@@ -10,53 +10,59 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     return localStorage.getItem("draw_selected_event_id") || "";
   });
 
-  const [activeScenario, setActiveScenario] = useState(() => {
+  // Hàm helper dùng để lấy giá trị từ localStorage với cơ chế phân vùng và fallback thông minh
+  const getLocalStorageFallback = (key, defaultVal, isJson = false) => {
     const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
     if (defaultEventId) {
-      const val = localStorage.getItem(`draw_active_scenario_${defaultEventId}`);
-      if (val !== null) return val;
+      const val = localStorage.getItem(`${key}_${defaultEventId}`);
+      if (val !== null) {
+        if (isJson) {
+          try { return JSON.parse(val) || defaultVal; } catch (e) { return defaultVal; }
+        }
+        return val;
+      }
+      
+      // Nếu đã có bất kỳ sự kiện nào có dữ liệu phân vùng, chứng tỏ ta đang ở chế độ nhiều sự kiện
+      // Lúc này, một sự kiện mới không có key riêng thì KHÔNG được lấy key global (vì key global thuộc về sự kiện khác cũ)
+      const keys = Object.keys(localStorage);
+      const hasAnySpecific = keys.some(k => k.startsWith("draw_data_e_") || k.startsWith("draw_generated_e_"));
+      if (!hasAnySpecific) {
+        const globalVal = localStorage.getItem(key);
+        if (globalVal !== null) {
+          if (isJson) {
+            try { return JSON.parse(globalVal) || defaultVal; } catch (e) { return defaultVal; }
+          }
+          return globalVal;
+        }
+      }
+    } else {
+      // Chưa chọn sự kiện nào, dùng global
+      const globalVal = localStorage.getItem(key);
+      if (globalVal !== null) {
+        if (isJson) {
+          try { return JSON.parse(globalVal) || defaultVal; } catch (e) { return defaultVal; }
+        }
+        return globalVal;
+      }
     }
-    return localStorage.getItem("draw_active_scenario") || "mixer";
+    return defaultVal;
+  };
+
+  const [activeScenario, setActiveScenario] = useState(() => {
+    return getLocalStorageFallback("draw_active_scenario", "mixer");
   });
 
   const [selectedMemberIds, setSelectedMemberIds] = useState(() => {
-    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
-    if (defaultEventId) {
-      const val = localStorage.getItem(`draw_selected_member_ids_${defaultEventId}`);
-      if (val !== null) {
-        try { return JSON.parse(val) || []; } catch (e) {}
-      }
-    }
-    try {
-      return JSON.parse(localStorage.getItem("draw_selected_member_ids")) || [];
-    } catch (e) {
-      return [];
-    }
+    return getLocalStorageFallback("draw_selected_member_ids", [], true);
   });
   
   // Trạng thái bốc thăm
   const [drawGenerated, setDrawGenerated] = useState(() => {
-    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
-    if (defaultEventId) {
-      const val = localStorage.getItem(`draw_generated_${defaultEventId}`);
-      if (val !== null) return val === "true";
-    }
-    return localStorage.getItem("draw_generated") === "true";
+    return getLocalStorageFallback("draw_generated", "false") === "true";
   });
 
   const [drawData, setDrawData] = useState(() => {
-    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
-    if (defaultEventId) {
-      const val = localStorage.getItem(`draw_data_${defaultEventId}`);
-      if (val !== null) {
-        try { return JSON.parse(val) || null; } catch (e) {}
-      }
-    }
-    try {
-      return JSON.parse(localStorage.getItem("draw_data")) || null;
-    } catch (e) {
-      return null;
-    }
+    return getLocalStorageFallback("draw_data", null, true);
   });
 
   const [loadedEventId, setLoadedEventId] = useState(() => {
@@ -103,38 +109,33 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       return;
     }
 
-    let scenario = localStorage.getItem(`draw_active_scenario_${selectedEventId}`);
-    if (scenario === null) {
-      scenario = localStorage.getItem("draw_active_scenario") || "mixer";
-    }
-    setActiveScenario(scenario);
+    const getValWithFallback = (key, defaultVal, isJson = false) => {
+      const val = localStorage.getItem(`${key}_${selectedEventId}`);
+      if (val !== null) {
+        if (isJson) {
+          try { return JSON.parse(val) || defaultVal; } catch (e) { return defaultVal; }
+        }
+        return val;
+      }
+      
+      const keys = Object.keys(localStorage);
+      const hasAnySpecific = keys.some(k => k.startsWith("draw_data_e_") || k.startsWith("draw_generated_e_"));
+      if (!hasAnySpecific) {
+        const globalVal = localStorage.getItem(key);
+        if (globalVal !== null) {
+          if (isJson) {
+            try { return JSON.parse(globalVal) || defaultVal; } catch (e) { return defaultVal; }
+          }
+          return globalVal;
+        }
+      }
+      return defaultVal;
+    };
 
-    let membersVal = [];
-    const membersStr = localStorage.getItem(`draw_selected_member_ids_${selectedEventId}`);
-    if (membersStr !== null) {
-      try { membersVal = JSON.parse(membersStr) || []; } catch (e) {}
-    } else {
-      try { membersVal = JSON.parse(localStorage.getItem("draw_selected_member_ids")) || []; } catch (e) {}
-    }
-    setSelectedMemberIds(membersVal);
-
-    let gen = false;
-    const genStr = localStorage.getItem(`draw_generated_${selectedEventId}`);
-    if (genStr !== null) {
-      gen = genStr === "true";
-    } else {
-      gen = localStorage.getItem("draw_generated") === "true";
-    }
-    setDrawGenerated(gen);
-
-    let dData = null;
-    const dataStr = localStorage.getItem(`draw_data_${selectedEventId}`);
-    if (dataStr !== null) {
-      try { dData = JSON.parse(dataStr) || null; } catch (e) {}
-    } else {
-      try { dData = JSON.parse(localStorage.getItem("draw_data")) || null; } catch (e) {}
-    }
-    setDrawData(dData);
+    setActiveScenario(getValWithFallback("draw_active_scenario", "mixer"));
+    setSelectedMemberIds(getValWithFallback("draw_selected_member_ids", [], true));
+    setDrawGenerated(getValWithFallback("draw_generated", "false") === "true");
+    setDrawData(getValWithFallback("draw_data", null, true));
 
     setLoadedEventId(selectedEventId);
   }, [selectedEventId]);
