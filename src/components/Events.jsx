@@ -964,23 +964,63 @@ export default function Events({ data, setData, isAdmin }) {
                       }}
                     >
                       {/* Số thứ tự & Lượt trận xếp dọc trên dưới cực kỳ gọn để chống tràn ngang di động */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start", flexShrink: 0, minWidth: "72px" }}>
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", fontWeight: "800", lineHeight: "1" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start", flexShrink: 0, minWidth: "62px" }}>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.7rem", fontWeight: "800", lineHeight: "1", marginBottom: "1px" }}>
                           #{index + 1}
                         </span>
-                        <span style={{ 
-                          fontSize: "0.65rem", 
-                          color: "var(--accent-electric-blue)", 
-                          fontWeight: "700", 
-                          background: "rgba(0, 236, 255, 0.06)", 
-                          border: "1px solid rgba(0, 236, 255, 0.12)",
-                          padding: "1px 4px",
-                          borderRadius: "3px",
-                          whiteSpace: "nowrap",
-                          lineHeight: "1.2"
-                        }}>
-                          {getMatchRoundText(match.id) || "Giao hữu"}
-                        </span>
+                        {(() => {
+                          const text = getMatchRoundText(match.id);
+                          if (!text) {
+                            return (
+                              <span style={{ 
+                                fontSize: "0.62rem", 
+                                color: "var(--text-muted)", 
+                                fontWeight: "700", 
+                                background: "rgba(255,255,255,0.03)", 
+                                border: "1px solid rgba(255,255,255,0.06)",
+                                padding: "1px 4px",
+                                borderRadius: "3px",
+                                whiteSpace: "nowrap",
+                                lineHeight: "1.1"
+                              }}>
+                                Giao hữu
+                              </span>
+                            );
+                          }
+                          const parts = text.split(" - ");
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start" }}>
+                              <span style={{ 
+                                fontSize: "0.65rem", 
+                                color: "var(--accent-electric-blue)", 
+                                fontWeight: "800", 
+                                background: "rgba(0, 236, 255, 0.05)",
+                                border: "1px solid rgba(0, 236, 255, 0.12)",
+                                padding: "1px 4px",
+                                borderRadius: "3px",
+                                whiteSpace: "nowrap",
+                                lineHeight: "1.1"
+                              }}>
+                                {parts[0]}
+                              </span>
+                              {parts[1] && (
+                                <span style={{ 
+                                  fontSize: "0.62rem", 
+                                  color: "var(--accent-neon-green)", 
+                                  fontWeight: "800", 
+                                  background: "rgba(57, 255, 20, 0.05)",
+                                  border: "1px solid rgba(57, 255, 20, 0.12)",
+                                  padding: "1px 4px",
+                                  borderRadius: "3px",
+                                  whiteSpace: "nowrap",
+                                  lineHeight: "1.1"
+                                }}>
+                                  {parts[1]}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Đội A */}
