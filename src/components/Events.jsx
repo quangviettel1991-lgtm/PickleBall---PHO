@@ -266,13 +266,20 @@ export default function Events({ data, setData, isAdmin }) {
             [a.scoreDiff, b.scoreDiff]
           ];
         } else if (eventSortBy === "won") {
-          valA = a.won;
-          valB = b.won;
+          const diffA = a.won - a.lost;
+          const diffB = b.won - b.lost;
           
+          valA = diffA;
+          valB = diffB;
+          
+          if (diffA !== diffB) {
+            return eventSortOrder === "desc" ? diffB - diffA : diffA - diffB;
+          }
+          // Nếu cùng hiệu số W-L: Ưu tiên người có nhiều trận thắng hơn (won)
           if (a.won !== b.won) {
             return eventSortOrder === "desc" ? b.won - a.won : a.won - b.won;
           }
-          // Nếu xếp theo thắng-thua, mà số trận thắng bằng nhau: xem mức tăng Elo
+          // Nếu số trận thắng bằng nhau: xem mức tăng Elo
           if (a.eloChange !== b.eloChange) {
             return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
           }
