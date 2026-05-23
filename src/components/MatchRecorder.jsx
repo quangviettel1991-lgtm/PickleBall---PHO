@@ -1583,18 +1583,26 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
                       {/* Tỷ số lớn & Sets chi tiết */}
                       <div className="match-score-section">
-                        <div className="match-score-pill">
-                          <span className={teamAWin ? "score-winner" : "score-loser"}>{match.scoreA}</span>
-                          <span style={{ color: "var(--text-muted)" }}>:</span>
-                          <span className={teamBWin ? "score-winner" : "score-loser"}>{match.scoreB}</span>
-                        </div>
-                        <div className="match-sets-detail">
-                          {match.sets && match.sets.map((s, idx) => (
-                            <span key={idx}>
-                              {s.a}-{s.b}{idx < match.sets.length - 1 ? ", " : ""}
-                            </span>
-                          ))}
-                        </div>
+                        {match.played === false ? (
+                          <div className="match-unplayed-badge">
+                            Chưa đấu
+                          </div>
+                        ) : (
+                          <>
+                            <div className="match-score-pill">
+                              <span className={teamAWin ? "score-winner" : "score-loser"}>{match.scoreA}</span>
+                              <span style={{ color: "var(--text-muted)" }}>:</span>
+                              <span className={teamBWin ? "score-winner" : "score-loser"}>{match.scoreB}</span>
+                            </div>
+                            <div className="match-sets-detail">
+                              {match.sets && match.sets.map((s, idx) => (
+                                <span key={idx}>
+                                  {s.a}-{s.b}{idx < match.sets.length - 1 ? ", " : ""}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* Đội B */}

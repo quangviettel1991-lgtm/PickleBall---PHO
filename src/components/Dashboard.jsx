@@ -18,6 +18,7 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
   
   // Sắp xếp trận đấu theo thời gian gần nhất
   const recentMatches = [...matches]
+    .filter(m => m.played !== false)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 2);
 

@@ -273,6 +273,13 @@ export function recalculateAllElos(data) {
   const calculatedMatches = sortedMatches.map(match => {
     const { type, teamA, teamB, scoreA, scoreB } = match;
 
+    if (match.played === false) {
+      return {
+        ...match,
+        eloChanges: {}
+      };
+    }
+
     // Bản đồ Elo của các người chơi ngay trước khi trận đấu này diễn ra
     const runningElos = {};
     data.members.forEach(m => {

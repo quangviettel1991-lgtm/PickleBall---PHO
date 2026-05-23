@@ -51,6 +51,9 @@ export default function Leaderboard({ data }) {
   // Bộ lọc các trận đấu dựa trên điều kiện
   const filteredMatches = useMemo(() => {
     return matches.filter(match => {
+      // Bỏ qua các trận đấu chưa diễn ra
+      if (match.played === false) return false;
+
       // 1. Lọc thể thức
       if (filterType !== "all" && match.type !== filterType) return false;
 

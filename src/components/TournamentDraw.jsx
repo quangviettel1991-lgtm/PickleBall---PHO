@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Shuffle, Users, Calendar, Trophy, Play, Check, HelpCircle, Plus, Trash2, Swords, Award } from "lucide-react";
+import { Shuffle, Users, Calendar, Trophy, Play, Check, HelpCircle, Plus, Minus, Trash2, Swords, Award } from "lucide-react";
 import { recordMatch, recalculateAllElos, saveClubData } from "../utils/db";
 
 export default function TournamentDraw({ data, setData, isAdmin }) {
@@ -805,13 +805,13 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       return;
     }
 
-    let playedMatches = [];
+    let allDrawMatches = [];
     
     if (activeScenario === "mixer") {
       if (drawData) {
         drawData.forEach(round => {
           round.matches.forEach(m => {
-            if (m.played) playedMatches.push(m);
+            allDrawMatches.push(m);
           });
         });
       }
@@ -819,7 +819,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       if (drawData && drawData.rounds) {
         drawData.rounds.forEach(round => {
           round.matches.forEach(m => {
-            if (m.played) playedMatches.push(m);
+            allDrawMatches.push(m);
           });
         });
       }
@@ -827,27 +827,29 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       if (drawData && drawData.rounds) {
         drawData.rounds.forEach(round => {
           round.matches.forEach(m => {
-            if (m.played && !m.isByeMatch) playedMatches.push(m);
+            if (!m.isByeMatch) allDrawMatches.push(m);
           });
         });
       }
     }
 
-    if (playedMatches.length === 0) {
-      alert("Không có trận đấu nào đã được ghi kết quả để đồng bộ. Vui lòng nhập điểm cho ít nhất 1 trận.");
+    if (allDrawMatches.length === 0) {
+      alert("Không tìm thấy lịch đấu nào để đồng bộ. Vui lòng phát sinh lịch đấu trước.");
       return;
     }
 
     const eventName = events.find(ev => ev.id === selectedEventId)?.name || "sự kiện đã chọn";
+    const playedCount = allDrawMatches.filter(m => m.played).length;
+    const unplayedCount = allDrawMatches.length - playedCount;
 
-    if (!window.confirm(`Bạn có chắc chắn muốn chốt kết quả bốc thăm và đồng bộ ${playedMatches.length} trận đấu đã đấu vào sự kiện "${eventName}"? Hệ thống sẽ ghi nhận kết quả và tự động tính toán lại điểm Elo xếp hạng cho toàn CLB.`)) {
+    if (!window.confirm(`Bạn có chắc chắn muốn chốt lịch thi đấu này vào sự kiện "${eventName}"?\n- Tổng số: ${allDrawMatches.length} trận (${playedCount} trận đã đấu, ${unplayedCount} trận chưa đấu).\n- Các trận chưa đấu sẽ hiển thị "Chưa đấu" và có thể cập nhật kết quả sau.\n- Điểm Elo sẽ chỉ tính toán cho các trận đấu đã ghi nhận điểm.`)) {
       return;
     }
 
     // Định dạng các trận đấu theo chuẩn của database
-    const formattedMatches = playedMatches.map(m => {
-      // Đảm bảo id của trận đấu bốc thăm có dạng match_draw_<matchId> để không trùng và có thể cập nhật
+    const formattedMatches = allDrawMatches.map(m => {
       const syncId = m.matchId.startsWith("match_") ? `match_draw_${m.matchId.substring(6)}` : `match_draw_${m.matchId}`;
+      const isPlayed = m.played || false;
       return {
         id: syncId,
         eventId: selectedEventId,
@@ -855,10 +857,10 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         date: m.date || new Date().toISOString(),
         teamA: m.teamA,
         teamB: m.teamB,
-        scoreA: parseInt(m.scoreA) || 0,
-        scoreB: parseInt(m.scoreB) || 0,
-        sets: [{ a: parseInt(m.scoreA) || 0, b: parseInt(m.scoreB) || 0 }],
-        played: true
+        scoreA: isPlayed ? (parseInt(m.scoreA) || 0) : 0,
+        scoreB: isPlayed ? (parseInt(m.scoreB) || 0) : 0,
+        sets: isPlayed ? [{ a: parseInt(m.scoreA) || 0, b: parseInt(m.scoreB) || 0 }] : [],
+        played: isPlayed
       };
     });
 
@@ -1218,6 +1220,57 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           color: #fff;
         }
 
+        /* Stepper Control */
+        .stepper-container {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: var(--bg-input);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 4px;
+          width: 100%;
+          height: 42px;
+          box-sizing: border-box;
+        }
+
+        .stepper-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid var(--border-color);
+          color: var(--text-primary);
+          border-radius: 6px;
+          width: 32px;
+          height: 32px;
+          cursor: pointer;
+          transition: all var(--transition-fast);
+        }
+
+        .stepper-btn:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.1);
+          border-color: rgba(255, 255, 255, 0.2);
+          color: var(--accent-electric-blue);
+        }
+
+        .stepper-btn:active:not(:disabled) {
+          transform: scale(0.95);
+        }
+
+        .stepper-btn:disabled {
+          opacity: 0.3;
+          cursor: not-allowed;
+        }
+
+        .stepper-value {
+          font-family: var(--font-primary);
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          user-select: none;
+        }
+
         /* Responsive */
         @media (max-width: 860px) {
           .setup-grid {
@@ -1281,14 +1334,24 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   <div className="form-group">
                     <label className="form-label">Số lượng sân thi đấu</label>
-                    <input 
-                      type="number" 
-                      min={1} 
-                      max={4} 
-                      className="form-input" 
-                      value={mixerCourts} 
-                      onChange={e => setMixerCourts(Math.max(1, parseInt(e.target.value) || 1))}
-                    />
+                    <div className="stepper-container">
+                      <button 
+                        type="button" 
+                        className="stepper-btn" 
+                        onClick={() => setMixerCourts(prev => Math.max(1, prev - 1))}
+                        disabled={mixerCourts <= 1}
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className="stepper-value">{mixerCourts}</span>
+                      <button 
+                        type="button" 
+                        className="stepper-btn" 
+                        onClick={() => setMixerCourts(prev => prev + 1)}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
                     {selectedMemberIds.length < mixerCourts * 4 && (
                       <div style={{ fontSize: "0.75rem", color: "var(--accent-electric-blue)", marginTop: "4px", lineHeight: "1.4" }}>
                         ⚠️ Cần chọn ít nhất {mixerCourts * 4} người chơi để đấu đủ {mixerCourts} sân (hiện đang chọn {selectedMemberIds.length} người).
@@ -1303,7 +1366,22 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                       max={12} 
                       className="form-input" 
                       value={mixerRounds} 
-                      onChange={e => setMixerRounds(Math.max(1, parseInt(e.target.value) || 1))}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setMixerRounds('');
+                        } else {
+                          const parsed = parseInt(val);
+                          if (!isNaN(parsed)) {
+                            setMixerRounds(parsed);
+                          }
+                        }
+                      }}
+                      onBlur={() => {
+                        if (mixerRounds === '' || mixerRounds < 1) {
+                          setMixerRounds(1);
+                        }
+                      }}
                     />
                   </div>
                 </div>

@@ -168,6 +168,7 @@ export default function Events({ data, setData, isAdmin }) {
     });
 
     eventMatches.forEach(match => {
+      if (match.played === false) return; // Bỏ qua trận chưa đấu
       const allPlayers = [...match.teamA, ...match.teamB];
       const aWon = match.scoreA > match.scoreB;
 
@@ -752,11 +753,17 @@ export default function Events({ data, setData, isAdmin }) {
                         </div>
 
                         {/* Điểm số */}
-                        <div className="match-score-pill" style={{ padding: "4px 10px", fontSize: "0.95rem" }}>
-                          <span className={match.scoreA > match.scoreB ? "score-winner" : "score-loser"}>{match.scoreA}</span>
-                          <span style={{ color: "var(--text-muted)" }}>:</span>
-                          <span className={match.scoreB > match.scoreA ? "score-winner" : "score-loser"}>{match.scoreB}</span>
-                        </div>
+                        {match.played === false ? (
+                          <div className="match-unplayed-badge" style={{ fontSize: "0.75rem", padding: "4px 8px" }}>
+                            Chưa đấu
+                          </div>
+                        ) : (
+                          <div className="match-score-pill" style={{ padding: "4px 10px", fontSize: "0.95rem" }}>
+                            <span className={match.scoreA > match.scoreB ? "score-winner" : "score-loser"}>{match.scoreA}</span>
+                            <span style={{ color: "var(--text-muted)" }}>:</span>
+                            <span className={match.scoreB > match.scoreA ? "score-winner" : "score-loser"}>{match.scoreB}</span>
+                          </div>
+                        )}
 
                         {/* Đội B */}
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
