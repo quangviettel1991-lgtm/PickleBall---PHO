@@ -961,7 +961,7 @@ export default function Events({ data, setData, isAdmin }) {
                         display: "flex", 
                         alignItems: "center",
                         justifyContent: "space-between",
-                        gap: "10px" 
+                        gap: "6px" 
                       }}
                     >
                       {/* Số thứ tự & Lượt trận xếp dọc trên dưới cực kỳ gọn để chống tràn ngang di động */}
@@ -1036,8 +1036,20 @@ export default function Events({ data, setData, isAdmin }) {
                       {/* Điểm số hoặc Trạng thái chưa đấu */}
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
                         {match.played === false ? (
-                          <div className="match-unplayed-badge" style={{ fontSize: "0.68rem", padding: "3px 6px" }}>
-                            Chưa đấu
+                          <div className="match-unplayed-badge" style={{ 
+                            fontSize: "0.6rem", 
+                            padding: "2px 5px", 
+                            display: "flex", 
+                            flexDirection: "column", 
+                            gap: "1px", 
+                            lineHeight: "1.1", 
+                            borderRadius: "4px",
+                            minWidth: "38px",
+                            textAlign: "center",
+                            flexShrink: 0
+                          }}>
+                            <span>Chưa</span>
+                            <span>đấu</span>
                           </div>
                         ) : (
                           <div className="match-score-pill" style={{ padding: "3px 8px", fontSize: "0.85rem" }}>
