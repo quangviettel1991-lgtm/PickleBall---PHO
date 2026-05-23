@@ -994,14 +994,19 @@ export default function Events({ data, setData, isAdmin }) {
       >
         {editingMatch && (
           <form onSubmit={handleEditMatchSubmit}>
-            {/* THÀNH VIÊN ĐỘI A */}
-            <div style={{ marginBottom: "16px" }}>
-              <label className="form-label" style={{ color: "var(--accent-electric-blue)", fontWeight: "700" }}>
-                Đội A {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
-              </label>
-              <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 1</label>
+            {/* THANH ĐIỀU HƯỚNG NÚT LÊN ĐẦU TIÊN THEO YÊU CẦU */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <button type="button" className="btn-secondary" onClick={() => setIsEditMatchOpen(false)} style={{ padding: "8px 16px", fontSize: "0.85rem" }}>Hủy</button>
+              <button type="submit" className="btn-neon-green" style={{ padding: "8px 20px", fontSize: "0.85rem" }}>Xác nhận Lưu</button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+              {/* THÀNH VIÊN ĐỘI A */}
+              <div>
+                <label className="form-label" style={{ color: "var(--accent-electric-blue)", fontWeight: "700", marginBottom: "4px", fontSize: "0.85rem" }}>
+                  Đội A {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
+                </label>
+                <div style={{ display: "flex", gap: "6px", flexDirection: "column" }}>
                   <select 
                     className="form-input"
                     value={editMatchTeamA[0] || ""}
@@ -1010,17 +1015,16 @@ export default function Events({ data, setData, isAdmin }) {
                       newTeam[0] = e.target.value;
                       setEditMatchTeamA(newTeam);
                     }}
+                    style={{ padding: "8px", fontSize: "0.82rem" }}
                     required
                   >
-                    <option value="" disabled>-- Chọn người chơi --</option>
+                    <option value="" disabled>-- Chọn người chơi 1 --</option>
                     {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                      <option key={m.id} value={m.id}>{m.name} ({m.elo})</option>
                     ))}
                   </select>
-                </div>
-                {editingMatch.type === "doubles" && (
-                  <div>
-                    <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 2</label>
+
+                  {editingMatch.type === "doubles" && (
                     <select 
                       className="form-input"
                       value={editMatchTeamA[1] || ""}
@@ -1029,26 +1033,24 @@ export default function Events({ data, setData, isAdmin }) {
                         newTeam[1] = e.target.value;
                         setEditMatchTeamA(newTeam);
                       }}
+                      style={{ padding: "8px", fontSize: "0.82rem" }}
                       required
                     >
-                      <option value="" disabled>-- Chọn người chơi --</option>
+                      <option value="" disabled>-- Chọn người chơi 2 --</option>
                       {members.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                        <option key={m.id} value={m.id}>{m.name} ({m.elo})</option>
                       ))}
                     </select>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* THÀNH VIÊN ĐỘI B */}
-            <div style={{ marginBottom: "16px" }}>
-              <label className="form-label" style={{ color: "var(--accent-neon-green)", fontWeight: "700" }}>
-                Đội B {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
-              </label>
-              <div style={{ display: "flex", gap: "10px", flexDirection: "column" }}>
-                <div>
-                  <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 1</label>
+              {/* THÀNH VIÊN ĐỘI B */}
+              <div>
+                <label className="form-label" style={{ color: "var(--accent-neon-green)", fontWeight: "700", marginBottom: "4px", fontSize: "0.85rem" }}>
+                  Đội B {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
+                </label>
+                <div style={{ display: "flex", gap: "6px", flexDirection: "column" }}>
                   <select 
                     className="form-input"
                     value={editMatchTeamB[0] || ""}
@@ -1057,17 +1059,16 @@ export default function Events({ data, setData, isAdmin }) {
                       newTeam[0] = e.target.value;
                       setEditMatchTeamB(newTeam);
                     }}
+                    style={{ padding: "8px", fontSize: "0.82rem" }}
                     required
                   >
-                    <option value="" disabled>-- Chọn người chơi --</option>
+                    <option value="" disabled>-- Chọn người chơi 1 --</option>
                     {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                      <option key={m.id} value={m.id}>{m.name} ({m.elo})</option>
                     ))}
                   </select>
-                </div>
-                {editingMatch.type === "doubles" && (
-                  <div>
-                    <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Người chơi 2</label>
+
+                  {editingMatch.type === "doubles" && (
                     <select 
                       className="form-input"
                       value={editMatchTeamB[1] || ""}
@@ -1076,59 +1077,56 @@ export default function Events({ data, setData, isAdmin }) {
                         newTeam[1] = e.target.value;
                         setEditMatchTeamB(newTeam);
                       }}
+                      style={{ padding: "8px", fontSize: "0.82rem" }}
                       required
                     >
-                      <option value="" disabled>-- Chọn người chơi --</option>
+                      <option value="" disabled>-- Chọn người chơi 2 --</option>
                       {members.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.elo} Elo)</option>
+                        <option key={m.id} value={m.id}>{m.name} ({m.elo})</option>
                       ))}
                     </select>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* ĐIỂM SỐ */}
-            <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
-              <div style={{ flex: 1 }}>
-                <label className="form-label">Điểm Đội A *</label>
+            {/* ĐIỂM SỐ & THỜI GIAN TRONG HÀNG NGANG SIÊU GỌN */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr", gap: "10px", marginBottom: "4px" }}>
+              <div>
+                <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Điểm A *</label>
                 <input 
                   type="number" 
                   min="0"
                   className="form-input" 
                   value={editMatchScoreA} 
                   onChange={e => setEditMatchScoreA(e.target.value)} 
+                  style={{ padding: "8px", fontSize: "0.82rem" }}
                   required
                 />
               </div>
-              <div style={{ flex: 1 }}>
-                <label className="form-label">Điểm Đội B *</label>
+              <div>
+                <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Điểm B *</label>
                 <input 
                   type="number" 
                   min="0"
                   className="form-input" 
                   value={editMatchScoreB} 
                   onChange={e => setEditMatchScoreB(e.target.value)} 
+                  style={{ padding: "8px", fontSize: "0.82rem" }}
                   required
                 />
               </div>
-            </div>
-
-            {/* THỜI GIAN */}
-            <div style={{ marginBottom: "24px" }}>
-              <label className="form-label">Ngày & Giờ đấu</label>
-              <input 
-                type="datetime-local" 
-                className="form-input" 
-                value={editMatchDate} 
-                onChange={e => setEditMatchDate(e.target.value)} 
-                required
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button type="button" className="btn-secondary" onClick={() => setIsEditMatchOpen(false)}>Hủy</button>
-              <button type="submit" className="btn-neon-green">Xác nhận Lưu</button>
+              <div>
+                <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "4px" }}>Thời gian đấu</label>
+                <input 
+                  type="datetime-local" 
+                  className="form-input" 
+                  value={editMatchDate} 
+                  onChange={e => setEditMatchDate(e.target.value)} 
+                  style={{ padding: "8px", fontSize: "0.82rem" }}
+                  required
+                />
+              </div>
             </div>
           </form>
         )}
