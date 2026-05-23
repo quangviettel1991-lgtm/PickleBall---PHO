@@ -636,10 +636,54 @@ export default function Events({ data, setData, isAdmin }) {
           box-shadow: 0 0 10px var(--accent-neon-green);
         }
 
-        /* Responsive */
+        /* Responsive & Table Alignment overrides matching main Leaderboard */
+        .show-text-on-mobile {
+          display: none;
+        }
+
+        .hide-text-on-mobile {
+          display: inline;
+        }
+
+        .hide-on-mobile {
+          display: table-cell;
+        }
+
         @media (max-width: 900px) {
           .event-detail-grid {
             grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .hide-on-mobile {
+            display: table-cell !important; /* Luôn hiển thị cột trên di động giống BXH */
+          }
+
+          .show-text-on-mobile {
+            display: inline !important;
+          }
+
+          .hide-text-on-mobile {
+            display: none !important;
+          }
+
+          .custom-table td, .custom-table th {
+            padding: 8px 3px !important; /* Kích thước siêu gọn trên di động */
+            font-size: 0.7rem !important;
+          }
+
+          .player-name-cell {
+            max-width: 80px;
+            font-size: 0.72rem !important;
+          }
+
+          .rank-col {
+            width: 24px !important;
+          }
+
+          .player-avatar-sm {
+            display: none !important; /* Ẩn avatar trên di động */
           }
         }
 
