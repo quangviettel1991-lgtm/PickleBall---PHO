@@ -128,7 +128,8 @@ export function addEvent(newEvent) {
     id,
     name: newEvent.name,
     date: newEvent.date || new Date().toISOString().split("T")[0],
-    description: newEvent.description || ""
+    description: newEvent.description || "",
+    isLocked: false
   };
   data.events.push(event);
   saveClubData(data);

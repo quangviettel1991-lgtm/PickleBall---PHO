@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock, Edit2, ArrowUpDown } from "lucide-react";
+import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock, Edit2, ArrowUpDown, Lock, Unlock } from "lucide-react";
 import Modal from "./Modal";
 import { addEvent, deleteEvent, updateEvent, updateMatch, deleteMatch } from "../utils/db";
 
@@ -172,6 +172,26 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
     const updatedData = deleteMatch(matchIdToDelete);
     setData(updatedData);
     setIsDeleteMatchOpen(false);
+  };
+
+  const handleToggleLockEvent = (event) => {
+    if (!isAdmin) {
+      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để thực hiện tính năng này.");
+      return;
+    }
+    const isLocked = !event.isLocked;
+    const confirmMsg = isLocked 
+      ? `Bạn có chắc chắn muốn KHÓA sự kiện "${event.name}"? Sau khi khóa, toàn bộ các trận đấu của sự kiện này sẽ không thể bị thay đổi điểm số, không thể xóa và lịch bốc thăm cũng không thể bị hủy.`
+      : `Bạn có muốn MỞ KHÓA sự kiện "${event.name}"?`;
+    
+    if (window.confirm(confirmMsg)) {
+      const updatedData = updateEvent({
+        id: event.id,
+        isLocked: isLocked
+      });
+      setData(updatedData);
+      setSelectedEvent(updatedData.events.find(e => e.id === event.id));
+    }
   };
 
 
@@ -753,8 +773,15 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
 
           {/* Banner thông tin sự kiện */}
           <div className="glass-panel event-detail-header-card glow-border-green" style={{ position: "relative" }}>
-            <div className="event-card-date">
-              <Calendar size={14} /> <span>Bắt đầu: {formatDate(selectedEvent.date)}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+              <div className="event-card-date" style={{ margin: 0 }}>
+                <Calendar size={14} /> <span>Bắt đầu: {formatDate(selectedEvent.date)}</span>
+              </div>
+              {selectedEvent.isLocked && (
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "0.75rem", fontWeight: "700", color: "var(--color-danger)", background: "rgba(255, 71, 87, 0.08)", border: "1px solid rgba(255, 71, 87, 0.15)", padding: "2px 8px", borderRadius: "20px" }}>
+                  <Lock size={12} /> Đã khóa kết quả
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
               <div style={{ flex: 1, minWidth: "260px" }}>
@@ -774,8 +801,30 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                   </button>
                   <button 
                     className="btn-secondary" 
-                    onClick={() => handleOpenEditEvent(selectedEvent)}
-                    style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: "pointer", border: "1px solid var(--border-color)" }}
+                    onClick={() => handleToggleLockEvent(selectedEvent)}
+                    style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: "pointer", border: `1px solid ${selectedEvent.isLocked ? "var(--color-danger)" : "var(--border-color)"}`, color: selectedEvent.isLocked ? "var(--color-danger)" : "inherit" }}
+                  >
+                    {selectedEvent.isLocked ? (
+                      <>
+                        <Lock size={14} /> Mở khóa sự kiện
+                      </>
+                    ) : (
+                      <>
+                        <Unlock size={14} /> Khóa sự kiện
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => {
+                      if (selectedEvent.isLocked) {
+                        alert("Sự kiện này đã bị khóa, không thể chỉnh sửa thông tin!");
+                        return;
+                      }
+                      handleOpenEditEvent(selectedEvent);
+                    }}
+                    style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: selectedEvent.isLocked ? "not-allowed" : "pointer", border: "1px solid var(--border-color)", opacity: selectedEvent.isLocked ? 0.5 : 1 }}
+                    disabled={selectedEvent.isLocked}
                   >
                     <Edit2 size={14} /> Chỉnh sửa thông tin
                   </button>
@@ -1098,18 +1147,32 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                         <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
                           <button 
                             className="event-action-btn-edit" 
-                            onClick={() => handleOpenEditMatch(match)}
-                            title="Sửa trận đấu"
-                            style={{ width: "28px", height: "28px", borderRadius: "5px" }}
+                            onClick={() => {
+                              if (selectedEvent.isLocked) {
+                                alert("Sự kiện này đã bị khóa, không thể sửa trận đấu!");
+                                return;
+                              }
+                              handleOpenEditMatch(match);
+                            }}
+                            title={selectedEvent.isLocked ? "Sự kiện đã bị khóa" : "Sửa trận đấu"}
+                            style={{ width: "28px", height: "28px", borderRadius: "5px", opacity: selectedEvent.isLocked ? 0.4 : 1, cursor: selectedEvent.isLocked ? "not-allowed" : "pointer" }}
+                            disabled={selectedEvent.isLocked}
                             type="button"
                           >
                             <Edit2 size={12} />
                           </button>
                           <button 
                             className="event-action-btn-delete" 
-                            onClick={() => handleOpenDeleteMatch(match.id)}
-                            title="Xóa trận đấu"
-                            style={{ width: "28px", height: "28px", borderRadius: "5px" }}
+                            onClick={() => {
+                              if (selectedEvent.isLocked) {
+                                alert("Sự kiện này đã bị khóa, không thể xóa trận đấu!");
+                                return;
+                              }
+                              handleOpenDeleteMatch(match.id);
+                            }}
+                            title={selectedEvent.isLocked ? "Sự kiện đã bị khóa" : "Xóa trận đấu"}
+                            style={{ width: "28px", height: "28px", borderRadius: "5px", opacity: selectedEvent.isLocked ? 0.4 : 1, cursor: selectedEvent.isLocked ? "not-allowed" : "pointer" }}
+                            disabled={selectedEvent.isLocked}
                             type="button"
                           >
                             <Trash2 size={12} />
@@ -1154,14 +1217,30 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                     onClick={() => setSelectedEvent(event)}
                   >
                     <div className="event-card-header">
-                      <span className="event-card-date">
-                        <Calendar size={12} /> {formatDate(event.date)}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span className="event-card-date" style={{ margin: 0 }}>
+                          <Calendar size={12} /> {formatDate(event.date)}
+                        </span>
+                        {event.isLocked && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "2px", fontSize: "0.68rem", fontWeight: "700", color: "var(--color-danger)", background: "rgba(255, 71, 87, 0.06)", padding: "1px 6px", borderRadius: "10px", border: "1px solid rgba(255, 71, 87, 0.12)" }}>
+                            <Lock size={9} /> Đã khóa
+                          </span>
+                        )}
+                      </div>
                       {isAdmin && (
                         <button 
                           className="event-action-delete" 
-                          onClick={(e) => handleOpenDelete(event, e)}
-                          title="Xóa sự kiện"
+                          onClick={(e) => {
+                            if (event.isLocked) {
+                              e.stopPropagation();
+                              alert("Sự kiện này đã bị khóa, không thể xóa!");
+                              return;
+                            }
+                            handleOpenDelete(event, e);
+                          }}
+                          title={event.isLocked ? "Sự kiện đã bị khóa" : "Xóa sự kiện"}
+                          style={{ opacity: event.isLocked ? 0.3 : 1, cursor: event.isLocked ? "not-allowed" : "pointer" }}
+                          disabled={event.isLocked}
                         >
                           <Trash2 size={14} />
                         </button>

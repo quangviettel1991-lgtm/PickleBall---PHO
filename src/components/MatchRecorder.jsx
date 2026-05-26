@@ -208,9 +208,19 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
     setEditingMatchId(null);
   };
 
+  const isMatchEventLocked = (match) => {
+    if (!match.eventId) return false;
+    const event = events.find(e => e.id === match.eventId);
+    return event?.isLocked || false;
+  };
+
   // --- XỬ LÝ SỬA & XÓA ---
 
   const handleEditClick = (match) => {
+    if (isMatchEventLocked(match)) {
+      alert("Trận đấu này thuộc sự kiện đã bị khóa. Không thể chỉnh sửa.");
+      return;
+    }
     setEditingMatchId(match.id);
     setMatchType(match.type);
     setEventId(match.eventId || "");
@@ -260,6 +270,12 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   };
 
   const handleDeleteClick = (matchId) => {
+    const match = data.matches?.find(m => m.id === matchId);
+    if (match && isMatchEventLocked(match)) {
+      alert("Trận đấu này thuộc sự kiện đã bị khóa. Không thể xóa.");
+      return;
+    }
+
     if (window.confirm("Bạn có chắc chắn muốn xóa trận đấu này không? Hệ thống sẽ tự động tính toán lại toàn bộ lịch sử điểm Elo của tất cả thành viên liên quan để đảm bảo tính nhất quán tuyệt đối.")) {
       const updatedData = deleteMatch(matchId);
       setData(updatedData);
@@ -294,6 +310,17 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
   const handleBulkDelete = () => {
     if (selectedMatchIds.length === 0) return;
+    
+    // Kiểm tra xem có trận nào thuộc sự kiện bị khóa không
+    const hasLockedMatch = selectedMatchIds.some(id => {
+      const match = data.matches?.find(m => m.id === id);
+      return match && isMatchEventLocked(match);
+    });
+
+    if (hasLockedMatch) {
+      alert("Một hoặc nhiều trận đấu đã chọn thuộc sự kiện đã bị khóa. Không thể xóa hàng loạt.");
+      return;
+    }
     
     if (window.confirm(`Bạn có chắc chắn muốn xóa ${selectedMatchIds.length} trận đấu đã chọn không? Hệ thống sẽ tự động tính toán lại toàn bộ lịch sử Elo của tất cả thành viên liên quan từ ban đầu để bảo đảm sự nhất quán toán học tuyệt đối.`)) {
       const updatedData = deleteMatches(selectedMatchIds);
@@ -460,6 +487,23 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!matchOutcome.isValid) return;
+
+    // Kiểm tra xem sự kiện có bị khóa không
+    const targetEventId = eventId || "";
+    const targetEvent = events.find(ev => ev.id === targetEventId);
+    if (targetEvent?.isLocked) {
+      alert("Sự kiện này đã bị khóa. Không thể tạo mới hoặc cập nhật trận đấu.");
+      return;
+    }
+
+    // Nếu đang sửa trận đấu, kiểm tra xem trận cũ có thuộc sự kiện bị khóa không
+    if (editingMatchId) {
+      const oldMatch = data.matches?.find(m => m.id === editingMatchId);
+      if (oldMatch && isMatchEventLocked(oldMatch)) {
+        alert("Trận đấu này thuộc sự kiện đã bị khóa. Không thể chỉnh sửa.");
+        return;
+      }
+    }
 
     const teamA = matchType === "singles" ? [playerA1] : [playerA1, playerA2];
     const teamB = matchType === "singles" ? [playerB1] : [playerB1, playerB2];
@@ -1536,11 +1580,12 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                     {/* Hộp chọn nhiều để xóa cho Admin */}
                     {isAdmin && (
                       <div className="match-checkbox-container">
-                        <label className="custom-checkbox-label">
+                        <label className="custom-checkbox-label" style={{ opacity: isMatchEventLocked(match) ? 0.3 : 1, cursor: isMatchEventLocked(match) ? "not-allowed" : "pointer" }}>
                           <input 
                             type="checkbox" 
                             className="custom-checkbox-input"
                             checked={selectedMatchIds.includes(match.id)}
+                            disabled={isMatchEventLocked(match)}
                             onChange={(e) => handleSelectMatch(match.id, e.target.checked)}
                           />
                           <span className="custom-checkbox-box"></span>
@@ -1643,15 +1688,19 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
                       <div className="match-actions">
                         <button 
                           className="btn-action-edit" 
-                          title="Sửa trận đấu"
+                          title={isMatchEventLocked(match) ? "Sự kiện đã bị khóa" : "Sửa trận đấu"}
                           onClick={() => handleEditClick(match)}
+                          style={{ opacity: isMatchEventLocked(match) ? 0.4 : 1, cursor: isMatchEventLocked(match) ? "not-allowed" : "pointer" }}
+                          disabled={isMatchEventLocked(match)}
                         >
                           <Edit2 size={14} />
                         </button>
                         <button 
                           className="btn-action-delete" 
-                          title="Xóa trận đấu"
+                          title={isMatchEventLocked(match) ? "Sự kiện đã bị khóa" : "Xóa trận đấu"}
                           onClick={() => handleDeleteClick(match.id)}
+                          style={{ opacity: isMatchEventLocked(match) ? 0.4 : 1, cursor: isMatchEventLocked(match) ? "not-allowed" : "pointer" }}
+                          disabled={isMatchEventLocked(match)}
                         >
                           <Trash2 size={14} />
                         </button>

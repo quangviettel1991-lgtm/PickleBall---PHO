@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Shuffle, Users, Calendar, Trophy, Play, Check, HelpCircle, Plus, Minus, Trash2, Swords, Award } from "lucide-react";
+import { Shuffle, Users, Calendar, Trophy, Play, Check, HelpCircle, Plus, Minus, Trash2, Swords, Award, Lock, Unlock } from "lucide-react";
 import { recordMatch, recalculateAllElos, saveClubData } from "../utils/db";
 
 export default function TournamentDraw({ data, setData, isAdmin }) {
@@ -9,6 +9,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   const [selectedEventId, setSelectedEventId] = useState(() => {
     return localStorage.getItem("draw_selected_event_id") || "";
   });
+
+  const selectedEventObj = useMemo(() => {
+    return events.find(e => e.id === selectedEventId) || null;
+  }, [events, selectedEventId]);
+
+  const isEventLocked = selectedEventObj?.isLocked || false;
 
   // Hàm helper dùng để lấy giá trị từ localStorage với cơ chế phân vùng và fallback thông minh
   const getLocalStorageFallback = (key, defaultVal, isJson = false) => {
@@ -282,6 +288,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     const actualRounds = parseInt(mixerRounds) || 4;
     const actualCourts = parseInt(mixerCourts) || 1;
 
+    // Thuật toán xáo trộn Fisher-Yates helper
+    const shuffleArray = (arr) => {
+      const newArr = [...arr];
+      for (let i = newArr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = newArr[i];
+        newArr[i] = newArr[j];
+        newArr[j] = temp;
+      }
+      return newArr;
+    };
+
     for (let r = 0; r < actualRounds; r++) {
       // Sắp xếp người chơi theo số lần đã đấu (tăng dần), ưu tiên người vừa nghỉ ở lượt trước
       const sortedPlayers = [...players].sort((a, b) => {
@@ -304,51 +322,63 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         sitoutHistory[p].push(sittingPlayers.includes(p));
       });
 
-      const courtMatches = [];
-      const pool = [...activePlayers];
+      // Chạy nhiều vòng xáo trộn để tìm ra cách chia cặp có ít lượt trùng lặp nhất toàn cục
+      let bestRoundMatches = null;
+      let bestRoundScore = Infinity;
+      const iterations = 1000;
 
-      for (let c = 0; c < numPlayersNeeded / 4; c++) {
-        const p1 = pool.shift();
-        
-        // Chọn đồng đội p2 ghép cặp ít nhất với p1
-        pool.sort((a, b) => (partnerCounts[p1][a] || 0) - (partnerCounts[p1][b] || 0));
-        const p2 = pool.shift();
+      for (let iter = 0; iter < iterations; iter++) {
+        const shuffledActive = shuffleArray(activePlayers);
+        let currentRoundScore = 0;
+        const currentMatches = [];
 
-        // Tìm 2 đối thủ p3, p4 từ số người còn lại sao cho ít lặp nhất
-        let bestPairIdx = [0, 1];
-        let minRepetition = Infinity;
+        for (let c = 0; c < numPlayersNeeded / 4; c++) {
+          const p1 = shuffledActive[c * 4];
+          const p2 = shuffledActive[c * 4 + 1];
+          const p3 = shuffledActive[c * 4 + 2];
+          const p4 = shuffledActive[c * 4 + 3];
 
-        for (let i = 0; i < pool.length; i++) {
-          for (let j = i + 1; j < pool.length; j++) {
-            const cand3 = pool[i];
-            const cand4 = pool[j];
+          const partner12 = partnerCounts[p1][p2] || 0;
+          const partner34 = partnerCounts[p3][p4] || 0;
 
-            const partner34 = partnerCounts[cand3][cand4] || 0;
-            const opp13 = opponentCounts[p1][cand3] || 0;
-            const opp14 = opponentCounts[p1][cand4] || 0;
-            const opp23 = opponentCounts[p2][cand3] || 0;
-            const opp24 = opponentCounts[p2][cand4] || 0;
+          const opp13 = opponentCounts[p1][p3] || 0;
+          const opp14 = opponentCounts[p1][p4] || 0;
+          const opp23 = opponentCounts[p2][p3] || 0;
+          const opp24 = opponentCounts[p2][p4] || 0;
 
-            const score = partner34 + (opp13 + opp14 + opp23 + opp24);
-            if (score < minRepetition) {
-              minRepetition = score;
-              bestPairIdx = [i, j];
-            }
-          }
+          // Phạt lũy tiến theo bình phương số lần trùng lắp
+          const partnerPenalty = Math.pow(partner12, 2) + Math.pow(partner34, 2);
+          const opponentPenalty = Math.pow(opp13, 2) + Math.pow(opp14, 2) + Math.pow(opp23, 2) + Math.pow(opp24, 2);
+
+          // Phạt trùng lặp đồng đội nặng hơn phạt trùng lặp đối thủ (đồng đội là hệ số 5)
+          currentRoundScore += partnerPenalty * 5 + opponentPenalty;
+
+          currentMatches.push({
+            courtIndex: c + 1,
+            teamA: [p1, p2],
+            teamB: [p3, p4],
+            scoreA: null,
+            scoreB: null,
+            played: false
+          });
         }
 
-        const p3 = pool.splice(bestPairIdx[1], 1)[0];
-        const p4 = pool.splice(bestPairIdx[0], 1)[0];
+        if (currentRoundScore < bestRoundScore) {
+          bestRoundScore = currentRoundScore;
+          bestRoundMatches = currentMatches;
+          if (bestRoundScore === 0) {
+            // Đã đạt kết quả hoàn hảo (không trùng đồng đội/đối thủ nào trong vòng này)
+            break;
+          }
+        }
+      }
 
-        courtMatches.push({
-          matchId: `mixer_m_${r}_${c}_${Date.now()}`,
-          courtIndex: c + 1,
-          teamA: [p1, p2],
-          teamB: [p3, p4],
-          scoreA: null,
-          scoreB: null,
-          played: false
-        });
+      // Lưu kết quả ghép cặp tốt nhất và gán ID trận đấu
+      bestRoundMatches.forEach((m, c) => {
+        m.matchId = `mixer_m_${r}_${c}_${Date.now()}`;
+
+        const [p1, p2] = m.teamA;
+        const [p3, p4] = m.teamB;
 
         playCounts[p1]++; playCounts[p2]++; playCounts[p3]++; playCounts[p4]++;
         partnerCounts[p1][p2]++; partnerCounts[p2][p1]++;
@@ -359,11 +389,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         };
         updateOpp(p1, p3); updateOpp(p1, p4);
         updateOpp(p2, p3); updateOpp(p2, p4);
-      }
+      });
 
       rounds.push({
         roundIndex: r + 1,
-        matches: courtMatches,
+        matches: bestRoundMatches,
         sittingOut: sittingPlayers
       });
     }
@@ -660,6 +690,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
   // --- KÍCH HOẠT BỐC THĂM CHUNG ---
   const handleGenerateDraw = () => {
+    if (isEventLocked) {
+      alert("Sự kiện này đã bị khóa. Không thể bốc thăm hoặc lập lịch đấu mới.");
+      return;
+    }
+
     if (!selectedEventId) {
       alert("Vui lòng tạo hoặc chọn một Sự kiện / Giải đấu trước khi bốc thăm.");
       return;
@@ -675,6 +710,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   };
 
   const handleClearDraw = () => {
+    if (isEventLocked) {
+      alert("Sự kiện này đã bị khóa. Không thể hủy lịch đấu.");
+      return;
+    }
+
     if (window.confirm("Bạn có chắc muốn hủy lịch đấu vừa bốc thăm? Tất cả các trận đấu đã ghi nhận điểm từ lịch đấu này cũng sẽ bị xóa khỏi hệ thống và tính lại Elo.")) {
       setDrawGenerated(false);
       setDrawData(null);
@@ -701,6 +741,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
   // --- XỬ LÝ NHẬP ĐIỂM SỐ CHO TRẬN BỐC THĂM ---
   const handleOpenScoring = (match) => {
+    if (isEventLocked) {
+      alert("Sự kiện này đã bị khóa. Không thể thay đổi hoặc ghi điểm số.");
+      return;
+    }
+
     if (!isAdmin) {
       alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để ghi kết quả thi đấu.");
       return;
@@ -826,6 +871,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   };
 
   const handleDeleteMatch = (matchId) => {
+    if (isEventLocked) {
+      alert("Sự kiện này đã bị khóa. Không thể xóa trận đấu.");
+      return;
+    }
+
     if (!isAdmin) {
       alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để xóa trận đấu.");
       return;
@@ -882,6 +932,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   };
 
   const handleFinalizeDraw = () => {
+    if (isEventLocked) {
+      alert("Sự kiện này đã bị khóa. Không thể chốt kết quả lịch đấu.");
+      return;
+    }
+
     if (!isAdmin) {
       alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để chốt kết quả bốc thăm.");
       return;
@@ -1700,7 +1755,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             
             <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
               {isAdmin ? (
-                <button className="btn-neon-green" onClick={handleFinalizeDraw} style={{ boxShadow: "0 0 15px rgba(212, 252, 52, 0.25)" }}>
+                <button 
+                  className="btn-neon-green" 
+                  onClick={handleFinalizeDraw} 
+                  style={{ boxShadow: "0 0 15px rgba(212, 252, 52, 0.25)", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
+                  disabled={isEventLocked}
+                >
                   <Check size={16} /> Chốt Kết Quả Lịch Đấu
                 </button>
               ) : (
@@ -1709,7 +1769,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 </button>
               )}
               
-              <button className="btn-secondary" onClick={handleClearDraw} style={{ borderColor: "rgba(255, 71, 87, 0.2)", color: "var(--color-danger)" }}>
+              <button 
+                className="btn-secondary" 
+                onClick={handleClearDraw} 
+                style={{ borderColor: "rgba(255, 71, 87, 0.2)", color: "var(--color-danger)", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
+                disabled={isEventLocked}
+              >
                 <Trash2 size={16} /> Hủy Lịch Đấu / Bốc Thăm Lại
               </button>
             </div>
@@ -1738,7 +1803,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                         {match.played ? (
                           <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
                         ) : (
-                          <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
+                          <button 
+                            className="btn-neon-green btn-draw-record" 
+                            onClick={() => handleOpenScoring(match)} 
+                            style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
+                            disabled={isEventLocked}
+                          >
                             <Swords size={10} /> Nhập kết quả
                           </button>
                         )}
@@ -1749,16 +1819,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                               background: "transparent", 
                               border: "none", 
                               color: "var(--color-danger)", 
-                              cursor: "pointer", 
+                              cursor: isEventLocked ? "not-allowed" : "pointer", 
                               display: "flex", 
                               alignItems: "center", 
                               padding: "4px",
                               transition: "transform 0.15s ease",
-                              borderRadius: "4px"
+                              borderRadius: "4px",
+                              opacity: isEventLocked ? 0.3 : 1
                             }}
-                            title="Xóa trận đấu"
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            title={isEventLocked ? "Sự kiện đã bị khóa" : "Xóa trận đấu"}
+                            disabled={isEventLocked}
+                            onMouseEnter={(e) => { if (!isEventLocked) e.currentTarget.style.transform = 'scale(1.15)'; }}
+                            onMouseLeave={(e) => { if (!isEventLocked) e.currentTarget.style.transform = 'scale(1)'; }}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -1812,7 +1884,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                         {match.played ? (
                           <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
                         ) : (
-                          <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem" }}>
+                          <button 
+                            className="btn-neon-green btn-draw-record" 
+                            onClick={() => handleOpenScoring(match)} 
+                            style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
+                            disabled={isEventLocked}
+                          >
                             <Swords size={10} /> Nhập kết quả
                           </button>
                         )}
@@ -1823,16 +1900,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                               background: "transparent", 
                               border: "none", 
                               color: "var(--color-danger)", 
-                              cursor: "pointer", 
+                              cursor: isEventLocked ? "not-allowed" : "pointer", 
                               display: "flex", 
                               alignItems: "center", 
                               padding: "4px",
                               transition: "transform 0.15s ease",
-                              borderRadius: "4px"
+                              borderRadius: "4px",
+                              opacity: isEventLocked ? 0.3 : 1
                             }}
-                            title="Xóa trận đấu"
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                            title={isEventLocked ? "Sự kiện đã bị khóa" : "Xóa trận đấu"}
+                            disabled={isEventLocked}
+                            onMouseEnter={(e) => { if (!isEventLocked) e.currentTarget.style.transform = 'scale(1.15)'; }}
+                            onMouseLeave={(e) => { if (!isEventLocked) e.currentTarget.style.transform = 'scale(1)'; }}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -1912,16 +1991,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                                 background: "transparent", 
                                 border: "none", 
                                 color: "var(--color-danger)", 
-                                cursor: "pointer", 
+                                cursor: isEventLocked ? "not-allowed" : "pointer", 
                                 display: "flex", 
                                 alignItems: "center", 
                                 padding: "4px",
                                 transition: "transform 0.15s ease",
-                                zIndex: 10
+                                zIndex: 10,
+                                opacity: isEventLocked ? 0.3 : 1
                               }}
-                              title="Xóa trận đấu"
-                              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-                              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                              title={isEventLocked ? "Sự kiện đã bị khóa" : "Xóa trận đấu"}
+                              disabled={isEventLocked}
+                              onMouseEnter={(e) => { if (!isEventLocked) e.currentTarget.style.transform = 'scale(1.15)'; }}
+                              onMouseLeave={(e) => { if (!isEventLocked) e.currentTarget.style.transform = 'scale(1)'; }}
                             >
                               <Trash2 size={12} />
                             </button>
@@ -1952,7 +2033,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
                           {/* Nhập điểm (nếu có đủ 2 đội và chưa đấu, và không phải trận đấu tự động Bye) */}
                           {!match.played && !isAEmpty && !isBEmpty && !match.isByeMatch && (
-                            <button className="btn-neon-green btn-draw-record" onClick={() => handleOpenScoring(match)} style={{ marginTop: "8px" }}>
+                            <button 
+                              className="btn-neon-green btn-draw-record" 
+                              onClick={() => handleOpenScoring(match)} 
+                              style={{ marginTop: "8px", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
+                              disabled={isEventLocked}
+                            >
                               <Swords size={12} /> Ghi điểm
                             </button>
                           )}
