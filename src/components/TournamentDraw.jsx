@@ -150,6 +150,8 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   // 1. Kịch bản Mixer
   const [mixerCourts, setMixerCourts] = useState(1);
   const [mixerRounds, setMixerRounds] = useState(4);
+  const [mixerMatchmaking, setMixerMatchmaking] = useState("rotation"); // rotation, balanced, similar
+  const [mixerPrioritizeSimilarEarly, setMixerPrioritizeSimilarEarly] = useState(true);
   
   // 2. Kịch bản Vòng tròn (Round Robin)
   const [rrFormat, setRrFormat] = useState("doubles"); // singles, doubles
@@ -346,12 +348,36 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           const opp23 = opponentCounts[p2][p3] || 0;
           const opp24 = opponentCounts[p2][p4] || 0;
 
+          const elo1 = members.find(m => m.id === p1)?.elo || 1200;
+          const elo2 = members.find(m => m.id === p2)?.elo || 1200;
+          const elo3 = members.find(m => m.id === p3)?.elo || 1200;
+          const elo4 = members.find(m => m.id === p4)?.elo || 1200;
+
           // Phạt lũy tiến theo bình phương số lần trùng lắp
           const partnerPenalty = Math.pow(partner12, 2) + Math.pow(partner34, 2);
           const opponentPenalty = Math.pow(opp13, 2) + Math.pow(opp14, 2) + Math.pow(opp23, 2) + Math.pow(opp24, 2);
 
           // Phạt trùng lặp đồng đội nặng hơn phạt trùng lặp đối thủ (đồng đội là hệ số 5)
-          currentRoundScore += partnerPenalty * 5 + opponentPenalty;
+          let matchImbalancePenalty = partnerPenalty * 5 + opponentPenalty;
+
+          // Tính toán điểm phạt trình độ Elo
+          let eloPenalty = 0;
+          const isEarlyRoundSimilar = mixerPrioritizeSimilarEarly && r < Math.ceil(actualRounds / 2);
+
+          if (mixerMatchmaking === "balanced") {
+            // Cân bằng sức mạnh 2 đội: |Elo_A - Elo_B| nhỏ nhất
+            const eloTeamA = (elo1 + elo2) / 2;
+            const eloTeamB = (elo3 + elo4) / 2;
+            eloPenalty = Math.abs(eloTeamA - eloTeamB) * 0.25;
+          } else if (mixerMatchmaking === "similar" || isEarlyRoundSimilar) {
+            // Trình độ ngang tài ngang sức trên cùng sân: max - min Elo nhỏ nhất
+            const elos = [elo1, elo2, elo3, elo4];
+            const spread = Math.max(...elos) - Math.min(...elos);
+            const spreadWeight = isEarlyRoundSimilar ? 0.6 : 0.3;
+            eloPenalty = spread * spreadWeight;
+          }
+
+          currentRoundScore += matchImbalancePenalty + eloPenalty;
 
           currentMatches.push({
             courtIndex: c + 1,
@@ -1527,8 +1553,35 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                     />
                   </div>
                 </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "16px", alignItems: "center" }}>
+                  <div className="form-group">
+                    <label className="form-label">Chế độ ghép cặp (Elo)</label>
+                    <select 
+                      className="form-select" 
+                      value={mixerMatchmaking} 
+                      onChange={e => setMixerMatchmaking(e.target.value)}
+                    >
+                      <option value="rotation">Xoay vòng đa dạng (Mặc định)</option>
+                      <option value="balanced">Cân bằng sức mạnh (Mạnh + Yếu)</option>
+                      <option value="similar">Trình độ ngang tài ngang sức</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "16px" }}>
+                    <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
+                      <input 
+                        type="checkbox" 
+                        checked={mixerPrioritizeSimilarEarly} 
+                        onChange={e => setMixerPrioritizeSimilarEarly(e.target.checked)}
+                        style={{ width: "16px", height: "16px", accentColor: "var(--accent-neon-green)", cursor: "pointer" }}
+                      />
+                      <span>Ngang cơ đầu giải</span>
+                    </label>
+                  </div>
+                </div>
+
                 <div style={{ padding: "14px", background: "rgba(0,236,255,0.03)", border: "1px solid rgba(0,236,255,0.1)", borderRadius: "8px", fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: "1.5" }}>
-                  💡 <strong>Kịch bản Xoay Tua:</strong> Cực kỳ thích hợp cho các buổi sinh hoạt CLB. Thuật toán sẽ tự động chia cặp sao cho <strong>ai cũng được đổi bạn đánh cùng/đối thủ liên tục</strong>, số trận ra sân bằng nhau tối đa và không ai phải ngồi ngoài nghỉ 2 trận liên tục.
+                  💡 <strong>Kịch bản Xoay Tua:</strong> Thích hợp cho sinh hoạt CLB. Thuật toán tự động xếp lịch sao cho <strong>mọi người ra sân công bằng</strong>, hạn chế ngồi ngoài trùng nhau và hỗ trợ <strong>cân đối trình độ dựa trên điểm Elo</strong> của từng thành viên.
                 </div>
               </div>
             )}
