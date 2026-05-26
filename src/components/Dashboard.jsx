@@ -3,6 +3,8 @@ import { Users, Swords, Calendar, Trophy, ChevronRight, UserPlus, Play } from "l
 import Modal from "./Modal";
 import { addMember } from "../utils/db";
 
+const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "Pickleball Phở";
+
 export default function Dashboard({ data, setData, setActiveTab, setRecorderSubTab }) {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [memberName, setMemberName] = useState("");
@@ -628,7 +630,7 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
       <div className="dashboard-main">
         {/* Banner chào mừng */}
         <div className="welcome-banner">
-          <h1 className="welcome-title">Xin chào, <span>Pickleball Phở!</span></h1>
+          <h1 className="welcome-title">Xin chào, <span>{CLUB_NAME}!</span></h1>
           <p className="welcome-subtitle">
             Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.
           </p>

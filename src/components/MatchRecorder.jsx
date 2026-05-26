@@ -3,6 +3,8 @@ import { Swords, Calendar, Award, AlertCircle, Plus, Minus, Check, Lock, Search,
 import { recordMatch, updateMatch, deleteMatch, deleteMatches } from "../utils/db";
 import { calculateSinglesElo, calculateDoublesElo } from "../utils/elo";
 
+const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "PICKLEBALL PHỞ";
+
 export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, setIsAdmin, subTab: externalSubTab, setSubTab: externalSetSubTab }) {
   const { members, events } = data;
 
@@ -1476,7 +1478,7 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
       {/* Tiêu đề chính */}
       <div className="recorder-header-main">
         <Swords size={28} style={{ color: "var(--accent-neon-green)" }} />
-        <h1 className="recorder-title">PICKLEBALL PHỞ RECORD</h1>
+        <h1 className="recorder-title">{CLUB_NAME.toUpperCase()} RECORD</h1>
       </div>
 
       {/* Thanh sub-tabs */}

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, X, Shuffle, MoreHorizontal, CreditCard } from "lucide-react";
 
+const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "PICKLEBALL PHỞ";
+
 export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, isModalOpen, setIsModalOpen }) {
   const [pinInput, setPinInput] = useState("");
   const [error, setError] = useState("");
@@ -484,7 +486,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
         `}} />
         <div className="mobile-header-brand">
           <div className="mobile-header-logo">PB</div>
-          <span className="mobile-header-text">PICKLEBALL PHỞ PRO RANK</span>
+          <span className="mobile-header-text">{CLUB_NAME.toUpperCase()} PRO RANK</span>
         </div>
         
         {/* Nút Admin Lock trên di động */}
@@ -500,7 +502,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
       <div className="navbar-content">
         <div className="navbar-brand" onClick={() => setActiveTab("dashboard")}>
           <div className="navbar-brand-logo">PB</div>
-          <span className="navbar-brand-text">PICKLEBALL PHỞ</span>
+          <span className="navbar-brand-text">{CLUB_NAME}</span>
           <span className="navbar-brand-tag">PRO RANK</span>
         </div>
         <div className="navbar-menu">

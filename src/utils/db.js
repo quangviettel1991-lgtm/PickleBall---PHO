@@ -2,7 +2,9 @@ import { initialMembers, initialEvents, initialMatches, initialTransactions } fr
 import { calculateSinglesElo, calculateDoublesElo } from "./elo";
 import { updateRemoteData } from "./supabase";
 
-const STORAGE_KEY = "pickleball_club_data";
+const CLUB_ID = import.meta.env.VITE_CLUB_ID || "1";
+const STORAGE_KEY = `pickleball_club_data_${CLUB_ID}`;
+const UPDATED_AT_KEY = `pickleball_club_data_updated_at_${CLUB_ID}`;
 
 // Lấy toàn bộ dữ liệu từ localStorage
 export function getClubData() {
@@ -17,7 +19,7 @@ export function getClubData() {
       transactions: initialTransactions
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
-    localStorage.setItem("pickleball_club_data_updated_at", new Date(0).toISOString());
+    localStorage.setItem(UPDATED_AT_KEY, new Date(0).toISOString());
     return defaultData;
   }
   try {
@@ -31,7 +33,7 @@ export function getClubData() {
       transactions: initialTransactions
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
-    localStorage.setItem("pickleball_club_data_updated_at", new Date(0).toISOString());
+    localStorage.setItem(UPDATED_AT_KEY, new Date(0).toISOString());
     return defaultData;
   }
 }
@@ -40,7 +42,7 @@ export function getClubData() {
 export function saveClubData(data) {
   const timestamp = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  localStorage.setItem("pickleball_club_data_updated_at", timestamp);
+  localStorage.setItem(UPDATED_AT_KEY, timestamp);
   // Đồng bộ ngầm lên đám mây Supabase
   updateRemoteData(data, timestamp).then(success => {
     if (success) {

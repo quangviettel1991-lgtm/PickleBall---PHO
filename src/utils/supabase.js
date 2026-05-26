@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://wnmatztyaowvudlellha.supabase.co";
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubWF0enR5YW93dnVkbGVsbGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MDg5MDcsImV4cCI6MjA5NDk4NDkwN30.l6jV2IMlYg08oz90TtaX5U-Vuineov84hNPTGut3Kns";
 
+const CLUB_ID = parseInt(import.meta.env.VITE_CLUB_ID) || 1;
+
 // Kiểm tra xem đã điền đầy đủ và đúng thông tin cấu hình chưa
 const isConfigured = 
   supabaseUrl && 
@@ -30,7 +32,7 @@ export async function fetchRemoteData() {
     const { data, error } = await supabase
       .from("pickleball_club")
       .select("data, updated_at")
-      .eq("id", 1)
+      .eq("id", CLUB_ID)
       .single();
 
     if (error) {
@@ -55,7 +57,7 @@ export async function fetchRemoteTimestamp() {
     const { data, error } = await supabase
       .from("pickleball_club")
       .select("updated_at")
-      .eq("id", 1)
+      .eq("id", CLUB_ID)
       .single();
 
     if (error) {
@@ -82,7 +84,7 @@ export async function updateRemoteData(clubData, customTimestamp = null) {
     const { error } = await supabase
       .from("pickleball_club")
       .upsert({
-        id: 1,
+        id: CLUB_ID,
         data: clubData,
         updated_at: timestamp
       });
