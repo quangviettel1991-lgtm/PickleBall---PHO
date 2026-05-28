@@ -202,7 +202,32 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
     if (!selectedEvent) return [];
     return matches
       .filter(m => m.eventId === selectedEvent.id)
-      .sort((a, b) => new Date(b.date) - new Date(a.date)); // Mới nhất lên đầu
+      .sort((a, b) => {
+        // Trích xuất thông tin vòng và sân/trận đấu để sắp xếp theo thứ tự giải đấu (Vòng 1 -> Vòng 10)
+        const getSortKey = (match) => {
+          if (match.id && match.id.startsWith("match_draw_")) {
+            const parts = match.id.split("_");
+            if (parts.length >= 6) {
+              const roundNum = parseInt(parts[4]) || 0;
+              const courtNum = parseInt(parts[5]) || 0;
+              // Quy đổi thành số trọng số để so sánh (ví dụ: vòng 1 sân 2 -> 0 * 1000 + 1 = 1)
+              return roundNum * 1000 + courtNum;
+            }
+          }
+          // Nếu là giao hữu tự do không thuộc draw, xếp xuống cuối cùng bằng cách dùng thời gian date
+          return 999999 + (new Date(match.date).getTime() || 0) * 0.000001;
+        };
+
+        const keyA = getSortKey(a);
+        const keyB = getSortKey(b);
+        
+        if (keyA !== keyB) {
+          return keyA - keyB; // Sắp xếp tăng dần theo Vòng -> Sân
+        }
+        
+        // Nếu cùng khóa hoặc không thuộc bốc thăm, xếp trận mới nhất lên đầu
+        return new Date(b.date) - new Date(a.date);
+      });
   }, [selectedEvent, matches]);
 
   // Tính toán bảng xếp hạng riêng cho sự kiện (BXH Sự kiện)
