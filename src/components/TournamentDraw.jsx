@@ -150,8 +150,6 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   // 1. Kịch bản Mixer
   const [mixerCourts, setMixerCourts] = useState(1);
   const [mixerRounds, setMixerRounds] = useState(4);
-  const [mixerMatchmaking, setMixerMatchmaking] = useState("rotation"); // rotation, balanced, similar
-  const [mixerPrioritizeSimilarEarly, setMixerPrioritizeSimilarEarly] = useState(true);
   
   // 2. Kịch bản Vòng tròn (Round Robin)
   const [rrFormat, setRrFormat] = useState("doubles"); // singles, doubles
@@ -360,24 +358,41 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           // Phạt trùng lặp đồng đội nặng hơn phạt trùng lặp đối thủ (đồng đội là hệ số 5)
           let matchImbalancePenalty = partnerPenalty * 5 + opponentPenalty;
 
-          // Tính toán điểm phạt trình độ Elo
-          let eloPenalty = 0;
-          const isEarlyRoundSimilar = mixerPrioritizeSimilarEarly && r < Math.ceil(actualRounds / 2);
+          // Phát hiện và loại bỏ TUYỆT ĐỐI trận đấu một chiều "Mạnh Mạnh vs Yếu Yếu"
+          // (Một đội có cả 2 người đều mạnh hơn cả 2 người đội kia)
+          const isOneSided = (Math.min(elo1, elo2) > Math.max(elo3, elo4)) || (Math.min(elo3, elo4) > Math.max(elo1, elo2));
+          const oneSidedPenalty = isOneSided ? 20000 : 0;
 
-          if (mixerMatchmaking === "balanced") {
-            // Cân bằng sức mạnh 2 đội: |Elo_A - Elo_B| nhỏ nhất
-            const eloTeamA = (elo1 + elo2) / 2;
-            const eloTeamB = (elo3 + elo4) / 2;
-            eloPenalty = Math.abs(eloTeamA - eloTeamB) * 0.25;
-          } else if (mixerMatchmaking === "similar" || isEarlyRoundSimilar) {
-            // Trình độ ngang tài ngang sức trên cùng sân: max - min Elo nhỏ nhất
+          // Tính toán điểm phạt trình độ Elo theo nguyên tắc VÒNG XEN KẼ
+          let eloPenalty = 0;
+          if (r % 2 === 0) {
+            // Các vòng lẻ (1, 3, 5...): Ưu tiên Trình độ ngang cơ trên cùng sân (Elo spread nhỏ nhất)
             const elos = [elo1, elo2, elo3, elo4];
             const spread = Math.max(...elos) - Math.min(...elos);
-            const spreadWeight = isEarlyRoundSimilar ? 0.6 : 0.3;
-            eloPenalty = spread * spreadWeight;
+            eloPenalty = spread * 0.8;
+          } else {
+            // Các vòng chẵn (2, 4, 6...): Ưu tiên Cân bằng lực lượng (Mạnh + Yếu, chênh lệch Elo 2 đội ít nhất)
+            const eloTeamA = (elo1 + elo2) / 2;
+            const eloTeamB = (elo3 + elo4) / 2;
+            eloPenalty = Math.abs(eloTeamA - eloTeamB) * 1.5;
           }
 
-          currentRoundScore += matchImbalancePenalty + eloPenalty;
+          // Phạt tránh trùng lặp cả cụm 4 người ở vòng liên tiếp
+          let overlapPenalty = 0;
+          if (r > 0 && rounds[r - 1]) {
+            const currentPlayers = [p1, p2, p3, p4];
+            rounds[r - 1].matches.forEach(prevMatch => {
+              const prevPlayers = [...prevMatch.teamA, ...prevMatch.teamB];
+              const commonCount = currentPlayers.filter(p => prevPlayers.includes(p)).length;
+              if (commonCount === 4) {
+                overlapPenalty += 15000; // Phạt cực nặng nếu cùng 4 người đổi vị trí
+              } else if (commonCount === 3) {
+                overlapPenalty += 200;   // Phạt vừa nếu trùng 3 người trên cùng sân
+              }
+            });
+          }
+
+          currentRoundScore += matchImbalancePenalty + oneSidedPenalty + eloPenalty + overlapPenalty;
 
           currentMatches.push({
             courtIndex: c + 1,
@@ -1551,32 +1566,6 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                         }
                       }}
                     />
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "16px", alignItems: "center" }}>
-                  <div className="form-group">
-                    <label className="form-label">Chế độ ghép cặp (Elo)</label>
-                    <select 
-                      className="form-select" 
-                      value={mixerMatchmaking} 
-                      onChange={e => setMixerMatchmaking(e.target.value)}
-                    >
-                      <option value="rotation">Xoay vòng đa dạng (Mặc định)</option>
-                      <option value="balanced">Cân bằng sức mạnh (Mạnh + Yếu)</option>
-                      <option value="similar">Trình độ ngang tài ngang sức</option>
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "16px" }}>
-                    <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}>
-                      <input 
-                        type="checkbox" 
-                        checked={mixerPrioritizeSimilarEarly} 
-                        onChange={e => setMixerPrioritizeSimilarEarly(e.target.checked)}
-                        style={{ width: "16px", height: "16px", accentColor: "var(--accent-neon-green)", cursor: "pointer" }}
-                      />
-                      <span>Ngang cơ đầu giải</span>
-                    </label>
                   </div>
                 </div>
 
