@@ -1893,9 +1893,23 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                     
                     <div className="match-teams-score-row">
                       {/* Đội A */}
-                      <div className="draw-team-box">
-                        <span className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff" }}>
-                          {match.teamA.map(p => getPlayerName(p)).join(" + ")}
+                      <div className="draw-team-box" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        <div className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff", display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                          {match.teamA.map((p, idx) => {
+                            const player = members.find(m => m.id === p);
+                            const name = player ? player.name : "Cựu thành viên";
+                            const elo = player ? player.elo : 1200;
+                            return (
+                              <span key={p} style={{ display: "inline-flex", alignItems: "center" }}>
+                                {idx > 0 && <span style={{ marginRight: "4px", marginLeft: "2px" }}>+</span>}
+                                <span>{name}</span>
+                                <span style={{ color: "var(--accent-electric-blue)", fontSize: "0.75rem", marginLeft: "2px", fontWeight: "700" }}>({elo})</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "700" }}>
+                          Tổng Elo: <span style={{ color: "var(--accent-neon-green)" }}>{match.teamA.reduce((sum, id) => sum + (members.find(m => m.id === id)?.elo || 1200), 0)}</span>
                         </span>
                       </div>
                       
@@ -1909,9 +1923,23 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                       )}
 
                       {/* Đội B */}
-                      <div className="draw-team-box" style={{ textAlign: "right" }}>
-                        <span className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff" }}>
-                          {match.teamB.map(p => getPlayerName(p)).join(" + ")}
+                      <div className="draw-team-box" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", textAlign: "right" }}>
+                        <div className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff", display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
+                          {match.teamB.map((p, idx) => {
+                            const player = members.find(m => m.id === p);
+                            const name = player ? player.name : "Cựu thành viên";
+                            const elo = player ? player.elo : 1200;
+                            return (
+                              <span key={p} style={{ display: "inline-flex", alignItems: "center" }}>
+                                {idx > 0 && <span style={{ marginRight: "4px", marginLeft: "2px" }}>+</span>}
+                                <span>{name}</span>
+                                <span style={{ color: "var(--accent-electric-blue)", fontSize: "0.75rem", marginLeft: "2px", fontWeight: "700" }}>({elo})</span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: "700" }}>
+                          Tổng Elo: <span style={{ color: "var(--accent-neon-green)" }}>{match.teamB.reduce((sum, id) => sum + (members.find(m => m.id === id)?.elo || 1200), 0)}</span>
                         </span>
                       </div>
                     </div>
