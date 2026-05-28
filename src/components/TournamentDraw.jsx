@@ -1202,7 +1202,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         .draw-results-container {
           display: flex;
           flex-direction: column;
-          gap: 24px;
+          gap: 12px;
         }
 
         .draw-actions-top {
@@ -1212,24 +1212,24 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         }
 
         .round-box {
-          padding: 16px;
-          margin-bottom: 16px;
+          padding: 8px 12px;
+          margin-bottom: 8px;
         }
 
         .round-title {
-          font-size: 1.05rem;
+          font-size: 0.92rem;
           font-weight: 800;
           color: var(--accent-neon-green);
-          margin-bottom: 12px;
+          margin-bottom: 6px;
           border-bottom: 1px solid var(--border-color);
-          padding-bottom: 6px;
+          padding-bottom: 4px;
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
 
         .mixer-sitout-badge {
-          font-size: 0.75rem;
+          font-size: 0.72rem;
           color: var(--text-muted);
           font-weight: 500;
         }
@@ -1237,22 +1237,22 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         .round-matches-list {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-          gap: 12px;
+          gap: 8px;
         }
 
         .match-draw-card {
-          padding: 12px 14px;
+          padding: 6px 10px;
           background: rgba(255,255,255,0.015);
           border: 1px solid rgba(255,255,255,0.04);
-          border-radius: 10px;
+          border-radius: 8px;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 4px;
           position: relative;
         }
 
         .match-court-header {
-          font-size: 0.72rem;
+          font-size: 0.68rem;
           text-transform: uppercase;
           color: var(--text-muted);
           font-weight: 750;
@@ -1263,7 +1263,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 8px;
         }
 
         .draw-team-box {
@@ -1850,7 +1850,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               <div className="round-matches-list">
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "6px", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "3px", marginBottom: "2px" }}>
                       <div className="match-court-header" style={{ marginBottom: 0 }}>Sân thi đấu {match.courtIndex}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {match.played ? (
@@ -1959,7 +1959,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               <div className="round-matches-list">
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "6px", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "3px", marginBottom: "2px" }}>
                       <div className="match-court-header" style={{ marginBottom: 0 }}>Trận đấu</div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {match.played ? (
