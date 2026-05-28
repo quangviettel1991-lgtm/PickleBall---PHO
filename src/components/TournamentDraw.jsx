@@ -352,11 +352,11 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           const elo4 = members.find(m => m.id === p4)?.elo || 1200;
 
           // Phạt lũy tiến theo bình phương số lần trùng lắp
-          const partnerPenalty = Math.pow(partner12, 2) + Math.pow(partner34, 2);
-          const opponentPenalty = Math.pow(opp13, 2) + Math.pow(opp14, 2) + Math.pow(opp23, 2) + Math.pow(opp24, 2);
+          // Dùng trọng số cực lớn để đảm bảo TRÁNH LẶP ĐỒNG ĐỘI/ĐỐI THỦ luôn là ưu tiên hàng đầu, cao hơn nhiều so với căn chỉnh Elo!
+          const partnerPenalty = (Math.pow(partner12, 2) + Math.pow(partner34, 2)) * 2000; // 1 lần trùng phạt 2000đ (lớn hơn tối đa phạt Elo)
+          const opponentPenalty = (Math.pow(opp13, 2) + Math.pow(opp14, 2) + Math.pow(opp23, 2) + Math.pow(opp24, 2)) * 300; // 1 lần trùng phạt 300đ
 
-          // Phạt trùng lặp đồng đội nặng hơn phạt trùng lặp đối thủ (đồng đội là hệ số 5)
-          let matchImbalancePenalty = partnerPenalty * 5 + opponentPenalty;
+          let matchImbalancePenalty = partnerPenalty + opponentPenalty;
 
           // Phát hiện và loại bỏ TUYỆT ĐỐI trận đấu một chiều "Mạnh Mạnh vs Yếu Yếu"
           // (Một đội có cả 2 người đều mạnh hơn cả 2 người đội kia)
