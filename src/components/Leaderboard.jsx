@@ -8,6 +8,7 @@ export default function Leaderboard({ data }) {
   const [filterType, setFilterType] = useState("all"); // all, singles, doubles
   const [filterEvent, setFilterEvent] = useState("all"); // all, eventId
   const [filterPeriod, setFilterPeriod] = useState("all"); // all, today, week, month, custom
+  const [showGuests, setShowGuests] = useState(false);
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
 
@@ -127,12 +128,18 @@ export default function Leaderboard({ data }) {
     });
 
     // Nếu đang lọc theo một giải đấu/sự kiện cụ thể, loại bỏ thành viên chưa đấu trận nào trong giải đấu đó
+    let filteredList = list;
     if (filterEvent !== "all") {
-      return list.filter(member => member.played > 0);
+      filteredList = filteredList.filter(member => member.played > 0);
     }
 
-    return list;
-  }, [members, filteredMatches, filterEvent]);
+    // Lọc khách mời
+    if (!showGuests) {
+      filteredList = filteredList.filter(member => !member.isGuest);
+    }
+
+    return filteredList;
+  }, [members, filteredMatches, filterEvent, showGuests]);
 
   // Sắp xếp dữ liệu bảng xếp hạng
   const sortedLeaderboard = useMemo(() => {
@@ -485,7 +492,16 @@ export default function Leaderboard({ data }) {
         <h1 className="leaderboard-title">
           <Trophy size={24} /> Bảng Xếp Hạng CLB
         </h1>
-        <div style={{ display: "flex", gap: "8px" }} className="match-event-tag">
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }} className="match-event-tag">
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+            <input 
+              type="checkbox" 
+              checked={showGuests} 
+              onChange={e => setShowGuests(e.target.checked)}
+              style={{ accentColor: "var(--accent-neon-green)", cursor: "pointer" }}
+            />
+            Hiển thị khách mời
+          </label>
           <span>{filteredMatches.length} trận đấu được tính</span>
         </div>
       </div>
@@ -686,7 +702,23 @@ export default function Leaderboard({ data }) {
                             {member.name.charAt(0)}
                           </div>
                           <div className="player-info-details">
-                            <span className="player-name-cell">{member.name}</span>
+                            <span className="player-name-cell" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              {member.name}
+                              {member.isGuest && (
+                                <span style={{
+                                  padding: "2px 6px",
+                                  fontSize: "0.65rem",
+                                  fontWeight: "700",
+                                  borderRadius: "4px",
+                                  background: "rgba(255, 165, 2, 0.15)",
+                                  color: "var(--color-warning)",
+                                  border: "1px solid rgba(255, 165, 2, 0.25)",
+                                  lineHeight: 1
+                                }}>
+                                  Khách
+                                </span>
+                              )}
+                            </span>
                           </div>
                         </div>
                       </td>

@@ -22,6 +22,7 @@ export default function Members({ data, setData, isAdmin }) {
   const [gender, setGender] = useState("Nam");
   const [eloSingles, setEloSingles] = useState("1000");
   const [eloDoubles, setEloDoubles] = useState("1200");
+  const [isGuest, setIsGuest] = useState(false);
   const [joinDate, setJoinDate] = useState("");
 
   // Tìm kiếm và lọc thành viên
@@ -164,6 +165,7 @@ export default function Members({ data, setData, isAdmin }) {
     setGender("Nam");
     setEloSingles("1000");
     setEloDoubles("1200");
+    setIsGuest(false);
     setJoinDate(new Date().toISOString().split("T")[0]);
     setIsAddOpen(true);
   };
@@ -172,7 +174,7 @@ export default function Members({ data, setData, isAdmin }) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const updatedData = addMember({ name, phone, gender, eloSingles, eloDoubles, joinDate });
+    const updatedData = addMember({ name, phone, gender, eloSingles, eloDoubles, isGuest, joinDate });
     setData(updatedData);
     setIsAddOpen(false);
   };
@@ -185,6 +187,7 @@ export default function Members({ data, setData, isAdmin }) {
     setGender(member.gender);
     setEloSingles((member.eloSingles !== undefined ? member.eloSingles : 1000).toString());
     setEloDoubles((member.eloDoubles !== undefined ? member.eloDoubles : member.elo).toString());
+    setIsGuest(!!member.isGuest);
     setJoinDate(member.joinDate);
     setIsEditOpen(true);
   };
@@ -193,7 +196,7 @@ export default function Members({ data, setData, isAdmin }) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const updatedData = updateMember({ id: memberId, name, phone, gender, eloSingles, eloDoubles, joinDate });
+    const updatedData = updateMember({ id: memberId, name, phone, gender, eloSingles, eloDoubles, isGuest, joinDate });
     setData(updatedData);
     
     // Nếu đang mở hồ sơ của người này, cập nhật lại dữ liệu hiển thị hồ sơ
@@ -695,7 +698,22 @@ export default function Members({ data, setData, isAdmin }) {
               </div>
 
               {/* Tên */}
-              <h3 className="member-card-name">{member.name}</h3>
+              <h3 className="member-card-name" style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
+                {member.name}
+                {member.isGuest && (
+                  <span style={{
+                    padding: "2px 6px",
+                    fontSize: "0.65rem",
+                    fontWeight: "700",
+                    borderRadius: "4px",
+                    background: "rgba(255, 165, 2, 0.15)",
+                    color: "var(--color-warning)",
+                    border: "1px solid rgba(255, 165, 2, 0.25)"
+                  }}>
+                    Khách
+                  </span>
+                )}
+              </h3>
 
               {/* SĐT */}
               <div className="member-card-info">
@@ -735,7 +753,22 @@ export default function Members({ data, setData, isAdmin }) {
                 {selectedMember.name.charAt(0)}
               </div>
               <div className="profile-header-info">
-                <h2 className="profile-name">{selectedMember.name}</h2>
+                <h2 className="profile-name" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {selectedMember.name}
+                  {selectedMember.isGuest && (
+                    <span style={{
+                      padding: "2px 6px",
+                      fontSize: "0.65rem",
+                      fontWeight: "700",
+                      borderRadius: "4px",
+                      background: "rgba(255, 165, 2, 0.15)",
+                      color: "var(--color-warning)",
+                      border: "1px solid rgba(255, 165, 2, 0.25)"
+                    }}>
+                      Khách mời
+                    </span>
+                  )}
+                </h2>
                 <div className="profile-meta-list">
                   <div className="profile-meta-item">
                     <Phone size={14} /> <span>{selectedMember.phone || "Chưa cập nhật"}</span>
@@ -961,9 +994,28 @@ export default function Members({ data, setData, isAdmin }) {
             </div>
           </div>
 
+          <div style={{ marginBottom: "16px" }}>
+            <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+              <input 
+                type="checkbox" 
+                checked={isGuest} 
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setIsGuest(checked);
+                  if (checked) {
+                    setEloSingles("1000");
+                    setEloDoubles("1000");
+                  }
+                }}
+                style={{ width: "auto", height: "auto", margin: 0, accentColor: "var(--accent-neon-green)" }}
+              />
+              <span style={{ fontSize: "0.9rem", color: "#fff", fontWeight: "600" }}>Khai báo là Khách mời (Mặc định 1000 Elo)</span>
+            </label>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <div>
-              <label className="form-label">Elo Đơn khởi điểm</label>
+              <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Elo Đơn khởi điểm</label>
               <input 
                 type="number" 
                 className="form-input" 
@@ -971,10 +1023,12 @@ export default function Members({ data, setData, isAdmin }) {
                 onChange={e => setEloSingles(e.target.value)} 
                 min="100" 
                 max="3000"
+                disabled={isGuest}
+                style={{ opacity: isGuest ? 0.6 : 1 }}
               />
             </div>
             <div>
-              <label className="form-label">Elo Đôi khởi điểm</label>
+              <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Elo Đôi khởi điểm</label>
               <input 
                 type="number" 
                 className="form-input" 
@@ -982,6 +1036,8 @@ export default function Members({ data, setData, isAdmin }) {
                 onChange={e => setEloDoubles(e.target.value)} 
                 min="100" 
                 max="3000"
+                disabled={isGuest}
+                style={{ opacity: isGuest ? 0.6 : 1 }}
               />
             </div>
           </div>
@@ -1040,9 +1096,28 @@ export default function Members({ data, setData, isAdmin }) {
             </div>
           </div>
 
+          <div style={{ marginBottom: "16px" }}>
+            <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+              <input 
+                type="checkbox" 
+                checked={isGuest} 
+                onChange={e => {
+                  const checked = e.target.checked;
+                  setIsGuest(checked);
+                  if (checked) {
+                    setEloSingles("1000");
+                    setEloDoubles("1000");
+                  }
+                }}
+                style={{ width: "auto", height: "auto", margin: 0, accentColor: "var(--accent-neon-green)" }}
+              />
+              <span style={{ fontSize: "0.9rem", color: "#fff", fontWeight: "600" }}>Khai báo là Khách mời (Mặc định 1000 Elo)</span>
+            </label>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <div>
-              <label className="form-label">Điểm Elo Đơn</label>
+              <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Điểm Elo Đơn</label>
               <input 
                 type="number" 
                 className="form-input" 
@@ -1050,10 +1125,12 @@ export default function Members({ data, setData, isAdmin }) {
                 onChange={e => setEloSingles(e.target.value)} 
                 min="100" 
                 max="3000"
+                disabled={isGuest}
+                style={{ opacity: isGuest ? 0.6 : 1 }}
               />
             </div>
             <div>
-              <label className="form-label">Điểm Elo Đôi</label>
+              <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Điểm Elo Đôi</label>
               <input 
                 type="number" 
                 className="form-input" 
@@ -1061,6 +1138,8 @@ export default function Members({ data, setData, isAdmin }) {
                 onChange={e => setEloDoubles(e.target.value)} 
                 min="100" 
                 max="3000"
+                disabled={isGuest}
+                style={{ opacity: isGuest ? 0.6 : 1 }}
               />
             </div>
           </div>

@@ -965,7 +965,23 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                                   {member.name.charAt(0)}
                                 </div>
                                 <div className="player-info-details">
-                                  <span className="player-name-cell">{member.name}</span>
+                                  <span className="player-name-cell" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                    {member.name}
+                                    {member.isGuest && (
+                                      <span style={{
+                                        padding: "2px 6px",
+                                        fontSize: "0.65rem",
+                                        fontWeight: "700",
+                                        borderRadius: "4px",
+                                        background: "rgba(255, 165, 2, 0.15)",
+                                        color: "var(--color-warning)",
+                                        border: "1px solid rgba(255, 165, 2, 0.25)",
+                                        lineHeight: 1
+                                      }}>
+                                        Khách
+                                      </span>
+                                    )}
+                                  </span>
                                 </div>
                               </div>
                             </td>

@@ -93,17 +93,22 @@ export function clearAllData() {
 export function addMember(newMember) {
   const data = getClubData();
   const id = "m_" + Date.now();
-  const baseElo = parseInt(newMember.elo) || 1200;
+  const isGuest = !!newMember.isGuest;
+  const baseEloSingles = isGuest ? 1000 : (parseInt(newMember.eloSingles) || 1000);
+  const baseEloDoubles = isGuest ? 1000 : (parseInt(newMember.eloDoubles) || 1200);
   const member = {
     id,
     name: newMember.name,
     phone: newMember.phone || "",
     gender: newMember.gender || "Nam",
     joinDate: newMember.joinDate || new Date().toISOString().split("T")[0],
-    elo: baseElo,
-    eloSingles: baseElo,
-    eloDoubles: baseElo,
-    initialElo: baseElo,
+    elo: baseEloDoubles,
+    eloSingles: baseEloSingles,
+    eloDoubles: baseEloDoubles,
+    initialElo: baseEloDoubles,
+    initialEloSingles: baseEloSingles,
+    initialEloDoubles: baseEloDoubles,
+    isGuest,
     avatarColor: newMember.avatarColor || getRandomColor()
   };
   data.members.push(member);
@@ -113,16 +118,22 @@ export function addMember(newMember) {
 
 export function updateMember(updatedMember) {
   const data = getClubData();
-  const newElo = parseInt(updatedMember.elo);
+  const isGuest = !!updatedMember.isGuest;
+  const eloSingles = isGuest ? 1000 : (parseInt(updatedMember.eloSingles) || 1000);
+  const eloDoubles = isGuest ? 1000 : (parseInt(updatedMember.eloDoubles) || 1200);
+
   data.members = data.members.map(m => 
     m.id === updatedMember.id 
       ? { 
           ...m, 
           ...updatedMember, 
-          elo: newElo, 
-          eloSingles: newElo,
-          eloDoubles: newElo,
-          initialElo: newElo 
+          elo: eloDoubles, 
+          eloSingles,
+          eloDoubles,
+          initialElo: eloDoubles,
+          initialEloSingles: eloSingles,
+          initialEloDoubles: eloDoubles,
+          isGuest
         } 
       : m
   );
@@ -301,10 +312,10 @@ export function recalculateAllElos(data) {
   data.members = data.members.map(m => {
     const baseDoublesElo = m.initialEloDoubles !== undefined 
       ? m.initialEloDoubles 
-      : (m.initialElo !== undefined ? m.initialElo : (demoElos[m.id] || 1200));
+      : (m.initialElo !== undefined ? m.initialElo : (demoElos[m.id] || (m.isGuest ? 1000 : 1200)));
     const baseSinglesElo = m.initialEloSingles !== undefined 
       ? m.initialEloSingles 
-      : 1000; // Reset all singles Elo to 1000 by default since no one has played singles before!
+      : (m.isGuest ? 1000 : 1000); // Reset all singles Elo to 1000 by default since no one has played singles before!
 
     return {
       ...m,
