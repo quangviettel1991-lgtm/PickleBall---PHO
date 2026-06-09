@@ -406,17 +406,17 @@ export default function MatchRecorder({ data, setData, setActiveTab, isAdmin, se
 
     const eloPreview = {};
     if (matchType === "singles") {
-      const eloA = pA1.elo;
-      const eloB = pB1.elo;
+      const eloA = pA1.eloSingles !== undefined ? pA1.eloSingles : pA1.elo;
+      const eloB = pB1.eloSingles !== undefined ? pB1.eloSingles : pB1.elo;
       const { changeA, changeB } = calculateSinglesElo(eloA, eloB, finalScoreA, finalScoreB);
       
       eloPreview[playerA1] = { name: pA1.name, before: eloA, after: Math.max(100, eloA + changeA), change: changeA };
       eloPreview[playerB1] = { name: pB1.name, before: eloB, after: Math.max(100, eloB + changeB), change: changeB };
     } else {
-      const eloA1 = pA1.elo;
-      const eloA2 = pA2.elo;
-      const eloB1 = pB1.elo;
-      const eloB2 = pB2.elo;
+      const eloA1 = pA1.eloDoubles !== undefined ? pA1.eloDoubles : pA1.elo;
+      const eloA2 = pA2.eloDoubles !== undefined ? pA2.eloDoubles : pA2.elo;
+      const eloB1 = pB1.eloDoubles !== undefined ? pB1.eloDoubles : pB1.elo;
+      const eloB2 = pB2.eloDoubles !== undefined ? pB2.eloDoubles : pB2.elo;
 
       const { changeA, changeB } = calculateDoublesElo([eloA1, eloA2], [eloB1, eloB2], finalScoreA, finalScoreB);
 

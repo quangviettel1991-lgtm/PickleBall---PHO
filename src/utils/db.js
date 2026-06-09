@@ -23,7 +23,20 @@ export function getClubData() {
     return defaultData;
   }
   try {
-    return JSON.parse(dataStr);
+    const data = JSON.parse(dataStr);
+    // Tự động nâng cấp cấu trúc dữ liệu cũ (di trú) nếu thiếu trường initialEloSingles hoặc initialEloDoubles
+    const needsMigration = data.members && data.members.some(m => m.initialEloSingles === undefined || m.initialEloDoubles === undefined);
+    if (needsMigration) {
+      console.log("Phát hiện dữ liệu định dạng cũ. Đang tự động tính toán lại Elo Đơn và Đôi...");
+      recalculateAllElos(data);
+      // Ghi lại dữ liệu mới vào localStorage
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      // Tự động đồng bộ lên đám mây với nhãn thời gian hiện tại
+      const timestamp = new Date().toISOString();
+      localStorage.setItem(UPDATED_AT_KEY, timestamp);
+      updateRemoteData(data, timestamp);
+    }
+    return data;
   } catch (e) {
     console.error("Lỗi parse dữ liệu từ localStorage, thiết lập lại dữ liệu mẫu cục bộ", e);
     const defaultData = {
@@ -80,14 +93,17 @@ export function clearAllData() {
 export function addMember(newMember) {
   const data = getClubData();
   const id = "m_" + Date.now();
+  const baseElo = parseInt(newMember.elo) || 1200;
   const member = {
     id,
     name: newMember.name,
     phone: newMember.phone || "",
     gender: newMember.gender || "Nam",
     joinDate: newMember.joinDate || new Date().toISOString().split("T")[0],
-    elo: parseInt(newMember.elo) || 1200,
-    initialElo: parseInt(newMember.elo) || 1200,
+    elo: baseElo,
+    eloSingles: baseElo,
+    eloDoubles: baseElo,
+    initialElo: baseElo,
     avatarColor: newMember.avatarColor || getRandomColor()
   };
   data.members.push(member);
@@ -97,16 +113,20 @@ export function addMember(newMember) {
 
 export function updateMember(updatedMember) {
   const data = getClubData();
+  const newElo = parseInt(updatedMember.elo);
   data.members = data.members.map(m => 
     m.id === updatedMember.id 
       ? { 
           ...m, 
           ...updatedMember, 
-          elo: parseInt(updatedMember.elo), 
-          initialElo: parseInt(updatedMember.elo) 
+          elo: newElo, 
+          eloSingles: newElo,
+          eloDoubles: newElo,
+          initialElo: newElo 
         } 
       : m
   );
+  recalculateAllElos(data);
   saveClubData(data);
   return data;
 }
@@ -171,9 +191,11 @@ export function recordMatch(matchData) {
   const { type, eventId, teamA, teamB, scoreA, scoreB, sets } = matchData;
   
   // Lấy Elo hiện tại của các người chơi
-  const membersMap = {};
+  const membersMapSingles = {};
+  const membersMapDoubles = {};
   data.members.forEach(m => {
-    membersMap[m.id] = m.elo;
+    membersMapSingles[m.id] = m.eloSingles !== undefined ? m.eloSingles : m.elo;
+    membersMapDoubles[m.id] = m.eloDoubles !== undefined ? m.eloDoubles : m.elo;
   });
 
   // Khai báo Elo thay đổi
@@ -183,8 +205,8 @@ export function recordMatch(matchData) {
     const playerAId = teamA[0];
     const playerBId = teamB[0];
     
-    const eloA = membersMap[playerAId] || 1200;
-    const eloB = membersMap[playerBId] || 1200;
+    const eloA = membersMapSingles[playerAId] || 1200;
+    const eloB = membersMapSingles[playerBId] || 1200;
 
     const { changeA, changeB } = calculateSinglesElo(eloA, eloB, scoreA, scoreB);
     eloChanges[playerAId] = changeA;
@@ -192,8 +214,16 @@ export function recordMatch(matchData) {
 
     // Cập nhật Elo của người chơi trong danh sách thành viên
     data.members = data.members.map(m => {
-      if (m.id === playerAId) return { ...m, elo: Math.max(100, m.elo + changeA) };
-      if (m.id === playerBId) return { ...m, elo: Math.max(100, m.elo + changeB) };
+      if (m.id === playerAId) return { 
+        ...m, 
+        eloSingles: Math.max(100, (m.eloSingles !== undefined ? m.eloSingles : m.elo) + changeA),
+        elo: Math.max(100, m.elo + changeA) 
+      };
+      if (m.id === playerBId) return { 
+        ...m, 
+        eloSingles: Math.max(100, (m.eloSingles !== undefined ? m.eloSingles : m.elo) + changeB),
+        elo: Math.max(100, m.elo + changeB) 
+      };
       return m;
     });
 
@@ -203,10 +233,10 @@ export function recordMatch(matchData) {
     const pB1Id = teamB[0];
     const pB2Id = teamB[1];
 
-    const eloA1 = membersMap[pA1Id] || 1200;
-    const eloA2 = membersMap[pA2Id] || 1200;
-    const eloB1 = membersMap[pB1Id] || 1200;
-    const eloB2 = membersMap[pB2Id] || 1200;
+    const eloA1 = membersMapDoubles[pA1Id] || 1200;
+    const eloA2 = membersMapDoubles[pA2Id] || 1200;
+    const eloB1 = membersMapDoubles[pB1Id] || 1200;
+    const eloB2 = membersMapDoubles[pB2Id] || 1200;
 
     const { changeA, changeB } = calculateDoublesElo([eloA1, eloA2], [eloB1, eloB2], scoreA, scoreB);
     
@@ -217,8 +247,16 @@ export function recordMatch(matchData) {
 
     // Cập nhật Elo của 4 người chơi trong danh sách thành viên
     data.members = data.members.map(m => {
-      if (m.id === pA1Id || m.id === pA2Id) return { ...m, elo: Math.max(100, m.elo + changeA) };
-      if (m.id === pB1Id || m.id === pB2Id) return { ...m, elo: Math.max(100, m.elo + changeB) };
+      if (m.id === pA1Id || m.id === pA2Id) return { 
+        ...m, 
+        eloDoubles: Math.max(100, (m.eloDoubles !== undefined ? m.eloDoubles : m.elo) + changeA),
+        elo: Math.max(100, m.elo + changeA) 
+      };
+      if (m.id === pB1Id || m.id === pB2Id) return { 
+        ...m, 
+        eloDoubles: Math.max(100, (m.eloDoubles !== undefined ? m.eloDoubles : m.elo) + changeB),
+        elo: Math.max(100, m.elo + changeB) 
+      };
       return m;
     });
   }
@@ -261,11 +299,21 @@ export function recalculateAllElos(data) {
   };
 
   data.members = data.members.map(m => {
-    const baseElo = m.initialElo !== undefined ? m.initialElo : (demoElos[m.id] || 1200);
+    const baseDoublesElo = m.initialEloDoubles !== undefined 
+      ? m.initialEloDoubles 
+      : (m.initialElo !== undefined ? m.initialElo : (demoElos[m.id] || 1200));
+    const baseSinglesElo = m.initialEloSingles !== undefined 
+      ? m.initialEloSingles 
+      : 1000; // Reset all singles Elo to 1000 by default since no one has played singles before!
+
     return {
       ...m,
-      elo: baseElo,
-      initialElo: baseElo // Đảm bảo luôn lưu giữ trường này
+      elo: baseDoublesElo,
+      eloSingles: baseSinglesElo,
+      eloDoubles: baseDoublesElo,
+      initialElo: baseDoublesElo,
+      initialEloSingles: baseSinglesElo,
+      initialEloDoubles: baseDoublesElo
     };
   });
 
@@ -284,9 +332,11 @@ export function recalculateAllElos(data) {
     }
 
     // Bản đồ Elo của các người chơi ngay trước khi trận đấu này diễn ra
-    const runningElos = {};
+    const runningSinglesElos = {};
+    const runningDoublesElos = {};
     data.members.forEach(m => {
-      runningElos[m.id] = m.elo;
+      runningSinglesElos[m.id] = m.eloSingles;
+      runningDoublesElos[m.id] = m.eloDoubles;
     });
 
     let eloChanges = {};
@@ -294,8 +344,8 @@ export function recalculateAllElos(data) {
     if (type === "singles") {
       const pAId = teamA[0];
       const pBId = teamB[0];
-      const eloA = runningElos[pAId] || 1200;
-      const eloB = runningElos[pBId] || 1200;
+      const eloA = runningSinglesElos[pAId] || 1200;
+      const eloB = runningSinglesElos[pBId] || 1200;
 
       const { changeA, changeB } = calculateSinglesElo(eloA, eloB, scoreA, scoreB);
       eloChanges[pAId] = changeA;
@@ -303,8 +353,16 @@ export function recalculateAllElos(data) {
 
       // Cập nhật điểm Elo thực tế của hai người chơi
       data.members = data.members.map(m => {
-        if (m.id === pAId) return { ...m, elo: Math.max(100, m.elo + changeA) };
-        if (m.id === pBId) return { ...m, elo: Math.max(100, m.elo + changeB) };
+        if (m.id === pAId) return { 
+          ...m, 
+          eloSingles: Math.max(100, m.eloSingles + changeA),
+          elo: Math.max(100, m.elo + changeA) 
+        };
+        if (m.id === pBId) return { 
+          ...m, 
+          eloSingles: Math.max(100, m.eloSingles + changeB),
+          elo: Math.max(100, m.elo + changeB) 
+        };
         return m;
       });
 
@@ -314,10 +372,10 @@ export function recalculateAllElos(data) {
       const pB1 = teamB[0];
       const pB2 = teamB[1];
 
-      const eloA1 = runningElos[pA1] || 1200;
-      const eloA2 = runningElos[pA2] || 1200;
-      const eloB1 = runningElos[pB1] || 1200;
-      const eloB2 = runningElos[pB2] || 1200;
+      const eloA1 = runningDoublesElos[pA1] || 1200;
+      const eloA2 = runningDoublesElos[pA2] || 1200;
+      const eloB1 = runningDoublesElos[pB1] || 1200;
+      const eloB2 = runningDoublesElos[pB2] || 1200;
 
       const { changeA, changeB } = calculateDoublesElo([eloA1, eloA2], [eloB1, eloB2], scoreA, scoreB);
       eloChanges[pA1] = changeA;
@@ -327,8 +385,16 @@ export function recalculateAllElos(data) {
 
       // Cập nhật điểm Elo thực tế của bốn người chơi
       data.members = data.members.map(m => {
-        if (m.id === pA1 || m.id === pA2) return { ...m, elo: Math.max(100, m.elo + changeA) };
-        if (m.id === pB1 || m.id === pB2) return { ...m, elo: Math.max(100, m.elo + changeB) };
+        if (m.id === pA1 || m.id === pA2) return { 
+          ...m, 
+          eloDoubles: Math.max(100, m.eloDoubles + changeA),
+          elo: Math.max(100, m.elo + changeA) 
+        };
+        if (m.id === pB1 || m.id === pB2) return { 
+          ...m, 
+          eloDoubles: Math.max(100, m.eloDoubles + changeB),
+          elo: Math.max(100, m.elo + changeB) 
+        };
         return m;
       });
     }

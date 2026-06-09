@@ -300,14 +300,17 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
           if (a.won !== b.won) {
             return eventSortOrder === "desc" ? b.won - a.won : a.won - b.won;
           }
-          // Cùng số trận thắng: Ưu tiên người có Elo tích lũy THẤP hơn (a.elo - b.elo)
+          // Cùng số trận thắng: Xem xét hiệu số điểm (scoreDiff)
+          if (a.scoreDiff !== b.scoreDiff) {
+            return eventSortOrder === "desc" ? b.scoreDiff - a.scoreDiff : a.scoreDiff - b.scoreDiff;
+          }
+          // Cùng hiệu số điểm: Ưu tiên người có Elo tích lũy THẤP hơn (a.elo - b.elo)
           if (a.elo !== b.elo) {
             return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;
           }
           // Các tiêu chí phụ tiếp theo
           tieBreakers = [
-            [a.winRate, b.winRate],
-            [a.scoreDiff, b.scoreDiff]
+            [a.winRate, b.winRate]
           ];
         } else if (eventSortBy === "elo") {
           valA = a.elo;
@@ -336,14 +339,17 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
           if (a.eloChange !== b.eloChange) {
             return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
           }
-          // Cùng thắng, cùng mức tăng Elo -> Ưu tiên người có Elo tích lũy THẤP hơn
+          // Nếu mức tăng Elo bằng nhau: xem xét hiệu số điểm (scoreDiff)
+          if (a.scoreDiff !== b.scoreDiff) {
+            return eventSortOrder === "desc" ? b.scoreDiff - a.scoreDiff : a.scoreDiff - b.scoreDiff;
+          }
+          // Cùng mức tăng Elo & hiệu số điểm -> Ưu tiên người có Elo tích lũy THẤP hơn
           if (a.elo !== b.elo) {
             return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;
           }
           
           tieBreakers = [
-            [a.winRate, b.winRate],
-            [a.scoreDiff, b.scoreDiff]
+            [a.winRate, b.winRate]
           ];
         } else if (eventSortBy === "matchesPlayed") {
           valA = a.played;
@@ -372,6 +378,9 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
           }
           if (a.won !== b.won) {
             return eventSortOrder === "desc" ? b.won - a.won : a.won - b.won;
+          }
+          if (a.scoreDiff !== b.scoreDiff) {
+            return eventSortOrder === "desc" ? b.scoreDiff - a.scoreDiff : a.scoreDiff - b.scoreDiff;
           }
           if (a.elo !== b.elo) {
             return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;

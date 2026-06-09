@@ -108,8 +108,15 @@ export default function Leaderboard({ data }) {
 
       const winRate = played > 0 ? Math.round((won / played) * 100) : 0;
 
+      const displayedElo = filterType === "singles"
+        ? (member.eloSingles !== undefined ? member.eloSingles : member.elo)
+        : filterType === "doubles"
+          ? (member.eloDoubles !== undefined ? member.eloDoubles : member.elo)
+          : member.elo;
+
       return {
         ...member,
+        displayedElo,
         played,
         won,
         lost,
@@ -134,8 +141,8 @@ export default function Leaderboard({ data }) {
       let tieBreakers = [];
 
       if (sortBy === "elo") {
-        valA = a.elo;
-        valB = b.elo;
+        valA = a.displayedElo;
+        valB = b.displayedElo;
         tieBreakers = [
           [a.won, b.won],
           [a.winRate, b.winRate],
@@ -145,7 +152,7 @@ export default function Leaderboard({ data }) {
         valA = a.won;
         valB = b.won;
         tieBreakers = [
-          [a.elo, b.elo],
+          [a.displayedElo, b.displayedElo],
           [a.winRate, b.winRate],
           [a.scoreDiff, b.scoreDiff]
         ];
@@ -153,7 +160,7 @@ export default function Leaderboard({ data }) {
         valA = a.eloChange;
         valB = b.eloChange;
         tieBreakers = [
-          [a.elo, b.elo],
+          [a.displayedElo, b.displayedElo],
           [a.won, b.won],
           [a.winRate, b.winRate],
           [a.scoreDiff, b.scoreDiff]
@@ -162,7 +169,7 @@ export default function Leaderboard({ data }) {
         valA = a.winRate;
         valB = b.winRate;
         tieBreakers = [
-          [a.elo, b.elo],
+          [a.displayedElo, b.displayedElo],
           [a.won, b.won],
           [a.scoreDiff, b.scoreDiff]
         ];
@@ -170,14 +177,14 @@ export default function Leaderboard({ data }) {
         valA = a.played;
         valB = b.played;
         tieBreakers = [
-          [a.elo, b.elo],
+          [a.displayedElo, b.displayedElo],
           [a.won, b.won],
           [a.winRate, b.winRate],
           [a.scoreDiff, b.scoreDiff]
         ];
       } else {
-        valA = a.elo;
-        valB = b.elo;
+        valA = a.displayedElo;
+        valB = b.displayedElo;
       }
 
       if (valA !== valB) {
@@ -686,7 +693,7 @@ export default function Leaderboard({ data }) {
 
                       {/* Cột Elo */}
                       <td style={{ fontWeight: "700", color: "var(--accent-electric-blue)" }}>
-                        {member.elo}
+                        {member.displayedElo}
                       </td>
 
                       {/* Cột Biến động Elo */}

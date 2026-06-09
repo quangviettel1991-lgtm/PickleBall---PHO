@@ -20,7 +20,8 @@ export default function Members({ data, setData, isAdmin }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("Nam");
-  const [elo, setElo] = useState("1200");
+  const [eloSingles, setEloSingles] = useState("1000");
+  const [eloDoubles, setEloDoubles] = useState("1200");
   const [joinDate, setJoinDate] = useState("");
 
   // Tìm kiếm và lọc thành viên
@@ -161,7 +162,8 @@ export default function Members({ data, setData, isAdmin }) {
     setName("");
     setPhone("");
     setGender("Nam");
-    setElo("1200");
+    setEloSingles("1000");
+    setEloDoubles("1200");
     setJoinDate(new Date().toISOString().split("T")[0]);
     setIsAddOpen(true);
   };
@@ -170,7 +172,7 @@ export default function Members({ data, setData, isAdmin }) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const updatedData = addMember({ name, phone, gender, elo, joinDate });
+    const updatedData = addMember({ name, phone, gender, eloSingles, eloDoubles, joinDate });
     setData(updatedData);
     setIsAddOpen(false);
   };
@@ -181,7 +183,8 @@ export default function Members({ data, setData, isAdmin }) {
     setName(member.name);
     setPhone(member.phone);
     setGender(member.gender);
-    setElo(member.elo.toString());
+    setEloSingles((member.eloSingles !== undefined ? member.eloSingles : 1000).toString());
+    setEloDoubles((member.eloDoubles !== undefined ? member.eloDoubles : member.elo).toString());
     setJoinDate(member.joinDate);
     setIsEditOpen(true);
   };
@@ -190,7 +193,7 @@ export default function Members({ data, setData, isAdmin }) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const updatedData = updateMember({ id: memberId, name, phone, gender, elo, joinDate });
+    const updatedData = updateMember({ id: memberId, name, phone, gender, eloSingles, eloDoubles, joinDate });
     setData(updatedData);
     
     // Nếu đang mở hồ sơ của người này, cập nhật lại dữ liệu hiển thị hồ sơ
@@ -788,16 +791,16 @@ export default function Members({ data, setData, isAdmin }) {
               <div className="profile-stat-box">
                 <div className="profile-stat-box-title">Thể thức Đơn (1v1)</div>
                 <div className="profile-stat-box-val" style={{ fontSize: "1.2rem" }}>
-                  {memberProfileStats.singlesWon}T - {memberProfileStats.singlesLost}B
+                  {selectedMember.eloSingles !== undefined ? selectedMember.eloSingles : 1000} Elo
                 </div>
-                <div className="profile-stat-box-sub">Tỷ lệ thắng đơn: {memberProfileStats.singlesWinRate}%</div>
+                <div className="profile-stat-box-sub">{memberProfileStats.singlesWon}T - {memberProfileStats.singlesLost}B ({memberProfileStats.singlesWinRate}%)</div>
               </div>
               <div className="profile-stat-box">
                 <div className="profile-stat-box-title">Thể thức Đôi (2v2)</div>
                 <div className="profile-stat-box-val" style={{ fontSize: "1.2rem" }}>
-                  {memberProfileStats.doublesWon}T - {memberProfileStats.doublesLost}B
+                  {selectedMember.eloDoubles !== undefined ? selectedMember.eloDoubles : selectedMember.elo} Elo
                 </div>
-                <div className="profile-stat-box-sub">Tỷ lệ thắng đôi: {memberProfileStats.doublesWinRate}%</div>
+                <div className="profile-stat-box-sub">{memberProfileStats.doublesWon}T - {memberProfileStats.doublesLost}B ({memberProfileStats.doublesWinRate}%)</div>
               </div>
             </div>
 
@@ -948,26 +951,39 @@ export default function Members({ data, setData, isAdmin }) {
               </select>
             </div>
             <div>
-              <label className="form-label">Điểm Elo khởi điểm</label>
+              <label className="form-label">Ngày gia nhập CLB</label>
               <input 
-                type="number" 
+                type="date" 
                 className="form-input" 
-                value={elo} 
-                onChange={e => setElo(e.target.value)} 
-                min="100" 
-                max="3000"
+                value={joinDate} 
+                onChange={e => setJoinDate(e.target.value)} 
               />
             </div>
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
-            <label className="form-label">Ngày gia nhập CLB</label>
-            <input 
-              type="date" 
-              className="form-input" 
-              value={joinDate} 
-              onChange={e => setJoinDate(e.target.value)} 
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+            <div>
+              <label className="form-label">Elo Đơn khởi điểm</label>
+              <input 
+                type="number" 
+                className="form-input" 
+                value={eloSingles} 
+                onChange={e => setEloSingles(e.target.value)} 
+                min="100" 
+                max="3000"
+              />
+            </div>
+            <div>
+              <label className="form-label">Elo Đôi khởi điểm</label>
+              <input 
+                type="number" 
+                className="form-input" 
+                value={eloDoubles} 
+                onChange={e => setEloDoubles(e.target.value)} 
+                min="100" 
+                max="3000"
+              />
+            </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
@@ -1014,26 +1030,39 @@ export default function Members({ data, setData, isAdmin }) {
               </select>
             </div>
             <div>
-              <label className="form-label">Điểm Elo hiện tại</label>
+              <label className="form-label">Ngày gia nhập CLB</label>
               <input 
-                type="number" 
+                type="date" 
                 className="form-input" 
-                value={elo} 
-                onChange={e => setElo(e.target.value)} 
-                min="100" 
-                max="3000"
+                value={joinDate} 
+                onChange={e => setJoinDate(e.target.value)} 
               />
             </div>
           </div>
 
-          <div style={{ marginBottom: "24px" }}>
-            <label className="form-label">Ngày gia nhập CLB</label>
-            <input 
-              type="date" 
-              className="form-input" 
-              value={joinDate} 
-              onChange={e => setJoinDate(e.target.value)} 
-            />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+            <div>
+              <label className="form-label">Điểm Elo Đơn</label>
+              <input 
+                type="number" 
+                className="form-input" 
+                value={eloSingles} 
+                onChange={e => setEloSingles(e.target.value)} 
+                min="100" 
+                max="3000"
+              />
+            </div>
+            <div>
+              <label className="form-label">Điểm Elo Đôi</label>
+              <input 
+                type="number" 
+                className="form-input" 
+                value={eloDoubles} 
+                onChange={e => setEloDoubles(e.target.value)} 
+                min="100" 
+                max="3000"
+              />
+            </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
