@@ -27,9 +27,9 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
   const mainNavItems = [
     { id: "dashboard", label: "Tổng Quan", icon: LayoutDashboard },
     { id: "leaderboard", label: "Xếp Hạng", icon: Trophy },
-    { id: "recorder", label: "Ghi Điểm", icon: Swords },
-    { id: "events", label: "Sự Kiện", icon: Calendar },
-    { id: "draw", label: "Bốc Thăm", icon: Shuffle },
+    { id: "h2h", label: "Đối Đầu", icon: Swords },
+    { id: "recorder", label: "Ghi Điểm", icon: Calendar },
+    { id: "events", label: "Sự Kiện", icon: Shuffle },
   ];
 
   const moreNavItems = [
@@ -166,7 +166,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, i
           .navbar-menu {
             width: 100%;
             display: grid;
-            grid-template-columns: repeat(6, 1fr);
+            grid-template-columns: repeat(7, 1fr);
             gap: 0;
             padding: 4px 6px;
           }

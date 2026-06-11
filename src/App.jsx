@@ -8,6 +8,7 @@ import Events from "./components/Events";
 import BackupRestore from "./components/BackupRestore";
 import TournamentDraw from "./components/TournamentDraw";
 import Finance from "./components/Finance";
+import HeadToHead from "./components/HeadToHead";
 import { getClubData } from "./utils/db";
 import { fetchRemoteData, updateRemoteData, fetchRemoteTimestamp, supabase } from "./utils/supabase";
 import { Lock } from "lucide-react";
@@ -224,7 +225,7 @@ export default function App() {
 
   const renderActiveTab = () => {
     // Các tab được phép truy cập tự do không cần Admin key
-    const publicTabs = ["dashboard", "leaderboard"];
+    const publicTabs = ["dashboard", "leaderboard", "h2h"];
     
     // Nếu tab không phải là public và chưa có quyền Admin, hiển thị màn hình khóa
     if (!publicTabs.includes(activeTab) && !isAdmin) {
@@ -307,6 +308,8 @@ export default function App() {
         return <Finance data={data} setData={setData} isAdmin={isAdmin} />;
       case "backup":
         return <BackupRestore data={data} setData={setData} isAdmin={isAdmin} />;
+      case "h2h":
+        return <HeadToHead data={data} />;
       default:
         return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} setRecorderSubTab={setRecorderSubTab} />;
     }
