@@ -693,12 +693,11 @@ export default function HeadToHead({ data }) {
                 let badgeClass = "badge-opponent";
 
                 if (m.isOpponent) {
-                  // If player A wins, highlight with green (win-a) or blue (win-b)
-                  borderClass = m.pAWon ? "win-a" : "win-b";
+                  borderClass = m.scoreA > m.scoreB ? "win-a" : "win-b";
                 } else {
                   badgeText = "ĐỒNG ĐỘI";
                   badgeClass = "badge-teammate";
-                  borderClass = m.pAWon ? "teammates-win" : "teammates-loss";
+                  borderClass = m.scoreA > m.scoreB ? "teammates-win" : "teammates-loss";
                 }
 
                 return (
