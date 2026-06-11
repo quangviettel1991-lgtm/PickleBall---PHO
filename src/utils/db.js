@@ -5,6 +5,10 @@ import { updateRemoteData } from "./supabase";
 const CLUB_ID = import.meta.env.VITE_CLUB_ID || "1";
 const STORAGE_KEY = `pickleball_club_data_${CLUB_ID}`;
 const UPDATED_AT_KEY = `pickleball_club_data_updated_at_${CLUB_ID}`;
+const SNAPSHOTS_KEY = `pickleball_snapshots_${CLUB_ID}`;
+const MAX_SNAPSHOTS = 14;          // Giữ tối đa 14 bản snapshot (~2 tuần)
+const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000; // Tối thiểu 5 phút giữa 2 snapshot liên tiếp
+let _lastSnapshotTime = 0;
 
 // Lấy toàn bộ dữ liệu từ localStorage
 export function getClubData() {
@@ -56,12 +60,104 @@ export function saveClubData(data) {
   const timestamp = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   localStorage.setItem(UPDATED_AT_KEY, timestamp);
+  // Tự động tạo snapshot (có throttle 5 phút)
+  _autoSaveSnapshot(data, timestamp);
   // Đồng bộ ngầm lên đám mây Supabase
   updateRemoteData(data, timestamp).then(success => {
     if (success) {
       console.log("Đồng bộ đám mây Supabase thành công!");
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// HỆ THỐNG SNAPSHOT (Lưu lịch sử phiên bản để phòng tránh mất dữ liệu)
+// ---------------------------------------------------------------------------
+
+/**
+ * [Nội bộ] Tự động lưu snapshot với throttle (tối thiểu 5 phút/lần).
+ */
+function _autoSaveSnapshot(data, timestamp) {
+  const now = Date.now();
+  if (now - _lastSnapshotTime < SNAPSHOT_THROTTLE_MS) return;
+  _lastSnapshotTime = now;
+  _writeSnapshot(data, timestamp, "auto");
+}
+
+/**
+ * [Nội bộ] Ghi 1 bản snapshot vào danh sách, giữ tối đa MAX_SNAPSHOTS bản.
+ */
+function _writeSnapshot(data, timestamp, label = "auto") {
+  try {
+    const snapshots = getSnapshots();
+    const snapshot = {
+      timestamp,
+      label,
+      membersCount: data.members ? data.members.length : 0,
+      eventsCount: data.events ? data.events.length : 0,
+      matchesCount: data.matches ? data.matches.length : 0,
+      data: JSON.parse(JSON.stringify(data)) // deep clone
+    };
+    snapshots.unshift(snapshot); // Thêm vào đầu (mới nhất trước)
+    // Giữ tối đa MAX_SNAPSHOTS bản
+    const trimmed = snapshots.slice(0, MAX_SNAPSHOTS);
+    localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(trimmed));
+    console.log(`[Snapshot] Đã lưu snapshot lúc ${timestamp} (${trimmed.length}/${MAX_SNAPSHOTS} bản)`);
+  } catch (e) {
+    console.warn("[Snapshot] Không thể lưu snapshot:", e);
+  }
+}
+
+/**
+ * Lấy danh sách tất cả bản snapshot đang lưu trong localStorage.
+ * @returns {Array} Mảng snapshot, mới nhất ở đầu.
+ */
+export function getSnapshots() {
+  try {
+    const raw = localStorage.getItem(SNAPSHOTS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) || [];
+  } catch (e) {
+    console.warn("[Snapshot] Lỗi đọc snapshots:", e);
+    return [];
+  }
+}
+
+/**
+ * Khôi phục dữ liệu về 1 bản snapshot cụ thể theo timestamp.
+ * @param {string} snapshotTimestamp - Timestamp của bản snapshot cần khôi phục.
+ * @returns {object|null} Dữ liệu đã khôi phục hoặc null nếu không tìm thấy.
+ */
+export function restoreSnapshot(snapshotTimestamp) {
+  const snapshots = getSnapshots();
+  const found = snapshots.find(s => s.timestamp === snapshotTimestamp);
+  if (!found) {
+    console.error("[Snapshot] Không tìm thấy snapshot:", snapshotTimestamp);
+    return null;
+  }
+  // Trước khi restore, lưu snapshot của trạng thái hiện tại (để còn undo được)
+  const currentData = getClubData();
+  _writeSnapshot(currentData, new Date().toISOString(), "before_restore");
+  // Ghi đè dữ liệu bằng bản snapshot được chọn
+  saveClubData(found.data);
+  return found.data;
+}
+
+/**
+ * Tạo thủ công 1 bản snapshot ngay lập tức (bỏ qua throttle).
+ * @param {object} data - Dữ liệu cần snapshot.
+ * @param {string} [label] - Nhãn mô tả (vd: "manual").
+ */
+export function createManualSnapshot(data, label = "manual") {
+  _writeSnapshot(data, new Date().toISOString(), label);
+}
+
+/**
+ * Xóa toàn bộ lịch sử snapshot.
+ */
+export function clearSnapshots() {
+  localStorage.removeItem(SNAPSHOTS_KEY);
+  _lastSnapshotTime = 0;
 }
 
 // Khôi phục dữ liệu về trạng thái mẫu (Demo)
