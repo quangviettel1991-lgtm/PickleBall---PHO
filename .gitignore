@@ -28,3 +28,7 @@ dist-ssr
 .env.local
 .env.*.local
 
+# Vercel downloaded files
+Vercel_files/
+replace_events.js
+replace_events.cjs
