@@ -117,8 +117,8 @@ export default function HeadToHead({ data }) {
         pBWon: isOpponent ? isBWin : (isTeamB ? !aWon : aWon),
         scoreOfA,
         scoreOfB,
-        eloChangeA: match.eloChanges?.[playerAId] || 0,
-        eloChangeB: match.eloChanges?.[playerBId] || 0,
+        eloChangeA: teamAMembers.reduce((acc, id) => acc + (match.eloChanges?.[id] || 0), 0),
+        eloChangeB: teamBMembers.reduce((acc, id) => acc + (match.eloChanges?.[id] || 0), 0),
       };
     }).sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
 
@@ -713,7 +713,7 @@ export default function HeadToHead({ data }) {
                         })}
                       </div>
 
-                      <div className={`match-history-team ${m.isOpponent && m.pAWon ? "winner" : "text-muted"}`}>
+                      <div className={`match-history-team ${m.scoreA > m.scoreB ? "winner text-white" : "text-muted"}`}>
                         {m.teamANames.join(" - ")}
                         {m.eloChangeA !== 0 && m.isOpponent && (
                           <div className={`elo-change-indicator ${m.eloChangeA > 0 ? "elo-up" : "elo-down"}`}>
@@ -730,7 +730,7 @@ export default function HeadToHead({ data }) {
                         <span className="text-muted text-xs capitalize">{m.type === "singles" ? "Đơn" : "Đôi"}</span>
                       </div>
 
-                      <div className={`match-history-team ${m.isOpponent && m.pBWon ? "winner" : "text-muted"}`} style={{ textAlign: "right" }}>
+                      <div className={`match-history-team ${m.scoreB > m.scoreA ? "winner text-white" : "text-muted"}`} style={{ textAlign: "right" }}>
                         {m.teamBNames.join(" - ")}
                         {m.eloChangeB !== 0 && m.isOpponent && (
                           <div className={`elo-change-indicator ${m.eloChangeB > 0 ? "elo-up" : "elo-down"}`}>
