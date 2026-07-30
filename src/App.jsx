@@ -45,32 +45,6 @@ export default function App() {
     return !(hasRealMembers || hasRealEvents || hasRealMatches);
   };
 
-  // Di trú (Migrate) các dữ liệu bốc thăm toàn cục cũ sang khoá riêng của sự kiện tương ứng (Chạy một lần duy nhất khi khởi động)
-  useEffect(() => {
-    const globalData = localStorage.getItem("draw_data");
-    const globalSelectedEventId = localStorage.getItem("draw_selected_event_id") || "";
-    
-    if (globalData && globalSelectedEventId) {
-      const keysToMigrate = [
-        "draw_active_scenario",
-        "draw_selected_member_ids",
-        "draw_generated",
-        "draw_data"
-      ];
-      keysToMigrate.forEach(key => {
-        const val = localStorage.getItem(key);
-        if (val !== null) {
-          // Chỉ di trú sang sự kiện cũ nếu sự kiện cũ chưa có khoá dữ liệu phân vùng
-          if (localStorage.getItem(`${key}_${globalSelectedEventId}`) === null) {
-            localStorage.setItem(`${key}_${globalSelectedEventId}`, val);
-          }
-          // Xoá khoá toàn cục để giải phóng và tránh đè dữ liệu chéo sau này
-          localStorage.removeItem(key);
-        }
-      });
-      console.log(`[Migration] Đã di trú dữ liệu bốc thăm toàn cục sang sự kiện: ${globalSelectedEventId}`);
-    }
-  }, []);
 
   // Tải dữ liệu ban đầu khi ứng dụng khởi chạy và thiết lập các bộ lắng nghe đồng bộ
   useEffect(() => {

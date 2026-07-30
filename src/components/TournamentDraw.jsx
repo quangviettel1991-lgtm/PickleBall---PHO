@@ -79,7 +79,6 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   useEffect(() => {
     if (selectedEventId && selectedEventId === loadedEventId) {
       localStorage.setItem(`draw_active_scenario_${selectedEventId}`, activeScenario);
-      localStorage.setItem("draw_active_scenario", activeScenario);
     }
   }, [activeScenario, selectedEventId, loadedEventId]);
 
@@ -90,21 +89,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   useEffect(() => {
     if (selectedEventId && selectedEventId === loadedEventId) {
       localStorage.setItem(`draw_selected_member_ids_${selectedEventId}`, JSON.stringify(selectedMemberIds));
-      localStorage.setItem("draw_selected_member_ids", JSON.stringify(selectedMemberIds));
     }
   }, [selectedMemberIds, selectedEventId, loadedEventId]);
 
   useEffect(() => {
     if (selectedEventId && selectedEventId === loadedEventId) {
       localStorage.setItem(`draw_generated_${selectedEventId}`, drawGenerated ? "true" : "false");
-      localStorage.setItem("draw_generated", drawGenerated ? "true" : "false");
     }
   }, [drawGenerated, selectedEventId, loadedEventId]);
 
   useEffect(() => {
     if (selectedEventId && selectedEventId === loadedEventId) {
       localStorage.setItem(`draw_data_${selectedEventId}`, JSON.stringify(drawData));
-      localStorage.setItem("draw_data", JSON.stringify(drawData));
     }
   }, [drawData, selectedEventId, loadedEventId]);
 
