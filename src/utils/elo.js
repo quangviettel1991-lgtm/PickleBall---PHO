@@ -19,17 +19,13 @@ export function getExpectedScore(ratingA, ratingB) {
  */
 export function calculateEloChange(ratingA, ratingB, scoreA, scoreB, kFactor = 32) {
   const expectedA = getExpectedScore(ratingA, ratingB);
-  const expectedB = getExpectedScore(ratingB, ratingA);
 
   let actualA = 0.5;
-  let actualB = 0.5;
 
   if (scoreA > scoreB) {
     actualA = 1;
-    actualB = 0;
   } else if (scoreB > scoreA) {
     actualA = 0;
-    actualB = 1;
   }
 
   // Tính lượng Elo thay đổi

@@ -1,0 +1,263 @@
+
+        .leaderboard-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 24px 16px;
+        }
+
+        .leaderboard-header-section {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 20px;
+        }
+
+        .leaderboard-title {
+          font-size: 1.5rem;
+          font-weight: 800;
+          letter-spacing: -0.02em;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .leaderboard-title svg {
+          color: var(--accent-neon-green);
+        }
+
+        /* Thanh bộ lọc ngang cao cấp */
+        .filters-panel {
+          padding: 20px;
+          margin-bottom: 24px;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          transition: all 0.3s ease;
+        }
+
+        .filter-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .custom-range-inputs {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .custom-range-inputs input {
+          width: 50%;
+        }
+
+        /* Nút toggle bộ lọc trên di động */
+        .mobile-filter-toggle {
+          display: none;
+          width: 100%;
+          padding: 12px;
+          background: rgba(255, 255, 255, 0.02);
+          border: 1px solid var(--border-color);
+          border-radius: 10px;
+          color: #fff;
+          font-weight: 600;
+          font-size: 0.9rem;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          cursor: pointer;
+          margin-bottom: 16px;
+          transition: all 0.2s;
+        }
+
+        .mobile-filter-toggle:hover {
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Thiết kế bảng xếp hạng */
+        .board-panel {
+          padding: 20px;
+        }
+
+        .sort-header {
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          user-select: none;
+          transition: color 0.15s;
+        }
+
+        .sort-header:hover {
+          color: var(--accent-neon-green);
+        }
+
+        .sort-header.active {
+          color: var(--accent-neon-green);
+          font-weight: 700;
+        }
+
+        /* Hạng */
+        .rank-col {
+          font-weight: 700;
+          font-size: 1.05rem;
+          width: 50px;
+          text-align: center;
+        }
+
+        .rank-medal {
+          font-size: 1.25rem;
+        }
+
+        .rank-1 { color: var(--accent-neon-green); }
+        .rank-2 { color: #cbd5e1; }
+        .rank-3 { color: #b45309; }
+
+        /* Cột người chơi */
+        .player-info-cell {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .player-info-details {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .player-name-cell {
+          font-weight: 700;
+          color: #fff;
+          font-size: 0.92rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 150px;
+        }
+
+        .player-gender-cell {
+          font-size: 0.72rem;
+          color: var(--text-muted);
+        }
+
+        /* Biến động Elo */
+        .elo-change-badge {
+          display: inline-flex;
+          align-items: center;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: 6px;
+          font-size: 0.8rem;
+        }
+
+        .elo-change-up {
+          background: rgba(46, 213, 115, 0.08);
+          color: var(--color-success);
+          border: 1px solid rgba(46, 213, 115, 0.15);
+        }
+
+        .elo-change-down {
+          background: rgba(255, 71, 87, 0.08);
+          color: var(--color-danger);
+          border: 1px solid rgba(255, 71, 87, 0.15);
+        }
+
+        .elo-change-none {
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-muted);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .active-filter-desc {
+          margin-top: -8px;
+          margin-bottom: 16px;
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
+
+        .show-on-mobile {
+          display: none;
+        }
+
+        .show-text-on-mobile {
+          display: none;
+        }
+
+        .hide-text-on-mobile {
+          display: inline;
+        }
+
+        /* Ẩn cột trên di động */
+        .hide-on-mobile {
+          display: table-cell;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .hide-on-mobile {
+            display: table-cell !important; /* Luôn hiển thị cột trên di động */
+          }
+
+          .show-text-on-mobile {
+            display: inline !important;
+          }
+
+          .hide-text-on-mobile {
+            display: none !important;
+          }
+
+          .mobile-filter-toggle {
+            display: flex;
+          }
+
+          .filters-panel {
+            display: none;
+            grid-template-columns: 1fr;
+            padding: 16px;
+            gap: 12px;
+          }
+
+          .leaderboard-title {
+            font-size: 1.3rem;
+          }
+
+          .board-panel {
+            padding: 8px !important;
+          }
+
+          .custom-table td, .custom-table th {
+            padding: 8px 3px !important; /* Rất bé như yêu cầu */
+            font-size: 0.7rem !important; /* Giảm font như yêu cầu */
+          }
+
+          .player-name-cell {
+            max-width: 80px;
+            font-size: 0.72rem !important;
+          }
+
+          .rank-col {
+            width: 24px !important;
+          }
+
+          .player-avatar-sm {
+            display: none !important; /* Ẩn avatar trên di động để nhường chỗ */
+          }
+
+          .player-info-cell {
+            gap: 4px !important;
+          }
+
+          .show-on-mobile {
+            display: inline-block !important;
+          }
+        }
+
+
+@media (max-width: 768px) { .filter-controls.mobile-filters-open { display: grid; } }
+
+@media (max-width:768px) { .filters-panel.mobile-filters-open { display: grid; } }

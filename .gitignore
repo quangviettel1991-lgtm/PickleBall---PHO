@@ -32,3 +32,9 @@ dist-ssr
 Vercel_files/
 replace_events.js
 replace_events.cjs
+
+# Private, timestamped safety copies (never publish)
+backups/
+.audit-local/
+playwright-report/
+test-results/

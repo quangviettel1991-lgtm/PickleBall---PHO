@@ -1,15 +1,23 @@
-import React, { useState, useMemo } from "react";
-import { Users, Search, UserPlus, Edit2, Trash2, Calendar, Phone, Shield, Swords, Award, Flame, UserCheck, UserX } from "lucide-react";
+import Pagination from './Pagination';
+import { usePagination } from '../hooks/usePagination';
+import PropTypes from 'prop-types';
+import './Members.css';
+import { isPlayed } from '../utils/schema.js';
+import { localDate } from '../utils/dates.js';
+import { useState, useMemo } from "react";
+import { Users, Search, UserPlus, Edit2, Trash2, Calendar, Phone, Shield, Flame, UserCheck, UserX } from "lucide-react";
 import Modal from "./Modal";
-import { addMember, updateMember, deleteMember } from "../utils/db";
+import { addMember, updateMember, deleteMember, restoreMember } from "../utils/db";
 
 export default function Members({ data, setData, isAdmin }) {
   const { members, matches } = data;
 
   // Trạng thái tìm kiếm & phân trang/hiển thị
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMember, setSelectedMember] = useState(null); // Thành viên đang xem chi tiết (Profile)
-  
+  const [selectedMemberState, setSelectedMember] = useState(null);
+  const selectedMember = members.find(m=>m.id===selectedMemberState?.id) || null;
+  const [showArchived, setShowArchived] = useState(false); // Thành viên đang xem chi tiết (Profile)
+
   // Trạng thái Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -24,14 +32,15 @@ export default function Members({ data, setData, isAdmin }) {
   const [eloDoubles, setEloDoubles] = useState("1200");
   const [isGuest, setIsGuest] = useState(false);
   const [joinDate, setJoinDate] = useState("");
+  const [adjustInitialElo, setAdjustInitialElo] = useState(false);
 
   // Tìm kiếm và lọc thành viên
   const filteredMembers = useMemo(() => {
-    return members.filter(m => 
-      m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    return members.filter(m => showArchived || !m.archivedAt).filter(m =>
+      m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.phone.includes(searchTerm)
     );
-  }, [members, searchTerm]);
+  }, [members, searchTerm, showArchived]);
 
   // Tìm xếp hạng CLB của thành viên (dựa trên Elo)
   const getClubRank = (memberId) => {
@@ -46,16 +55,15 @@ export default function Members({ data, setData, isAdmin }) {
 
     let singlesPlayed = 0, singlesWon = 0, singlesLost = 0;
     let doublesPlayed = 0, doublesWon = 0, doublesLost = 0;
-    
+
     const partnerWinsCount = {}; // Lưu số trận thắng với mỗi đồng đội
     const opponentLossesCount = {}; // Lưu số trận thua trước đối thủ
 
     // Sắp xếp các trận đấu của người này theo thời gian từ cũ đến mới để tính chuỗi phong độ
     const personalMatches = [...matches]
-      .filter(match => match.teamA.includes(mId) || match.teamB.includes(mId))
+      .filter(match => isPlayed(match) && (match.teamA.includes(mId) || match.teamB.includes(mId)))
       .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    let winStreak = 0;
     let currentStreak = 0;
     let isStreakWinning = true;
 
@@ -166,7 +174,7 @@ export default function Members({ data, setData, isAdmin }) {
     setEloSingles("1000");
     setEloDoubles("1200");
     setIsGuest(false);
-    setJoinDate(new Date().toISOString().split("T")[0]);
+    setJoinDate(localDate());
     setIsAddOpen(true);
   };
 
@@ -181,12 +189,13 @@ export default function Members({ data, setData, isAdmin }) {
 
   const handleOpenEdit = (member, e) => {
     e.stopPropagation(); // Ngăn mở Profile khi click nút sửa
+    setAdjustInitialElo(false);
     setMemberId(member.id);
     setName(member.name);
     setPhone(member.phone);
     setGender(member.gender);
-    setEloSingles((member.eloSingles !== undefined ? member.eloSingles : 1000).toString());
-    setEloDoubles((member.eloDoubles !== undefined ? member.eloDoubles : member.elo).toString());
+    setEloSingles((member.initialEloSingles ?? member.eloSingles ?? 1000).toString());
+    setEloDoubles((member.initialEloDoubles ?? member.initialElo ?? member.eloDoubles ?? member.elo).toString());
     setIsGuest(!!member.isGuest);
     setJoinDate(member.joinDate);
     setIsEditOpen(true);
@@ -196,14 +205,14 @@ export default function Members({ data, setData, isAdmin }) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const updatedData = updateMember({ id: memberId, name, phone, gender, eloSingles, eloDoubles, isGuest, joinDate });
+    const updatedData = updateMember({ id: memberId, name, phone, gender, adjustInitialElo, initialEloSingles: eloSingles, initialEloDoubles: eloDoubles, isGuest, joinDate });
     setData(updatedData);
-    
+
     // Nếu đang mở hồ sơ của người này, cập nhật lại dữ liệu hiển thị hồ sơ
     if (selectedMember && selectedMember.id === memberId) {
       setSelectedMember(updatedData.members.find(m => m.id === memberId));
     }
-    
+
     setIsEditOpen(false);
   };
 
@@ -218,7 +227,7 @@ export default function Members({ data, setData, isAdmin }) {
     const updatedData = deleteMember(memberId);
     setData(updatedData);
     setIsDeleteOpen(false);
-    
+
     // Đóng hồ sơ nếu vừa xóa người đang xem
     if (selectedMember && selectedMember.id === memberId) {
       setSelectedMember(null);
@@ -230,401 +239,13 @@ export default function Members({ data, setData, isAdmin }) {
     return player ? player.name : "Cựu thành viên";
   };
 
-  const getPlayerAvatarColor = (id) => {
-    const player = members.find(m => m.id === id);
-    return player ? player.avatarColor : "#718096";
-  };
 
+  const pager = usePagination(filteredMembers, searchTerm);
   return (
     <div className="members-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{__html: `
-        .members-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 32px 24px;
-        }
+      <Pagination pager={pager} />
+      <label className="form-label"><input type="checkbox" checked={showArchived} onChange={e=>setShowArchived(e.target.checked)} /> Hiện thành viên đã lưu trữ</label>
 
-        .members-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 28px;
-        }
-
-        .members-title {
-          font-size: 1.75rem;
-          font-weight: 800;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .members-title svg {
-          color: var(--accent-neon-green);
-        }
-
-        /* Thanh Tìm kiếm & Nút thêm */
-        .action-row {
-          display: flex;
-          gap: 16px;
-          margin-bottom: 28px;
-        }
-
-        .search-wrapper {
-          position: relative;
-          flex-grow: 1;
-        }
-
-        .search-icon-inside {
-          position: absolute;
-          left: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--text-muted);
-        }
-
-        .search-input {
-          padding-left: 44px;
-        }
-
-        /* Danh sách thành viên dạng Card Grid */
-        .members-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 20px;
-        }
-
-        .member-card {
-          padding: 24px;
-          cursor: pointer;
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-
-        .member-card-actions {
-          position: absolute;
-          top: 16px;
-          right: 16px;
-          display: flex;
-          gap: 4px;
-          opacity: 0;
-          transition: opacity 0.2s;
-          z-index: 10;
-        }
-
-        .member-card:hover .member-card-actions {
-          opacity: 1;
-        }
-
-        .action-icon-btn {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid var(--border-color);
-          color: var(--text-muted);
-          border-radius: 6px;
-          padding: 6px;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .action-icon-btn:hover {
-          background: rgba(255, 255, 255, 0.08);
-          color: #fff;
-        }
-
-        .action-icon-btn.btn-delete:hover {
-          background: rgba(255, 71, 87, 0.15);
-          color: var(--color-danger);
-          border-color: rgba(255, 71, 87, 0.3);
-        }
-
-        .member-card-avatar {
-          margin-bottom: 16px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
-        }
-
-        .member-card-name {
-          font-size: 1.1rem;
-          font-weight: 700;
-          color: #fff;
-          margin-bottom: 4px;
-        }
-
-        .member-card-info {
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          margin-bottom: 14px;
-        }
-
-        .member-card-elo {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: var(--accent-neon-green);
-          letter-spacing: -0.02em;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          line-height: 1.1;
-        }
-
-        .member-card-elo-label {
-          font-size: 0.7rem;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-        }
-
-        .member-card-rank-badge {
-          position: absolute;
-          top: 16px;
-          left: 16px;
-          background: rgba(0, 236, 255, 0.1);
-          color: var(--accent-electric-blue);
-          border: 1px solid rgba(0, 236, 255, 0.2);
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-size: 0.7rem;
-          font-weight: 700;
-        }
-
-        /* CSS TRANG CÁ NHÂN (PROFILE MODAL) */
-        .profile-layout {
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-        }
-
-        .profile-header-card {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-          padding: 20px;
-          background: rgba(255,255,255,0.02);
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-        }
-
-        .profile-header-info {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .profile-name {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: #fff;
-        }
-
-        .profile-meta-list {
-          display: flex;
-          gap: 16px;
-          font-size: 0.85rem;
-          color: var(--text-secondary);
-        }
-
-        .profile-meta-item {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        /* Chỉ số phân tích (Stats Panel) */
-        .profile-stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
-        }
-
-        .profile-stat-box {
-          background: rgba(255, 255, 255, 0.01);
-          border: 1px solid var(--border-color);
-          border-radius: 10px;
-          padding: 16px;
-          text-align: center;
-        }
-
-        .profile-stat-box-title {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-
-        .profile-stat-box-val {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: #fff;
-        }
-
-        .profile-stat-box-sub {
-          font-size: 0.75rem;
-          color: var(--text-secondary);
-          margin-top: 4px;
-        }
-
-        /* Phân tích sâu (Partner & Opponent) */
-        .analysis-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-
-        .analysis-card {
-          padding: 16px;
-          display: flex;
-          align-items: center;
-          gap: 14px;
-          background: rgba(255, 255, 255, 0.015);
-          border: 1px solid var(--border-color);
-          border-radius: 10px;
-        }
-
-        .analysis-card-icon {
-          width: 44px;
-          height: 44px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .partner-card .analysis-card-icon { background: rgba(46, 213, 115, 0.08); color: var(--color-success); border: 1px solid rgba(46, 213, 115, 0.15); }
-        .opponent-card .analysis-card-icon { background: rgba(255, 71, 87, 0.08); color: var(--color-danger); border: 1px solid rgba(255, 71, 87, 0.15); }
-
-        .analysis-card-info {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .analysis-card-title {
-          font-size: 0.75rem;
-          font-weight: 600;
-          color: var(--text-muted);
-          text-transform: uppercase;
-        }
-
-        .analysis-card-name {
-          font-weight: 700;
-          color: #fff;
-          font-size: 0.95rem;
-          margin-top: 2px;
-        }
-
-        .analysis-card-desc {
-          font-size: 0.75rem;
-          color: var(--text-secondary);
-        }
-
-        /* Phong độ Streak */
-        .streak-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 12px;
-          border-radius: 8px;
-          font-weight: 700;
-          font-size: 0.85rem;
-        }
-
-        .streak-win { background: rgba(255, 165, 2, 0.1); color: var(--color-warning); border: 1px solid rgba(255, 165, 2, 0.2); }
-        .streak-loss { background: rgba(255, 255, 255, 0.04); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.06); }
-
-        /* Lịch sử cá nhân */
-        .history-section {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .history-title {
-          font-size: 1rem;
-          font-weight: 700;
-        }
-
-        .history-list-mini {
-          max-height: 240px;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .history-row-mini {
-          background: rgba(255,255,255,0.01);
-          border: 1px solid rgba(255,255,255,0.04);
-          border-radius: 8px;
-          padding: 10px 14px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          font-size: 0.88rem;
-        }
-
-        .result-badge {
-          display: inline-block;
-          padding: 2px 8px;
-          border-radius: 4px;
-          font-size: 0.7rem;
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        .result-win { background: rgba(46, 213, 115, 0.15); color: var(--color-success); }
-        .result-loss { background: rgba(255, 71, 87, 0.15); color: var(--color-danger); }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-          .member-card-actions {
-            opacity: 1 !important;
-            top: 10px;
-            right: 10px;
-          }
-
-          .action-icon-btn {
-            padding: 9px;
-            background: rgba(18, 22, 32, 0.85);
-            border-color: rgba(255, 255, 255, 0.15);
-            color: #fff;
-          }
-
-          .action-row {
-            flex-direction: column;
-          }
-          .profile-header-card {
-            flex-direction: column;
-            text-align: center;
-            padding: 16px;
-          }
-          .profile-meta-list {
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-          }
-          .profile-stats-grid {
-            grid-template-columns: 1fr;
-          }
-          .analysis-row {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-          .history-row-mini {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 8px;
-          }
-        }
-
-      `}} />
 
       <div className="members-header">
         <h1 className="members-title">
@@ -641,10 +262,10 @@ export default function Members({ data, setData, isAdmin }) {
       <div className="action-row">
         <div className="search-wrapper">
           <Search size={18} className="search-icon-inside" />
-          <input 
-            type="text" 
-            className="form-input search-input" 
-            placeholder="Tìm kiếm thành viên theo tên hoặc số điện thoại..." 
+          <input aria-label="Tìm thành viên"
+            type="text"
+            className="form-input search-input"
+            placeholder="Tìm kiếm thành viên theo tên hoặc số điện thoại..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -658,9 +279,9 @@ export default function Members({ data, setData, isAdmin }) {
             Không tìm thấy thành viên nào.
           </div>
         ) : (
-          filteredMembers.map((member) => (
-            <div 
-              key={member.id} 
+          pager.items.map((member) => (
+            <div
+              key={member.id}
               className="glass-panel member-card animate-slide-up"
               onClick={() => setSelectedMember(member)}
             >
@@ -672,17 +293,18 @@ export default function Members({ data, setData, isAdmin }) {
               {/* Nút sửa/xóa nhanh */}
               {isAdmin && (
                 <div className="member-card-actions">
-                  <button 
-                    className="action-icon-btn" 
+                  {member.archivedAt && <button className="btn-secondary" onClick={e=>{ e.stopPropagation(); setData(restoreMember(member.id)); }}>Khôi phục</button>}
+                  <button
+                    className="action-icon-btn"
                     onClick={(e) => handleOpenEdit(member, e)}
                     title="Sửa thành viên"
                   >
                     <Edit2 size={14} />
                   </button>
-                  <button 
-                    className="action-icon-btn btn-delete" 
+                  <button
+                    className="action-icon-btn btn-delete"
                     onClick={(e) => handleOpenDelete(member, e)}
-                    title="Xóa thành viên"
+                    title="Lưu trữ thành viên"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -690,8 +312,8 @@ export default function Members({ data, setData, isAdmin }) {
               )}
 
               {/* Ảnh đại diện */}
-              <div 
-                className="player-avatar player-avatar-lg member-card-avatar" 
+              <div
+                className="player-avatar player-avatar-lg member-card-avatar"
                 style={{ backgroundColor: member.avatarColor }}
               >
                 {member.name.charAt(0)}
@@ -746,8 +368,8 @@ export default function Members({ data, setData, isAdmin }) {
           <div className="profile-layout">
             {/* Header hồ sơ */}
             <div className="profile-header-card">
-              <div 
-                className="player-avatar player-avatar-lg" 
+              <div
+                className="player-avatar player-avatar-lg"
                 style={{ backgroundColor: selectedMember.avatarColor, width: "72px", height: "72px", fontSize: "1.75rem" }}
               >
                 {selectedMember.name.charAt(0)}
@@ -810,7 +432,7 @@ export default function Members({ data, setData, isAdmin }) {
                   <div className="profile-stat-box-sub">
                     {memberProfileStats.currentStreak > 0 && (
                       <span className={`streak-badge ${memberProfileStats.isStreakWinning ? "streak-win" : "streak-loss"}`}>
-                        <Flame size={12} fill={memberProfileStats.isStreakWinning ? "currentColor" : "none"} /> 
+                        <Flame size={12} fill={memberProfileStats.isStreakWinning ? "currentColor" : "none"} />
                         Chuỗi {memberProfileStats.isStreakWinning ? "thắng" : "thua"}: {memberProfileStats.currentStreak}
                       </span>
                     )}
@@ -893,9 +515,8 @@ export default function Members({ data, setData, isAdmin }) {
                     const isTeamA = match.teamA.includes(selectedMember.id);
                     const aWon = match.scoreA > match.scoreB;
                     const isWin = (isTeamA && aWon) || (!isTeamA && !aWon);
-                    const myTeamPlayers = isTeamA ? match.teamA : match.teamB;
                     const oppTeamPlayers = isTeamA ? match.teamB : match.teamA;
-                    
+
                     const eloChange = match.eloChanges[selectedMember.id] || 0;
 
                     return (
@@ -954,51 +575,51 @@ export default function Members({ data, setData, isAdmin }) {
         <form onSubmit={handleAddSubmit}>
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Họ và tên thành viên *</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="VD: Nguyễn Hải Đăng" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
+            <input aria-label="Tên thành viên"
+              type="text"
+              className="form-input"
+              placeholder="VD: Nguyễn Hải Đăng"
+              value={name}
+              onChange={e => setName(e.target.value)}
               required
             />
           </div>
-          
+
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Số điện thoại</label>
-            <input 
-              type="tel" 
-              className="form-input" 
-              placeholder="VD: 0912345678" 
-              value={phone} 
-              onChange={e => setPhone(e.target.value)} 
+            <input aria-label="Số điện thoại"
+              type="tel"
+              className="form-input"
+              placeholder="VD: 0912345678"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
             />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
             <div>
               <label className="form-label">Giới tính</label>
-              <select className="form-select" value={gender} onChange={e => setGender(e.target.value)}>
+              <select aria-label="Giới tính" className="form-select" value={gender} onChange={e => setGender(e.target.value)}>
                 <option value="Nam">Nam</option>
                 <option value="Nữ">Nữ</option>
               </select>
             </div>
             <div>
               <label className="form-label">Ngày gia nhập CLB</label>
-              <input 
-                type="date" 
-                className="form-input" 
-                value={joinDate} 
-                onChange={e => setJoinDate(e.target.value)} 
+              <input aria-label="Ngày tham gia"
+                type="date"
+                className="form-input"
+                value={joinDate}
+                onChange={e => setJoinDate(e.target.value)}
               />
             </div>
           </div>
 
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-              <input 
-                type="checkbox" 
-                checked={isGuest} 
+              <input
+                type="checkbox"
+                checked={isGuest}
                 onChange={e => {
                   const checked = e.target.checked;
                   setIsGuest(checked);
@@ -1016,12 +637,12 @@ export default function Members({ data, setData, isAdmin }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <div>
               <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Elo Đơn khởi điểm</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={eloSingles} 
-                onChange={e => setEloSingles(e.target.value)} 
-                min="100" 
+              <input aria-label="Elo đơn ban đầu"
+                type="number"
+                className="form-input"
+                value={eloSingles}
+                onChange={e => setEloSingles(e.target.value)}
+                min="100"
                 max="3000"
                 disabled={isGuest}
                 style={{ opacity: isGuest ? 0.6 : 1 }}
@@ -1029,12 +650,12 @@ export default function Members({ data, setData, isAdmin }) {
             </div>
             <div>
               <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Elo Đôi khởi điểm</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={eloDoubles} 
-                onChange={e => setEloDoubles(e.target.value)} 
-                min="100" 
+              <input aria-label="Elo đôi ban đầu"
+                type="number"
+                className="form-input"
+                value={eloDoubles}
+                onChange={e => setEloDoubles(e.target.value)}
+                min="100"
                 max="3000"
                 disabled={isGuest}
                 style={{ opacity: isGuest ? 0.6 : 1 }}
@@ -1056,51 +677,52 @@ export default function Members({ data, setData, isAdmin }) {
         title="Chỉnh Sửa Thông Tin Thành Viên"
       >
         <form onSubmit={handleEditSubmit}>
+          <label className="form-label"><input type="checkbox" checked={adjustInitialElo} onChange={e=>setAdjustInitialElo(e.target.checked)} /> Điều chỉnh điểm khởi đầu và tính lại lịch sử Elo</label><p>Đổi tên, điện thoại và hồ sơ không thay đổi Elo. Điểm bên dưới chỉ áp dụng khi chọn điều chỉnh.</p>
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Họ và tên thành viên *</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
+            <input aria-label="Tên thành viên"
+              type="text"
+              className="form-input"
+              value={name}
+              onChange={e => setName(e.target.value)}
               required
             />
           </div>
-          
+
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Số điện thoại</label>
-            <input 
-              type="tel" 
-              className="form-input" 
-              value={phone} 
-              onChange={e => setPhone(e.target.value)} 
+            <input aria-label="Số điện thoại"
+              type="tel"
+              className="form-input"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
             />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
             <div>
               <label className="form-label">Giới tính</label>
-              <select className="form-select" value={gender} onChange={e => setGender(e.target.value)}>
+              <select aria-label="Giới tính" className="form-select" value={gender} onChange={e => setGender(e.target.value)}>
                 <option value="Nam">Nam</option>
                 <option value="Nữ">Nữ</option>
               </select>
             </div>
             <div>
               <label className="form-label">Ngày gia nhập CLB</label>
-              <input 
-                type="date" 
-                className="form-input" 
-                value={joinDate} 
-                onChange={e => setJoinDate(e.target.value)} 
+              <input aria-label="Ngày tham gia"
+                type="date"
+                className="form-input"
+                value={joinDate}
+                onChange={e => setJoinDate(e.target.value)}
               />
             </div>
           </div>
 
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label" style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-              <input 
-                type="checkbox" 
-                checked={isGuest} 
+              <input
+                type="checkbox"
+                checked={isGuest}
                 onChange={e => {
                   const checked = e.target.checked;
                   setIsGuest(checked);
@@ -1118,27 +740,27 @@ export default function Members({ data, setData, isAdmin }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <div>
               <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Điểm Elo Đơn</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={eloSingles} 
-                onChange={e => setEloSingles(e.target.value)} 
-                min="100" 
+              <input aria-label="Elo đơn ban đầu"
+                type="number"
+                className="form-input"
+                value={eloSingles}
+                onChange={e => setEloSingles(e.target.value)}
+                min="100"
                 max="3000"
-                disabled={isGuest}
+                disabled={!adjustInitialElo}
                 style={{ opacity: isGuest ? 0.6 : 1 }}
               />
             </div>
             <div>
               <label className="form-label" style={{ opacity: isGuest ? 0.5 : 1 }}>Điểm Elo Đôi</label>
-              <input 
-                type="number" 
-                className="form-input" 
-                value={eloDoubles} 
-                onChange={e => setEloDoubles(e.target.value)} 
-                min="100" 
+              <input aria-label="Elo đôi ban đầu"
+                type="number"
+                className="form-input"
+                value={eloDoubles}
+                onChange={e => setEloDoubles(e.target.value)}
+                min="100"
                 max="3000"
-                disabled={isGuest}
+                disabled={!adjustInitialElo}
                 style={{ opacity: isGuest ? 0.6 : 1 }}
               />
             </div>
@@ -1155,11 +777,11 @@ export default function Members({ data, setData, isAdmin }) {
       <Modal
         isOpen={isDeleteOpen}
         onClose={() => setIsDeleteOpen(false)}
-        title="Xác Nhận Xóa Thành Viên"
+        title="Lưu Trữ Thành Viên"
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <p style={{ color: "var(--text-secondary)", lineHeight: "1.6" }}>
-            Bạn có chắc chắn muốn xóa thành viên <strong style={{ color: "#fff" }}>{name}</strong> ra khỏi CLB? 
+            Bạn có chắc chắn muốn lưu trữ thành viên <strong style={{ color: "#fff" }}>{name}</strong> ra khỏi CLB?
             Thao tác này không thể hoàn tác. Lịch sử các trận đấu của người chơi này vẫn sẽ được giữ lại để đảm bảo tính trọn vẹn điểm số Elo cho các đối thủ/đồng đội khác.
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
@@ -1173,3 +795,9 @@ export default function Members({ data, setData, isAdmin }) {
     </div>
   );
 }
+
+Members.propTypes = {
+  data: PropTypes.object,
+  setData: PropTypes.func,
+  isAdmin: PropTypes.bool,
+};

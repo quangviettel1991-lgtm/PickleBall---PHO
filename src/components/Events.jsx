@@ -1,5 +1,10 @@
-import React, { useState, useMemo } from "react";
-import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Clock, Edit2, ArrowUpDown, Lock, Unlock } from "lucide-react";
+import PropTypes from 'prop-types';
+import './Events.css';
+import { keys } from '../utils/config.js';
+import { scoreFromSets } from '../utils/schema.js';
+import { localDate } from '../utils/dates.js';
+import { useState, useMemo } from "react";
+import { Calendar, Plus, Trophy, Swords, Trash2, ChevronRight, ArrowLeft, Edit2, ArrowUpDown, Lock, Unlock } from "lucide-react";
 import Modal from "./Modal";
 import { addEvent, deleteEvent, updateEvent, updateMatch, deleteMatch } from "../utils/db";
 
@@ -11,7 +16,7 @@ const getMatchRoundText = (matchId) => {
       const type = parts[2]; // "mixer", "rr", "elim"
       const roundNum = parseInt(parts[4]) + 1; // 0-indexed to 1-indexed
       const courtNum = parseInt(parts[5]) + 1; // 0-indexed to 1-indexed
-      
+
       if (type === "mixer") {
         return `Vòng ${roundNum} - Sân ${courtNum}`;
       } else if (type === "rr") {
@@ -29,14 +34,16 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
 
   // Điều hướng nhanh sang trang Bốc thăm & Lập lịch
   const handleGoToDraw = (event) => {
-    localStorage.setItem("draw_selected_event_id", event.id);
+    localStorage.setItem(keys.drawEvent, event.id);
     if (setActiveTab) {
       setActiveTab("draw");
     }
   };
 
   // Trạng thái sự kiện được chọn để xem chi tiết
-  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedEventState, setSelectedEventState] = useState(null);
+  const selectedEvent = events.find(e=>e.id===selectedEventState?.id) || null;
+  const setSelectedEvent = setSelectedEventState;
 
   // Trạng thái Sắp xếp BXH giải đấu
   const [eventSortBy, setEventSortBy] = useState("eloChange"); // eloChange, won
@@ -50,7 +57,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
       setEventSortOrder("desc");
     }
   };
-  
+
   // Trạng thái Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -74,7 +81,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
   const [editMatchScoreB, setEditMatchScoreB] = useState(0);
   const [editMatchTeamA, setEditMatchTeamA] = useState([]);
   const [editMatchTeamB, setEditMatchTeamB] = useState([]);
-  const [editMatchDate, setEditMatchDate] = useState("");
+  const [editSets, setEditSets] = useState([]);
 
   // Trạng thái Xóa Trận Đấu
   const [isDeleteMatchOpen, setIsDeleteMatchOpen] = useState(false);
@@ -100,7 +107,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
       description: editEventDesc
     });
     setData(updatedData);
-    
+
     // Cập nhật lại sự kiện đang chọn trong state
     const newSelected = updatedData.events.find(ev => ev.id === selectedEvent.id);
     setSelectedEvent(newSelected);
@@ -113,13 +120,9 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
     setEditMatchScoreB(match.scoreB);
     setEditMatchTeamA(match.teamA);
     setEditMatchTeamB(match.teamB);
-    
-    // convert date string to local datetime string (YYYY-MM-DDTHH:mm)
-    const d = new Date(match.date);
-    const tzOffset = d.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
-    setEditMatchDate(localISOTime);
-    
+
+    setEditSets(match.sets?.length > 1 ? match.sets.map(s=>({...s})) : []);
+
     setIsEditMatchOpen(true);
   };
 
@@ -142,9 +145,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
       }
     }
 
-    const scoreA = parseInt(editMatchScoreA) || 0;
-    const scoreB = parseInt(editMatchScoreB) || 0;
-    const isPlayed = (scoreA > 0 || scoreB > 0);
+    const outcome = scoreFromSets(editSets.length > 1 ? editSets : [{ a: editMatchScoreA, b: editMatchScoreB }], editSets.length > 1 ? "bestOf3" : "single");
 
     const updatedData = updateMatch({
       id: editingMatch.id,
@@ -152,10 +153,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
       type: editingMatch.type,
       teamA: editMatchTeamA,
       teamB: editMatchTeamB,
-      scoreA: scoreA,
-      scoreB: scoreB,
-      sets: isPlayed ? [{ a: scoreA, b: scoreB }] : [],
-      played: isPlayed,
+      ...outcome,
       date: editingMatch.date
     });
 
@@ -176,14 +174,14 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
 
   const handleToggleLockEvent = (event) => {
     if (!isAdmin) {
-      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để thực hiện tính năng này.");
+      alert("Vui lòng mở khóa tài khoản quản trị trên thanh menu để thực hiện tính năng này.");
       return;
     }
     const isLocked = !event.isLocked;
-    const confirmMsg = isLocked 
+    const confirmMsg = isLocked
       ? `Bạn có chắc chắn muốn KHÓA sự kiện "${event.name}"? Sau khi khóa, toàn bộ các trận đấu của sự kiện này sẽ không thể bị thay đổi điểm số, không thể xóa và lịch bốc thăm cũng không thể bị hủy.`
       : `Bạn có muốn MỞ KHÓA sự kiện "${event.name}"?`;
-    
+
     if (window.confirm(confirmMsg)) {
       const updatedData = updateEvent({
         id: event.id,
@@ -196,7 +194,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
 
 
   // --- PHÂN TÍCH CHI TIẾT SỰ KIỆN ---
-  
+
   // Lấy danh sách các trận đấu thuộc sự kiện hiện tại
   const eventMatches = useMemo(() => {
     if (!selectedEvent) return [];
@@ -220,11 +218,11 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
 
         const keyA = getSortKey(a);
         const keyB = getSortKey(b);
-        
+
         if (keyA !== keyB) {
           return keyA - keyB; // Sắp xếp tăng dần theo Vòng -> Sân
         }
-        
+
         // Nếu cùng khóa hoặc không thuộc bốc thăm, xếp trận mới nhất lên đầu
         return new Date(b.date) - new Date(a.date);
       });
@@ -233,7 +231,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
   // Tính toán bảng xếp hạng riêng cho sự kiện (BXH Sự kiện)
   const eventLeaderboard = useMemo(() => {
     if (!selectedEvent) return [];
-    
+
     // Tính toán thống kê từ các trận đấu thuộc sự kiện
     const statsMap = {};
     members.forEach(m => {
@@ -256,7 +254,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         if (!statsMap[pId]) return;
 
         statsMap[pId].played++;
-        
+
         const change = match.eloChanges[pId] || 0;
         statsMap[pId].eloChange += change;
 
@@ -292,7 +290,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         if (eventSortBy === "eloChange") {
           valA = a.eloChange;
           valB = b.eloChange;
-          
+
           if (a.eloChange !== b.eloChange) {
             return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
           }
@@ -324,10 +322,10 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         } else if (eventSortBy === "won") {
           const diffA = a.won - a.lost;
           const diffB = b.won - b.lost;
-          
+
           valA = diffA;
           valB = diffB;
-          
+
           if (diffA !== diffB) {
             return eventSortOrder === "desc" ? diffB - diffA : diffA - diffB;
           }
@@ -347,7 +345,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
           if (a.elo !== b.elo) {
             return eventSortOrder === "desc" ? a.elo - b.elo : b.elo - a.elo;
           }
-          
+
           tieBreakers = [
             [a.winRate, b.winRate]
           ];
@@ -372,7 +370,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         } else {
           valA = a.eloChange;
           valB = b.eloChange;
-          
+
           if (a.eloChange !== b.eloChange) {
             return eventSortOrder === "desc" ? b.eloChange - a.eloChange : a.eloChange - b.eloChange;
           }
@@ -415,7 +413,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
 
   const handleOpenAdd = () => {
     setEventName("");
-    setEventDate(new Date().toISOString().split("T")[0]);
+    setEventDate(localDate());
     setEventDesc("");
     setIsAddOpen(true);
   };
@@ -452,10 +450,6 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
     return player ? player.name : "Cựu thành viên";
   };
 
-  const getPlayerAvatarColor = (id) => {
-    const player = members.find(m => m.id === id);
-    return player ? player.avatarColor : "#718096";
-  };
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -466,335 +460,10 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
     });
   };
 
-  const formatDateTime = (dateStr) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
 
   return (
     <div className="events-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{__html: `
-        .events-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 32px 24px;
-        }
 
-        .sort-header {
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          user-select: none;
-          transition: color 0.15s;
-        }
-
-        .sort-header:hover {
-          color: var(--accent-neon-green);
-        }
-
-        .sort-header.active {
-          color: var(--accent-neon-green);
-          font-weight: 700;
-        }
-
-        .events-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 28px;
-        }
-
-        .events-title {
-          font-size: 1.75rem;
-          font-weight: 800;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .events-title svg {
-          color: var(--accent-neon-green);
-        }
-
-        /* Lưới danh sách sự kiện */
-        .events-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-          gap: 20px;
-        }
-
-        .event-card {
-          padding: 24px;
-          cursor: pointer;
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          gap: 14px;
-        }
-
-        .event-card-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-        }
-
-        .event-card-date {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 0.8rem;
-          color: var(--accent-electric-blue);
-          font-weight: 600;
-        }
-
-        .event-card-name {
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #fff;
-          line-height: 1.3;
-          margin-top: 4px;
-        }
-
-        .event-card-desc {
-          font-size: 0.88rem;
-          color: var(--text-secondary);
-          line-height: 1.5;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          min-height: 42px;
-        }
-
-        .event-card-footer {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-top: 1px solid var(--border-color);
-          padding-top: 14px;
-          margin-top: 6px;
-        }
-
-        .event-match-count {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-          font-weight: 500;
-        }
-
-        .event-action-delete {
-          color: var(--text-muted);
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          padding: 4px;
-          border-radius: 4px;
-          transition: all 0.2s;
-        }
-
-        .event-action-delete:hover {
-          color: var(--color-danger);
-          background: rgba(255, 71, 87, 0.1);
-        }
-
-        /* --- LAYOUT XEM CHI TIẾT SỰ KIỆN --- */
-        .event-detail-layout {
-          display: flex;
-          flex-direction: column;
-          gap: 28px;
-        }
-
-        .back-button-row {
-          margin-bottom: -10px;
-        }
-
-        .btn-back {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          color: var(--text-secondary);
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 0.9rem;
-          transition: color 0.15s;
-        }
-
-        .btn-back:hover {
-          color: #fff;
-        }
-
-        .event-detail-header-card {
-          padding: 32px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .event-detail-header-card::before {
-          content: '';
-          position: absolute;
-          width: 300px;
-          height: 300px;
-          background: var(--accent-electric-blue);
-          filter: blur(160px);
-          top: -150px;
-          right: -100px;
-          opacity: 0.12;
-          pointer-events: none;
-        }
-
-        .event-detail-grid {
-          display: grid;
-          grid-template-columns: 3fr 2fr;
-          gap: 28px;
-        }
-
-        .event-section-title {
-          font-size: 1.2rem;
-          font-weight: 700;
-          margin-bottom: 20px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .event-section-title svg {
-          color: var(--accent-neon-green);
-        }
-
-        .event-table-panel {
-          padding: 24px;
-        }
-
-        /* Nút hành động sửa/xóa trận đấu */
-        .event-action-btn-edit, .event-action-btn-delete {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          border: 1px solid var(--border-color);
-          background: rgba(255, 255, 255, 0.03);
-          color: var(--text-secondary);
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          transition: all 0.2s ease;
-        }
-
-        .event-action-btn-edit:hover {
-          color: var(--accent-electric-blue);
-          background: rgba(0, 236, 255, 0.08);
-          border-color: rgba(0, 236, 255, 0.2);
-          box-shadow: 0 0 10px rgba(0, 236, 255, 0.15);
-        }
-
-        .event-action-btn-delete:hover {
-          color: var(--color-danger);
-          background: rgba(255, 71, 87, 0.08);
-          border-color: rgba(255, 71, 87, 0.2);
-          box-shadow: 0 0 10px rgba(255, 71, 87, 0.15);
-        }
-
-        .event-matches-scroll {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-height: 480px;
-          overflow-y: auto;
-          padding-right: 10px;
-        }
-
-        .event-matches-scroll::-webkit-scrollbar {
-          width: 12px;
-          display: block;
-        }
-
-        .event-matches-scroll::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.05);
-          border-radius: 6px;
-        }
-
-        .event-matches-scroll::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.45);
-          border: 2px solid rgba(0, 0, 0, 0.2);
-          border-radius: 6px;
-          transition: background-color 0.2s ease;
-        }
-
-        .event-matches-scroll::-webkit-scrollbar-thumb:hover {
-          background: var(--accent-neon-green);
-          box-shadow: 0 0 10px var(--accent-neon-green);
-        }
-
-        /* Responsive & Table Alignment overrides matching main Leaderboard */
-        .show-text-on-mobile {
-          display: none;
-        }
-
-        .hide-text-on-mobile {
-          display: inline;
-        }
-
-        .hide-on-mobile {
-          display: table-cell;
-        }
-
-        @media (max-width: 900px) {
-          .event-detail-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .hide-on-mobile {
-            display: table-cell !important; /* Luôn hiển thị cột trên di động giống BXH */
-          }
-
-          .show-text-on-mobile {
-            display: inline !important;
-          }
-
-          .hide-text-on-mobile {
-            display: none !important;
-          }
-
-          .custom-table td, .custom-table th {
-            padding: 8px 3px !important; /* Kích thước siêu gọn trên di động */
-            font-size: 0.7rem !important;
-          }
-
-          .player-name-cell {
-            max-width: 80px;
-            font-size: 0.72rem !important;
-          }
-
-          .rank-col {
-            width: 24px !important;
-          }
-
-          .player-avatar-sm {
-            display: none !important; /* Ẩn avatar trên di động */
-          }
-        }
-
-        @media (max-width: 600px) {
-          .events-grid {
-            grid-template-columns: 1fr;
-          }
-          .event-detail-header-card {
-            padding: 20px;
-          }
-        }
-      `}} />
 
       {/* --- XEM CHI TIẾT SỰ KIỆN --- */}
       {selectedEvent ? (
@@ -826,15 +495,15 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
               </div>
               {isAdmin && (
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignSelf: "flex-start" }}>
-                  <button 
-                    className="btn-neon-green" 
+                  <button
+                    className="btn-neon-green"
                     onClick={() => handleGoToDraw(selectedEvent)}
                     style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: "pointer" }}
                   >
                     <Swords size={14} /> Bốc thăm & Lập lịch
                   </button>
-                  <button 
-                    className="btn-secondary" 
+                  <button
+                    className="btn-secondary"
                     onClick={() => handleToggleLockEvent(selectedEvent)}
                     style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.85rem", padding: "8px 14px", cursor: "pointer", border: `1px solid ${selectedEvent.isLocked ? "var(--color-danger)" : "var(--border-color)"}`, color: selectedEvent.isLocked ? "var(--color-danger)" : "inherit" }}
                   >
@@ -848,8 +517,8 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                       </>
                     )}
                   </button>
-                  <button 
-                    className="btn-secondary" 
+                  <button
+                    className="btn-secondary"
                     onClick={() => {
                       if (selectedEvent.isLocked) {
                         alert("Sự kiện này đã bị khóa, không thể chỉnh sửa thông tin!");
@@ -884,7 +553,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                         <span className="show-text-on-mobile">Tên</span>
                       </th>
                       <th style={{ width: "60px" }}>
-                        <div 
+                        <div
                           className={`sort-header ${eventSortBy === "elo" ? "active" : ""}`}
                           onClick={() => toggleEventSort("elo")}
                         >
@@ -892,7 +561,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                         </div>
                       </th>
                       <th style={{ width: "65px", textAlign: "center" }}>
-                        <div 
+                        <div
                           className={`sort-header ${eventSortBy === "eloChange" ? "active" : ""}`}
                           onClick={() => toggleEventSort("eloChange")}
                         >
@@ -901,7 +570,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                         </div>
                       </th>
                       <th style={{ width: "55px", textAlign: "center" }} className="hide-on-mobile">
-                        <div 
+                        <div
                           className={`sort-header ${eventSortBy === "matchesPlayed" ? "active" : ""}`}
                           onClick={() => toggleEventSort("matchesPlayed")}
                         >
@@ -910,7 +579,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                         </div>
                       </th>
                       <th style={{ width: "65px", textAlign: "center" }} className="hide-on-mobile">
-                        <div 
+                        <div
                           className={`sort-header ${eventSortBy === "won" ? "active" : ""}`}
                           onClick={() => toggleEventSort("won")}
                         >
@@ -920,7 +589,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                       </th>
                       <th style={{ width: "55px", textAlign: "center" }} className="hide-on-mobile">Hiệu số</th>
                       <th style={{ width: "70px", textAlign: "center" }}>
-                        <div 
+                        <div
                           className={`sort-header ${eventSortBy === "winRate" ? "active" : ""}`}
                           onClick={() => toggleEventSort("winRate")}
                         >
@@ -958,8 +627,8 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                             {/* Cột người chơi */}
                             <td>
                               <div className="player-info-cell">
-                                <div 
-                                  className="player-avatar player-avatar-sm" 
+                                <div
+                                  className="player-avatar player-avatar-sm"
                                   style={{ backgroundColor: member.avatarColor }}
                                 >
                                   {member.name.charAt(0)}
@@ -1073,18 +742,18 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                   </p>
                 ) : (
                   eventMatches.map((match, index) => (
-                    <div 
-                      key={match.id} 
-                      className="glass-card" 
-                      style={{ 
-                        padding: "10px 12px", 
-                        minHeight: "56px", 
-                        background: "rgba(255,255,255,0.015)", 
-                        borderRadius: "8px", 
-                        display: "flex", 
+                    <div
+                      key={match.id}
+                      className="glass-card"
+                      style={{
+                        padding: "10px 12px",
+                        minHeight: "56px",
+                        background: "rgba(255,255,255,0.015)",
+                        borderRadius: "8px",
+                        display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        gap: "6px" 
+                        gap: "6px"
                       }}
                     >
                       {/* Số thứ tự & Lượt trận xếp dọc trên dưới cực kỳ gọn để chống tràn ngang di động */}
@@ -1096,11 +765,11 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                           const text = getMatchRoundText(match.id);
                           if (!text) {
                             return (
-                              <span style={{ 
-                                fontSize: "0.62rem", 
-                                color: "var(--text-muted)", 
-                                fontWeight: "700", 
-                                background: "rgba(255,255,255,0.03)", 
+                              <span style={{
+                                fontSize: "0.62rem",
+                                color: "var(--text-muted)",
+                                fontWeight: "700",
+                                background: "rgba(255,255,255,0.03)",
                                 border: "1px solid rgba(255,255,255,0.06)",
                                 padding: "1px 4px",
                                 borderRadius: "3px",
@@ -1114,10 +783,10 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                           const parts = text.split(" - ");
                           return (
                             <div style={{ display: "flex", flexDirection: "column", gap: "2px", alignItems: "flex-start" }}>
-                              <span style={{ 
-                                fontSize: "0.65rem", 
-                                color: "var(--accent-electric-blue)", 
-                                fontWeight: "800", 
+                              <span style={{
+                                fontSize: "0.65rem",
+                                color: "var(--accent-electric-blue)",
+                                fontWeight: "800",
                                 background: "rgba(0, 236, 255, 0.05)",
                                 border: "1px solid rgba(0, 236, 255, 0.12)",
                                 padding: "1px 4px",
@@ -1128,10 +797,10 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                                 {parts[0]}
                               </span>
                               {parts[1] && (
-                                <span style={{ 
-                                  fontSize: "0.62rem", 
-                                  color: "var(--accent-neon-green)", 
-                                  fontWeight: "800", 
+                                <span style={{
+                                  fontSize: "0.62rem",
+                                  color: "var(--accent-neon-green)",
+                                  fontWeight: "800",
                                   background: "rgba(57, 255, 20, 0.05)",
                                   border: "1px solid rgba(57, 255, 20, 0.12)",
                                   padding: "1px 4px",
@@ -1159,13 +828,13 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                       {/* Điểm số hoặc Trạng thái chưa đấu */}
                       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flexShrink: 0 }}>
                         {match.played === false ? (
-                          <div className="match-unplayed-badge" style={{ 
-                            fontSize: "0.6rem", 
-                            padding: "2px 5px", 
-                            display: "flex", 
-                            flexDirection: "column", 
-                            gap: "1px", 
-                            lineHeight: "1.1", 
+                          <div className="match-unplayed-badge" style={{
+                            fontSize: "0.6rem",
+                            padding: "2px 5px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "1px",
+                            lineHeight: "1.1",
                             borderRadius: "4px",
                             minWidth: "38px",
                             textAlign: "center",
@@ -1195,8 +864,8 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                       {/* Nút hành động cho Admin */}
                       {isAdmin && (
                         <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                          <button 
-                            className="event-action-btn-edit" 
+                          <button
+                            className="event-action-btn-edit"
                             onClick={() => {
                               if (selectedEvent.isLocked) {
                                 alert("Sự kiện này đã bị khóa, không thể sửa trận đấu!");
@@ -1211,8 +880,11 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                           >
                             <Edit2 size={12} />
                           </button>
-                          <button 
-                            className="event-action-btn-delete" 
+                          {match.played !== false && <button className="btn-secondary" title="Xóa kết quả, giữ lịch đấu" disabled={selectedEvent.isLocked} onClick={()=>{
+                            if(window.confirm('Đưa trận về chưa đấu và giữ lịch? Bản kết quả cũ sẽ được sao lưu.')) setData(updateMatch({id:match.id,played:false,scoreA:0,scoreB:0,sets:[]}));
+                          }}>Đặt lại điểm</button>}
+                          <button
+                            className="event-action-btn-delete"
                             onClick={() => {
                               if (selectedEvent.isLocked) {
                                 alert("Sự kiện này đã bị khóa, không thể xóa trận đấu!");
@@ -1253,7 +925,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
           <div className="events-grid">
             {events.length === 0 ? (
               <div className="glass-panel" style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text-muted)" }}>
-                Chưa có giải đấu hoặc sự kiện nào được tổ chức. Nhấp vào "Tạo sự kiện mới" để bắt đầu!
+                Chưa có giải đấu hoặc sự kiện nào được tổ chức. Nhấp vào &quot;Tạo sự kiện mới&quot; để bắt đầu!
               </div>
             ) : (
               events.map((event) => {
@@ -1261,8 +933,8 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                 const matchCount = matches.filter(m => m.eventId === event.id).length;
 
                 return (
-                  <div 
-                    key={event.id} 
+                  <div
+                    key={event.id}
                     className="glass-panel event-card animate-slide-up"
                     onClick={() => setSelectedEvent(event)}
                   >
@@ -1278,8 +950,8 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                         )}
                       </div>
                       {isAdmin && (
-                        <button 
-                          className="event-action-delete" 
+                        <button
+                          className="event-action-delete"
                           onClick={(e) => {
                             if (event.isLocked) {
                               e.stopPropagation();
@@ -1325,33 +997,33 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         <form onSubmit={handleAddSubmit}>
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Tên giải đấu / Sự kiện *</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="VD: Giải Pickleball Nội Bộ Tháng 5" 
-              value={eventName} 
-              onChange={e => setEventName(e.target.value)} 
+            <input aria-label="Tên sự kiện"
+              type="text"
+              className="form-input"
+              placeholder="VD: Giải Pickleball Nội Bộ Tháng 5"
+              value={eventName}
+              onChange={e => setEventName(e.target.value)}
               required
             />
           </div>
 
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Ngày bắt đầu sự kiện</label>
-            <input 
-              type="date" 
-              className="form-input" 
-              value={eventDate} 
-              onChange={e => setEventDate(e.target.value)} 
+            <input aria-label="Ngày sự kiện"
+              type="date"
+              className="form-input"
+              value={eventDate}
+              onChange={e => setEventDate(e.target.value)}
             />
           </div>
 
           <div style={{ marginBottom: "24px" }}>
             <label className="form-label">Mô tả chi tiết giải đấu</label>
-            <textarea 
-              className="form-textarea" 
-              placeholder="Nhập thông tin về thể thức thi đấu, giải thưởng..." 
-              value={eventDesc} 
-              onChange={e => setEventDesc(e.target.value)} 
+            <textarea aria-label="Mô tả sự kiện"
+              className="form-textarea"
+              placeholder="Nhập thông tin về thể thức thi đấu, giải thưởng..."
+              value={eventDesc}
+              onChange={e => setEventDesc(e.target.value)}
               rows={4}
             />
           </div>
@@ -1372,7 +1044,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           <p style={{ color: "var(--text-secondary)", lineHeight: "1.6" }}>
             Bạn có chắc chắn muốn xóa sự kiện <strong style={{ color: "#fff" }}>{eventName}</strong>?
-            Thao tác này sẽ không xóa các trận đấu đã chơi trong sự kiện, tuy nhiên toàn bộ các trận đấu đó sẽ được chuyển thành thể thức **"Giao lưu tự do"** (không thuộc sự kiện nào).
+            Thao tác này sẽ không xóa các trận đấu đã chơi trong sự kiện, tuy nhiên toàn bộ các trận đấu đó sẽ được chuyển thành thể thức **&quot;Giao lưu tự do&quot;** (không thuộc sự kiện nào).
           </p>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
             <button type="button" className="btn-secondary" onClick={() => setIsDeleteOpen(false)}>Hủy</button>
@@ -1392,33 +1064,33 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
         <form onSubmit={handleEditEventSubmit}>
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Tên giải đấu / Sự kiện *</label>
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="VD: Giải Pickleball Nội Bộ Tháng 5" 
-              value={editEventName} 
-              onChange={e => setEditEventName(e.target.value)} 
+            <input aria-label="Tên sự kiện"
+              type="text"
+              className="form-input"
+              placeholder="VD: Giải Pickleball Nội Bộ Tháng 5"
+              value={editEventName}
+              onChange={e => setEditEventName(e.target.value)}
               required
             />
           </div>
 
           <div style={{ marginBottom: "16px" }}>
             <label className="form-label">Ngày bắt đầu sự kiện</label>
-            <input 
-              type="date" 
-              className="form-input" 
-              value={editEventDate} 
-              onChange={e => setEditEventDate(e.target.value)} 
+            <input aria-label="Ngày sự kiện"
+              type="date"
+              className="form-input"
+              value={editEventDate}
+              onChange={e => setEditEventDate(e.target.value)}
             />
           </div>
 
           <div style={{ marginBottom: "24px" }}>
             <label className="form-label">Mô tả chi tiết giải đấu</label>
-            <textarea 
-              className="form-textarea" 
-              placeholder="Nhập thông tin về thể thức thi đấu, giải thưởng..." 
-              value={editEventDesc} 
-              onChange={e => setEditEventDesc(e.target.value)} 
+            <textarea aria-label="Mô tả sự kiện"
+              className="form-textarea"
+              placeholder="Nhập thông tin về thể thức thi đấu, giải thưởng..."
+              value={editEventDesc}
+              onChange={e => setEditEventDesc(e.target.value)}
               rows={4}
             />
           </div>
@@ -1451,7 +1123,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                   Đội A {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
                 </label>
                 <div style={{ display: "flex", gap: "6px", flexDirection: "column" }}>
-                  <select 
+                  <select aria-label="Người chơi A1"
                     className="form-input"
                     value={editMatchTeamA[0] || ""}
                     onChange={e => {
@@ -1469,7 +1141,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                   </select>
 
                   {editingMatch.type === "doubles" && (
-                    <select 
+                    <select aria-label="Người chơi A2"
                       className="form-input"
                       value={editMatchTeamA[1] || ""}
                       onChange={e => {
@@ -1495,7 +1167,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                   Đội B {editingMatch.type === "singles" ? "(Đơn)" : "(Đôi)"}
                 </label>
                 <div style={{ display: "flex", gap: "6px", flexDirection: "column" }}>
-                  <select 
+                  <select aria-label="Người chơi B1"
                     className="form-input"
                     value={editMatchTeamB[0] || ""}
                     onChange={e => {
@@ -1513,7 +1185,7 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
                   </select>
 
                   {editingMatch.type === "doubles" && (
-                    <select 
+                    <select aria-label="Người chơi B2"
                       className="form-input"
                       value={editMatchTeamB[1] || ""}
                       onChange={e => {
@@ -1534,28 +1206,29 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
               </div>
             </div>
 
+            {editSets.length > 1 && <fieldset><legend>Điểm từng set</legend>{editSets.map((s,i)=><div className="set-row" key={i}><label>Set {i+1} A<input className="form-input" type="number" min="0" max="999" value={s.a} onChange={e=>setEditSets(prev=>prev.map((x,j)=>j===i?{...x,a:e.target.value}:x))} /></label><label>Set {i+1} B<input className="form-input" type="number" min="0" max="999" value={s.b} onChange={e=>setEditSets(prev=>prev.map((x,j)=>j===i?{...x,b:e.target.value}:x))} /></label></div>)}</fieldset>}
             {/* ĐIỂM SỐ TRONG HÀNG NGANG SIÊU GỌN - ĐÃ BỎ THỜI GIAN ĐẤU THEO YÊU CẦU */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "4px" }}>
               <div>
                 <label className="form-label" style={{ fontSize: "0.85rem", marginBottom: "4px" }}>Điểm A *</label>
-                <input 
-                  type="number" 
+                <input aria-label="Điểm đội A"
+                  type="number"
                   min="0"
-                  className="form-input" 
-                  value={editMatchScoreA} 
-                  onChange={e => setEditMatchScoreA(e.target.value)} 
+                  className="form-input"
+                  disabled={editSets.length > 1} value={editMatchScoreA}
+                  onChange={e => setEditMatchScoreA(e.target.value)}
                   style={{ padding: "8px", fontSize: "16px" }}
                   required
                 />
               </div>
               <div>
                 <label className="form-label" style={{ fontSize: "0.85rem", marginBottom: "4px" }}>Điểm B *</label>
-                <input 
-                  type="number" 
+                <input aria-label="Điểm đội B"
+                  type="number"
                   min="0"
-                  className="form-input" 
-                  value={editMatchScoreB} 
-                  onChange={e => setEditMatchScoreB(e.target.value)} 
+                  className="form-input"
+                  disabled={editSets.length > 1} value={editMatchScoreB}
+                  onChange={e => setEditMatchScoreB(e.target.value)}
                   style={{ padding: "8px", fontSize: "16px" }}
                   required
                 />
@@ -1586,3 +1259,10 @@ export default function Events({ data, setData, isAdmin, setActiveTab }) {
     </div>
   );
 }
+
+Events.propTypes = {
+  data: PropTypes.object,
+  setData: PropTypes.func,
+  isAdmin: PropTypes.bool,
+  setActiveTab: PropTypes.func,
+};

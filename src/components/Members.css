@@ -1,0 +1,390 @@
+
+        .members-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 32px 24px;
+        }
+
+        .members-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 28px;
+        }
+
+        .members-title {
+          font-size: 1.75rem;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .members-title svg {
+          color: var(--accent-neon-green);
+        }
+
+        /* Thanh Tìm kiếm & Nút thêm */
+        .action-row {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+
+        .search-wrapper {
+          position: relative;
+          flex-grow: 1;
+        }
+
+        .search-icon-inside {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--text-muted);
+        }
+
+        .search-input {
+          padding-left: 44px;
+        }
+
+        /* Danh sách thành viên dạng Card Grid */
+        .members-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 20px;
+        }
+
+        .member-card {
+          padding: 24px;
+          cursor: pointer;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+
+        .member-card-actions {
+          position: absolute;
+          top: 16px;
+          right: 16px;
+          display: flex;
+          gap: 4px;
+          opacity: 0;
+          transition: opacity 0.2s;
+          z-index: 10;
+        }
+
+        .member-card:hover .member-card-actions {
+          opacity: 1;
+        }
+
+        .action-icon-btn {
+          background: rgba(255,255,255,0.03);
+          border: 1px solid var(--border-color);
+          color: var(--text-muted);
+          border-radius: 6px;
+          padding: 6px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .action-icon-btn:hover {
+          background: rgba(255, 255, 255, 0.08);
+          color: #fff;
+        }
+
+        .action-icon-btn.btn-delete:hover {
+          background: rgba(255, 71, 87, 0.15);
+          color: var(--color-danger);
+          border-color: rgba(255, 71, 87, 0.3);
+        }
+
+        .member-card-avatar {
+          margin-bottom: 16px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        .member-card-name {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: #fff;
+          margin-bottom: 4px;
+        }
+
+        .member-card-info {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 14px;
+        }
+
+        .member-card-elo {
+          font-size: 1.5rem;
+          font-weight: 800;
+          color: var(--accent-neon-green);
+          letter-spacing: -0.02em;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          line-height: 1.1;
+        }
+
+        .member-card-elo-label {
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+
+        .member-card-rank-badge {
+          position: absolute;
+          top: 16px;
+          left: 16px;
+          background: rgba(0, 236, 255, 0.1);
+          color: var(--accent-electric-blue);
+          border: 1px solid rgba(0, 236, 255, 0.2);
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 0.7rem;
+          font-weight: 700;
+        }
+
+        /* CSS TRANG CÁ NHÂN (PROFILE MODAL) */
+        .profile-layout {
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+        }
+
+        .profile-header-card {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          padding: 20px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid var(--border-color);
+          border-radius: 12px;
+        }
+
+        .profile-header-info {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .profile-name {
+          font-size: 1.5rem;
+          font-weight: 800;
+          color: #fff;
+        }
+
+        .profile-meta-list {
+          display: flex;
+          gap: 16px;
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+        }
+
+        .profile-meta-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        /* Chỉ số phân tích (Stats Panel) */
+        .profile-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 16px;
+        }
+
+        .profile-stat-box {
+          background: rgba(255, 255, 255, 0.01);
+          border: 1px solid var(--border-color);
+          border-radius: 10px;
+          padding: 16px;
+          text-align: center;
+        }
+
+        .profile-stat-box-title {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          margin-bottom: 8px;
+        }
+
+        .profile-stat-box-val {
+          font-size: 1.5rem;
+          font-weight: 800;
+          color: #fff;
+        }
+
+        .profile-stat-box-sub {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          margin-top: 4px;
+        }
+
+        /* Phân tích sâu (Partner & Opponent) */
+        .analysis-row {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+        }
+
+        .analysis-card {
+          padding: 16px;
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          background: rgba(255, 255, 255, 0.015);
+          border: 1px solid var(--border-color);
+          border-radius: 10px;
+        }
+
+        .analysis-card-icon {
+          width: 44px;
+          height: 44px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .partner-card .analysis-card-icon { background: rgba(46, 213, 115, 0.08); color: var(--color-success); border: 1px solid rgba(46, 213, 115, 0.15); }
+        .opponent-card .analysis-card-icon { background: rgba(255, 71, 87, 0.08); color: var(--color-danger); border: 1px solid rgba(255, 71, 87, 0.15); }
+
+        .analysis-card-info {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .analysis-card-title {
+          font-size: 0.75rem;
+          font-weight: 600;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        }
+
+        .analysis-card-name {
+          font-weight: 700;
+          color: #fff;
+          font-size: 0.95rem;
+          margin-top: 2px;
+        }
+
+        .analysis-card-desc {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+        }
+
+        /* Phong độ Streak */
+        .streak-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-weight: 700;
+          font-size: 0.85rem;
+        }
+
+        .streak-win { background: rgba(255, 165, 2, 0.1); color: var(--color-warning); border: 1px solid rgba(255, 165, 2, 0.2); }
+        .streak-loss { background: rgba(255, 255, 255, 0.04); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.06); }
+
+        /* Lịch sử cá nhân */
+        .history-section {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .history-title {
+          font-size: 1rem;
+          font-weight: 700;
+        }
+
+        .history-list-mini {
+          max-height: 240px;
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .history-row-mini {
+          background: rgba(255,255,255,0.01);
+          border: 1px solid rgba(255,255,255,0.04);
+          border-radius: 8px;
+          padding: 10px 14px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.88rem;
+        }
+
+        .result-badge {
+          display: inline-block;
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+        }
+
+        .result-win { background: rgba(46, 213, 115, 0.15); color: var(--color-success); }
+        .result-loss { background: rgba(255, 71, 87, 0.15); color: var(--color-danger); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+          .member-card-actions {
+            opacity: 1 !important;
+            top: 10px;
+            right: 10px;
+          }
+
+          .action-icon-btn {
+            padding: 9px;
+            background: rgba(18, 22, 32, 0.85);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: #fff;
+          }
+
+          .action-row {
+            flex-direction: column;
+          }
+          .profile-header-card {
+            flex-direction: column;
+            text-align: center;
+            padding: 16px;
+          }
+          .profile-meta-list {
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+          }
+          .profile-stats-grid {
+            grid-template-columns: 1fr;
+          }
+          .analysis-row {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+          .history-row-mini {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+        }
+
+
+
+.member-card:focus-within .member-card-actions { opacity: 1; }

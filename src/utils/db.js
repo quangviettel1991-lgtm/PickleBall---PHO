@@ -1,615 +1,227 @@
-import { initialMembers, initialEvents, initialMatches, initialTransactions } from "./mockData";
-import { calculateSinglesElo, calculateDoublesElo } from "./elo";
-import { updateRemoteData } from "./supabase";
+import { initialMembers, initialEvents, initialMatches, initialTransactions } from './mockData.js';
+import { calculateSinglesElo, calculateDoublesElo } from './elo.js';
+import { keys, LOCAL_MODE } from './config.js';
+import { getAccess, requireWrite } from './access.js';
+import { readState, commitState, readSnapshots, snapshot, newId } from './storage.js';
+import { clone, emptyClub, normalizeClub, integer, requiredText, validateMatch, isPlayed, stableJson } from './schema.js';
+import { localDate, toInstant } from './dates.js';
+import { drawMatchId, drawNodes, syncDraws, removeDrawNodes } from './draws.js';
 
-const CLUB_ID = import.meta.env.VITE_CLUB_ID || "1";
-const STORAGE_KEY = `pickleball_club_data_${CLUB_ID}`;
-const UPDATED_AT_KEY = `pickleball_club_data_updated_at_${CLUB_ID}`;
-const SNAPSHOTS_KEY = `pickleball_snapshots_${CLUB_ID}`;
-const MAX_SNAPSHOTS = 14;          // Giữ tối đa 14 bản snapshot (~2 tuần)
-const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000; // Tối thiểu 5 phút giữa 2 snapshot liên tiếp
-let _lastSnapshotTime = 0;
-
-// Lấy toàn bộ dữ liệu từ localStorage
-export function getClubData() {
-  const dataStr = localStorage.getItem(STORAGE_KEY);
-  if (!dataStr) {
-    // Nếu chưa có dữ liệu, khởi tạo bằng dữ liệu mẫu cục bộ nhưng với nhãn thời gian cực kỳ cũ (epoch)
-    // để dữ liệu đám mây Supabase (nếu có) luôn được ưu tiên tải về ghi đè lên dữ liệu cục bộ.
-    const defaultData = {
-      members: initialMembers,
-      events: initialEvents,
-      matches: initialMatches,
-      transactions: initialTransactions
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
-    localStorage.setItem(UPDATED_AT_KEY, new Date(0).toISOString());
-    return defaultData;
+export function getClubData() { return readState().data; }
+function unlocked(data, eventId) {
+  if (eventId && data.events.find(e => e.id === eventId)?.isLocked) throw new Error('Sự kiện đã khóa. Hãy mở khóa trước khi thay đổi.');
+}
+function persist(state, data, action) {
+  requireWrite();
+  if (!LOCAL_MODE && !getAccess().local && !state.acknowledged) throw new Error('Cần kết nối và đối chiếu dữ liệu máy chủ trước khi chỉnh sửa. Bản cũ trên máy vẫn được giữ nguyên.');
+  const clean = normalizeClub(data);
+  for (const event of state.data.events.filter(e=>e.isLocked)) {
+    const matchesFor = club => club.matches.filter(m=>m.eventId===event.id).sort((a,b)=>a.id.localeCompare(b.id));
+    if (stableJson(matchesFor(state.data)) !== stableJson(matchesFor(clean))) throw new Error('Thay đổi này ảnh hưởng kết quả hoặc Elo của sự kiện đã khóa. Mở khóa sự kiện liên quan trước khi lưu.');
   }
-  try {
-    const data = JSON.parse(dataStr);
-    // Tự động nâng cấp cấu trúc dữ liệu cũ (di trú) nếu thiếu trường initialEloSingles hoặc initialEloDoubles
-    const needsMigration = data.members && data.members.some(m => m.initialEloSingles === undefined || m.initialEloDoubles === undefined);
-    if (needsMigration) {
-      console.log("Phát hiện dữ liệu định dạng cũ. Đang tự động tính toán lại Elo Đơn và Đôi...");
-      recalculateAllElos(data);
-      // Ghi lại dữ liệu mới vào localStorage
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      // Tự động đồng bộ lên đám mây với nhãn thời gian hiện tại
-      const timestamp = new Date().toISOString();
-      localStorage.setItem(UPDATED_AT_KEY, timestamp);
-      updateRemoteData(data, timestamp);
-    }
-    return data;
-  } catch (e) {
-    console.error("Lỗi parse dữ liệu từ localStorage, thiết lập lại dữ liệu mẫu cục bộ", e);
-    const defaultData = {
-      members: initialMembers,
-      events: initialEvents,
-      matches: initialMatches,
-      transactions: initialTransactions
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
-    localStorage.setItem(UPDATED_AT_KEY, new Date(0).toISOString());
-    return defaultData;
-  }
+  commitState({ ...state, data: clean, pending: !getAccess().local,
+    operationId: newId('operation') }, state.generation, { label: action });
+  return clean;
 }
-
-// Lưu dữ liệu vào localStorage
-export function saveClubData(data) {
-  const timestamp = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  localStorage.setItem(UPDATED_AT_KEY, timestamp);
-  // Tự động tạo snapshot (có throttle 5 phút)
-  _autoSaveSnapshot(data, timestamp);
-  // Đồng bộ ngầm lên đám mây Supabase
-  updateRemoteData(data, timestamp).then(success => {
-    if (success) {
-      console.log("Đồng bộ đám mây Supabase thành công!");
-    }
-  });
+function change(action, mutate) {
+  requireWrite();
+  const state = readState(); const data = clone(state.data);
+  mutate(data);
+  return persist(state, data, action);
 }
-
-// ---------------------------------------------------------------------------
-// HỆ THỐNG SNAPSHOT (Lưu lịch sử phiên bản để phòng tránh mất dữ liệu)
-// ---------------------------------------------------------------------------
-
-/**
- * [Nội bộ] Tự động lưu snapshot với throttle (tối thiểu 5 phút/lần).
- */
-function _autoSaveSnapshot(data, timestamp) {
-  const now = Date.now();
-  if (now - _lastSnapshotTime < SNAPSHOT_THROTTLE_MS) return;
-  _lastSnapshotTime = now;
-  _writeSnapshot(data, timestamp, "auto");
+export function saveClubData(data) { return replaceClubData(data, 'before_import'); }
+export function replaceClubData(input, action = 'before_restore') {
+  requireWrite();
+  const clean = normalizeClub(input, { strict: true });
+  const state = readState();
+  return persist(state, clean, action);
 }
-
-/**
- * [Nội bộ] Ghi 1 bản snapshot vào danh sách, giữ tối đa MAX_SNAPSHOTS bản.
- */
-function _writeSnapshot(data, timestamp, label = "auto") {
-  try {
-    const snapshots = getSnapshots();
-    const snapshot = {
-      timestamp,
-      label,
-      membersCount: data.members ? data.members.length : 0,
-      eventsCount: data.events ? data.events.length : 0,
-      matchesCount: data.matches ? data.matches.length : 0,
-      data: JSON.parse(JSON.stringify(data)) // deep clone
-    };
-    snapshots.unshift(snapshot); // Thêm vào đầu (mới nhất trước)
-    // Giữ tối đa MAX_SNAPSHOTS bản
-    const trimmed = snapshots.slice(0, MAX_SNAPSHOTS);
-    localStorage.setItem(SNAPSHOTS_KEY, JSON.stringify(trimmed));
-    console.log(`[Snapshot] Đã lưu snapshot lúc ${timestamp} (${trimmed.length}/${MAX_SNAPSHOTS} bản)`);
-  } catch (e) {
-    console.warn("[Snapshot] Không thể lưu snapshot:", e);
-  }
+export const getSnapshots = readSnapshots;
+export function createManualSnapshot(data, label = 'manual') { requireWrite(); return snapshot(data, label); }
+export function restoreSnapshot(id) {
+  const found = readSnapshots().find(s => s.id === id || s.timestamp === id);
+  if (!found) throw new Error('Không tìm thấy bản sao lưu.');
+  return replaceClubData(found.data, 'before_restore');
 }
-
-/**
- * Lấy danh sách tất cả bản snapshot đang lưu trong localStorage.
- * @returns {Array} Mảng snapshot, mới nhất ở đầu.
- */
-export function getSnapshots() {
-  try {
-    const raw = localStorage.getItem(SNAPSHOTS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) || [];
-  } catch (e) {
-    console.warn("[Snapshot] Lỗi đọc snapshots:", e);
-    return [];
-  }
-}
-
-/**
- * Khôi phục dữ liệu về 1 bản snapshot cụ thể theo timestamp.
- * @param {string} snapshotTimestamp - Timestamp của bản snapshot cần khôi phục.
- * @returns {object|null} Dữ liệu đã khôi phục hoặc null nếu không tìm thấy.
- */
-export function restoreSnapshot(snapshotTimestamp) {
-  const snapshots = getSnapshots();
-  const found = snapshots.find(s => s.timestamp === snapshotTimestamp);
-  if (!found) {
-    console.error("[Snapshot] Không tìm thấy snapshot:", snapshotTimestamp);
-    return null;
-  }
-  // Trước khi restore, lưu snapshot của trạng thái hiện tại (để còn undo được)
-  const currentData = getClubData();
-  _writeSnapshot(currentData, new Date().toISOString(), "before_restore");
-  // Ghi đè dữ liệu bằng bản snapshot được chọn
-  saveClubData(found.data);
-  return found.data;
-}
-
-/**
- * Tạo thủ công 1 bản snapshot ngay lập tức (bỏ qua throttle).
- * @param {object} data - Dữ liệu cần snapshot.
- * @param {string} [label] - Nhãn mô tả (vd: "manual").
- */
-export function createManualSnapshot(data, label = "manual") {
-  _writeSnapshot(data, new Date().toISOString(), label);
-}
-
-/**
- * Xóa toàn bộ lịch sử snapshot.
- */
-export function clearSnapshots() {
-  localStorage.removeItem(SNAPSHOTS_KEY);
-  _lastSnapshotTime = 0;
-}
-
-// Khôi phục dữ liệu về trạng thái mẫu (Demo)
+export function clearSnapshots() { requireWrite(); localStorage.setItem(keys.snapshots, '[]'); }
 export function resetToDemoData() {
-  const defaultData = {
-    members: initialMembers,
-    events: initialEvents,
-    matches: initialMatches,
-    transactions: initialTransactions
-  };
-  saveClubData(defaultData);
-  return defaultData;
-}
-
-// Khôi phục hoàn toàn dữ liệu trống
-export function clearAllData() {
-  const emptyData = {
-    members: [],
-    events: [],
-    matches: [],
-    transactions: []
-  };
-  saveClubData(emptyData);
-  return emptyData;
-}
-
-// --- THAO TÁC THÀNH VIÊN ---
-
-export function addMember(newMember) {
-  const data = getClubData();
-  const id = "m_" + Date.now();
-  const isGuest = !!newMember.isGuest;
-  const baseEloSingles = isGuest ? 1000 : (parseInt(newMember.eloSingles) || 1000);
-  const baseEloDoubles = isGuest ? 1000 : (parseInt(newMember.eloDoubles) || 1200);
-  const member = {
-    id,
-    name: newMember.name,
-    phone: newMember.phone || "",
-    gender: newMember.gender || "Nam",
-    joinDate: newMember.joinDate || new Date().toISOString().split("T")[0],
-    elo: baseEloDoubles,
-    eloSingles: baseEloSingles,
-    eloDoubles: baseEloDoubles,
-    initialElo: baseEloDoubles,
-    initialEloSingles: baseEloSingles,
-    initialEloDoubles: baseEloDoubles,
-    isGuest,
-    avatarColor: newMember.avatarColor || getRandomColor()
-  };
-  data.members.push(member);
-  saveClubData(data);
-  return data;
-}
-
-export function updateMember(updatedMember) {
-  const data = getClubData();
-  const isGuest = !!updatedMember.isGuest;
-  const eloSingles = isGuest ? 1000 : (parseInt(updatedMember.eloSingles) || 1000);
-  const eloDoubles = isGuest ? 1000 : (parseInt(updatedMember.eloDoubles) || 1200);
-
-  data.members = data.members.map(m => 
-    m.id === updatedMember.id 
-      ? { 
-          ...m, 
-          ...updatedMember, 
-          elo: eloDoubles, 
-          eloSingles,
-          eloDoubles,
-          initialElo: eloDoubles,
-          initialEloSingles: eloSingles,
-          initialEloDoubles: eloDoubles,
-          isGuest
-        } 
-      : m
-  );
+  const data = normalizeClub({ members: initialMembers, events: initialEvents, matches: initialMatches, transactions: initialTransactions });
   recalculateAllElos(data);
-  saveClubData(data);
-  return data;
+  return replaceClubData(data, 'before_demo');
 }
+export function clearAllData() { return replaceClubData(emptyClub(), 'before_clear'); }
 
-export function deleteMember(memberId) {
-  const data = getClubData();
-  // Xóa thành viên
-  data.members = data.members.filter(m => m.id !== memberId);
-  // Đồng thời, chúng ta vẫn giữ nguyên các trận đấu trong lịch sử để tránh hỏng dữ liệu,
-  // nhưng khi hiển thị, các ID người chơi không tồn tại sẽ hiển thị là "Cựu thành viên".
-  saveClubData(data);
-  return data;
-}
-
-// --- THAO TÁC SỰ KIỆN ---
-
-export function addEvent(newEvent) {
-  const data = getClubData();
-  const id = "e_" + Date.now();
-  const event = {
-    id,
-    name: newEvent.name,
-    date: newEvent.date || new Date().toISOString().split("T")[0],
-    description: newEvent.description || "",
-    isLocked: false
-  };
-  data.events.push(event);
-  saveClubData(data);
-  return data;
-}
-
-export function deleteEvent(eventId) {
-  const data = getClubData();
-  data.events = data.events.filter(e => e.id !== eventId);
-  // Các trận đấu thuộc sự kiện bị xóa sẽ được cập nhật thành giao lưu tự do (eventId: "")
-  data.matches = data.matches.map(m => 
-    m.eventId === eventId ? { ...m, eventId: "" } : m
-  );
-  saveClubData(data);
-  return data;
-}
-
-export function updateEvent(updatedEvent) {
-  const data = getClubData();
-  data.events = data.events.map(e => 
-    e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e
-  );
-  saveClubData(data);
-  return data;
-}
-
-
-// --- GHI NHẬN TRẬN ĐẤU & CẬP NHẬT ELO ---
-
-/**
- * Ghi nhận trận đấu mới và tự động cập nhật Elo của các người chơi
- */
-export function recordMatch(matchData) {
-  const data = getClubData();
-  const matchId = "match_" + Date.now();
-  
-  const { type, eventId, teamA, teamB, scoreA, scoreB, sets } = matchData;
-  
-  // Lấy Elo hiện tại của các người chơi
-  const membersMapSingles = {};
-  const membersMapDoubles = {};
-  data.members.forEach(m => {
-    membersMapSingles[m.id] = m.eloSingles !== undefined ? m.eloSingles : m.elo;
-    membersMapDoubles[m.id] = m.eloDoubles !== undefined ? m.eloDoubles : m.elo;
+export function addMember(input) {
+  return change('before_add_member', data => {
+    const singles = integer(input.eloSingles ?? 1000, 'Elo đơn', 100, 3000);
+    const doubles = integer(input.eloDoubles ?? input.elo ?? (input.isGuest ? 1000 : 1200), 'Elo đôi', 100, 3000);
+    data.members.push({ id: newId('m'), name: requiredText(input.name, 'Tên thành viên'), phone: input.phone || '',
+      gender: input.gender || 'Nam', joinDate: input.joinDate || localDate(), isGuest: Boolean(input.isGuest),
+      elo: doubles, eloSingles: singles, eloDoubles: doubles, initialElo: doubles, initialEloSingles: singles, initialEloDoubles: doubles,
+      avatarColor: input.avatarColor || '#1e90ff' });
   });
-
-  // Khai báo Elo thay đổi
-  let eloChanges = {};
-
-  if (type === "singles") {
-    const playerAId = teamA[0];
-    const playerBId = teamB[0];
-    
-    const eloA = membersMapSingles[playerAId] || 1200;
-    const eloB = membersMapSingles[playerBId] || 1200;
-
-    const { changeA, changeB } = calculateSinglesElo(eloA, eloB, scoreA, scoreB);
-    eloChanges[playerAId] = changeA;
-    eloChanges[playerBId] = changeB;
-
-    // Cập nhật Elo của người chơi trong danh sách thành viên
-    data.members = data.members.map(m => {
-      if (m.id === playerAId) return { 
-        ...m, 
-        eloSingles: Math.max(100, (m.eloSingles !== undefined ? m.eloSingles : m.elo) + changeA),
-        elo: Math.max(100, m.elo + changeA) 
-      };
-      if (m.id === playerBId) return { 
-        ...m, 
-        eloSingles: Math.max(100, (m.eloSingles !== undefined ? m.eloSingles : m.elo) + changeB),
-        elo: Math.max(100, m.elo + changeB) 
-      };
-      return m;
-    });
-
-  } else if (type === "doubles") {
-    const pA1Id = teamA[0];
-    const pA2Id = teamA[1];
-    const pB1Id = teamB[0];
-    const pB2Id = teamB[1];
-
-    const eloA1 = membersMapDoubles[pA1Id] || 1200;
-    const eloA2 = membersMapDoubles[pA2Id] || 1200;
-    const eloB1 = membersMapDoubles[pB1Id] || 1200;
-    const eloB2 = membersMapDoubles[pB2Id] || 1200;
-
-    const { changeA, changeB } = calculateDoublesElo([eloA1, eloA2], [eloB1, eloB2], scoreA, scoreB);
-    
-    eloChanges[pA1Id] = changeA;
-    eloChanges[pA2Id] = changeA;
-    eloChanges[pB1Id] = changeB;
-    eloChanges[pB2Id] = changeB;
-
-    // Cập nhật Elo của 4 người chơi trong danh sách thành viên
-    data.members = data.members.map(m => {
-      if (m.id === pA1Id || m.id === pA2Id) return { 
-        ...m, 
-        eloDoubles: Math.max(100, (m.eloDoubles !== undefined ? m.eloDoubles : m.elo) + changeA),
-        elo: Math.max(100, m.elo + changeA) 
-      };
-      if (m.id === pB1Id || m.id === pB2Id) return { 
-        ...m, 
-        eloDoubles: Math.max(100, (m.eloDoubles !== undefined ? m.eloDoubles : m.elo) + changeB),
-        elo: Math.max(100, m.elo + changeB) 
-      };
-      return m;
-    });
+}
+export function updateMember(input) {
+  return change('before_edit_member', data => {
+    const member = data.members.find(m => m.id === input.id);
+    if (!member) throw new Error('Thành viên không tồn tại.');
+    Object.assign(member, { name: requiredText(input.name, 'Tên thành viên'), phone: input.phone || '', gender: input.gender || 'Nam', joinDate: input.joinDate, isGuest: Boolean(input.isGuest) });
+    // Profile edits never alter current or starting ratings. Explicit initial rating adjustment only.
+    if (input.adjustInitialElo === true) {
+      if (data.matches.some(m => [...m.teamA, ...m.teamB].includes(member.id) && data.events.find(e=>e.id===m.eventId)?.isLocked)) throw new Error('Không sửa điểm xuất phát của thành viên đã có trận trong sự kiện khóa.');
+      establishBaselines(data);
+      member.initialEloSingles = integer(input.initialEloSingles, 'Elo đơn khởi điểm', 100, 3000);
+      member.initialEloDoubles = integer(input.initialEloDoubles, 'Elo đôi khởi điểm', 100, 3000);
+      member.initialElo = member.initialEloDoubles;
+      recalculateAllElos(data);
+    }
+  });
+}
+export function deleteMember(id) {
+  return change('before_archive_member', data => {
+    const m = data.members.find(m => m.id === id);
+    if (!m) throw new Error('Thành viên không tồn tại.');
+    m.archivedAt = new Date().toISOString();
+  });
+}
+export function restoreMember(id) {
+  return change('before_restore_member', data => { const m = data.members.find(m=>m.id===id); if (m) delete m.archivedAt; });
+}
+export function addEvent(input) {
+  return change('before_add_event', data => data.events.push({ id: newId('e'), name: requiredText(input.name, 'Tên sự kiện'), date: input.date || localDate(), description: input.description || '', isLocked: false }));
+}
+export function updateEvent(input) {
+  return change('before_edit_event', data => {
+    const e = data.events.find(e => e.id === input.id);
+    if (!e) throw new Error('Sự kiện không tồn tại.');
+    if (e.isLocked && Object.keys(input).some(k => !['id','isLocked'].includes(k))) throw new Error('Mở khóa sự kiện trước khi sửa.');
+    Object.assign(e, input);
+  });
+}
+export function deleteEvent(id) {
+  return change('before_delete_event', data => {
+    unlocked(data, id); data.events = data.events.filter(e => e.id !== id);
+    data.matches = data.matches.map(m => m.eventId === id ? { ...m, eventId: '' } : m);
+    // Preserve the detached bracket in backups; do not delete historical matches.
+    delete data.draws[id];
+  });
+}
+export function establishBaselines(data) {
+  for (const m of data.members) {
+    for (const [type, field, initial] of [['singles','eloSingles','initialEloSingles'], ['doubles','eloDoubles','initialEloDoubles']]) {
+      if (m[initial] === undefined) {
+        const changes = data.matches.filter(x => x.type === type && isPlayed(x)).reduce((sum,x) => sum + (x.eloChanges?.[m.id] || 0), 0);
+        m[initial] = type === 'doubles' && m.initialElo !== undefined ? m.initialElo : Math.max(100, m[field] - changes);
+      }
+    }
+    m.initialElo ??= m.initialEloDoubles;
   }
-
-  // Thêm trận đấu vào lịch sử
-  const newMatch = {
-    id: matchId,
-    eventId: eventId || "",
-    type,
-    date: matchData.date || new Date().toISOString(),
-    teamA,
-    teamB,
-    scoreA,
-    scoreB,
-    sets,
-    eloChanges
-  };
-
-  data.matches.push(newMatch);
-  recalculateAllElos(data); // Đảm bảo tính toán Elo được cập nhật nhất quán
-  saveClubData(data);
-  return data;
 }
-
-/**
- * Tự động tính toán lại toàn bộ lịch sử Elo của CLB từ điểm khởi đầu của các thành viên.
- * Đảm bảo tính nhất quán tuyệt đối về mặt toán học khi sửa hoặc xóa trận đấu cũ.
- */
 export function recalculateAllElos(data) {
-  // 1. Khôi phục điểm Elo của tất cả thành viên về điểm bắt đầu
-  const demoElos = {
-    m1: 1350,
-    m2: 1280,
-    m3: 1220,
-    m4: 1190,
-    m5: 1150,
-    m6: 1110,
-    m7: 1080,
-    m8: 1020
-  };
-
-  data.members = data.members.map(m => {
-    const baseDoublesElo = m.initialEloDoubles !== undefined 
-      ? m.initialEloDoubles 
-      : (m.initialElo !== undefined ? m.initialElo : (demoElos[m.id] || (m.isGuest ? 1000 : 1200)));
-    const baseSinglesElo = m.initialEloSingles !== undefined 
-      ? m.initialEloSingles 
-      : (m.isGuest ? 1000 : 1000); // Reset all singles Elo to 1000 by default since no one has played singles before!
-
-    return {
-      ...m,
-      elo: baseDoublesElo,
-      eloSingles: baseSinglesElo,
-      eloDoubles: baseDoublesElo,
-      initialElo: baseDoublesElo,
-      initialEloSingles: baseSinglesElo,
-      initialEloDoubles: baseDoublesElo
-    };
-  });
-
-  // 2. Sắp xếp toàn bộ trận đấu theo dòng thời gian tăng dần
-  const sortedMatches = [...data.matches].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  // 3. Giả lập phát lại từng trận đấu và cập nhật biến động Elo
-  const calculatedMatches = sortedMatches.map(match => {
-    const { type, teamA, teamB, scoreA, scoreB } = match;
-
-    if (match.played === false) {
-      return {
-        ...match,
-        eloChanges: {}
-      };
+  establishBaselines(data);
+  const players = new Map(data.members.map(m => {
+    m.eloSingles = m.initialEloSingles; m.eloDoubles = m.initialEloDoubles; m.elo = m.initialEloDoubles;
+    return [m.id, m];
+  }));
+  const sorted = [...data.matches].sort((a,b) => new Date(a.date) - new Date(b.date));
+  for (const match of sorted) {
+    if (!isPlayed(match)) { match.eloChanges = {}; continue; }
+    const field = match.type === 'singles' ? 'eloSingles' : 'eloDoubles';
+    const ids = [...match.teamA, ...match.teamB];
+    // Legacy deleted players have no reconstructible baseline: preserve recorded changes for that match.
+    let changes = match.eloChanges || {};
+    if (ids.every(id=>players.has(id))) {
+      const ratings = team => team.map(id=>players.get(id)[field]);
+      const result = match.type === 'singles'
+        ? calculateSinglesElo(ratings(match.teamA)[0], ratings(match.teamB)[0], match.scoreA, match.scoreB)
+        : calculateDoublesElo(ratings(match.teamA), ratings(match.teamB), match.scoreA, match.scoreB);
+      changes = Object.fromEntries([...match.teamA.map(id=>[id,result.changeA]), ...match.teamB.map(id=>[id,result.changeB])]);
     }
-
-    // Bản đồ Elo của các người chơi ngay trước khi trận đấu này diễn ra
-    const runningSinglesElos = {};
-    const runningDoublesElos = {};
-    data.members.forEach(m => {
-      runningSinglesElos[m.id] = m.eloSingles;
-      runningDoublesElos[m.id] = m.eloDoubles;
-    });
-
-    let eloChanges = {};
-
-    if (type === "singles") {
-      const pAId = teamA[0];
-      const pBId = teamB[0];
-      const eloA = runningSinglesElos[pAId] || 1200;
-      const eloB = runningSinglesElos[pBId] || 1200;
-
-      const { changeA, changeB } = calculateSinglesElo(eloA, eloB, scoreA, scoreB);
-      eloChanges[pAId] = changeA;
-      eloChanges[pBId] = changeB;
-
-      // Cập nhật điểm Elo thực tế của hai người chơi
-      data.members = data.members.map(m => {
-        if (m.id === pAId) return { 
-          ...m, 
-          eloSingles: Math.max(100, m.eloSingles + changeA),
-          elo: Math.max(100, m.elo + changeA) 
-        };
-        if (m.id === pBId) return { 
-          ...m, 
-          eloSingles: Math.max(100, m.eloSingles + changeB),
-          elo: Math.max(100, m.elo + changeB) 
-        };
-        return m;
-      });
-
-    } else if (type === "doubles") {
-      const pA1 = teamA[0];
-      const pA2 = teamA[1];
-      const pB1 = teamB[0];
-      const pB2 = teamB[1];
-
-      const eloA1 = runningDoublesElos[pA1] || 1200;
-      const eloA2 = runningDoublesElos[pA2] || 1200;
-      const eloB1 = runningDoublesElos[pB1] || 1200;
-      const eloB2 = runningDoublesElos[pB2] || 1200;
-
-      const { changeA, changeB } = calculateDoublesElo([eloA1, eloA2], [eloB1, eloB2], scoreA, scoreB);
-      eloChanges[pA1] = changeA;
-      eloChanges[pA2] = changeA;
-      eloChanges[pB1] = changeB;
-      eloChanges[pB2] = changeB;
-
-      // Cập nhật điểm Elo thực tế của bốn người chơi
-      data.members = data.members.map(m => {
-        if (m.id === pA1 || m.id === pA2) return { 
-          ...m, 
-          eloDoubles: Math.max(100, m.eloDoubles + changeA),
-          elo: Math.max(100, m.elo + changeA) 
-        };
-        if (m.id === pB1 || m.id === pB2) return { 
-          ...m, 
-          eloDoubles: Math.max(100, m.eloDoubles + changeB),
-          elo: Math.max(100, m.elo + changeB) 
-        };
-        return m;
-      });
+    const applied = {};
+    for (const id of ids) {
+      const player = players.get(id);
+      if (!player) { applied[id] = changes[id] || 0; continue; }
+      const before = player[field]; player[field] = Math.max(100, before + (changes[id] || 0));
+      const delta = player[field] - before; player.elo = Math.max(100, player.elo + delta); applied[id] = delta;
     }
-
-    return {
-      ...match,
-      eloChanges
-    };
+    match.eloChanges = applied;
+  }
+  data.matches = sorted; return data;
+}
+export function recordMatch(input) {
+  return change('before_record_match', data => {
+    unlocked(data, input.eventId); establishBaselines(data);
+    const match = { ...input, id: newId('match'), date: toInstant(input.date || new Date()), eventId: input.eventId || '', played: true, eloChanges: {} };
+    validateMatch(match, data);
+    if ([...match.teamA, ...match.teamB].some(id=>data.members.find(m=>m.id===id)?.archivedAt)) throw new Error('Không thêm trận mới cho thành viên đã lưu trữ.');
+    data.matches.push(match); recalculateAllElos(data);
   });
-
-  // Gán lại danh sách trận đấu đã được cập nhật Elo và sắp xếp lại theo thời gian
-  data.matches = calculatedMatches;
-  return data;
 }
-
-/**
- * Cập nhật một trận đấu hiện có và tính lại toàn bộ Elo
- */
-export function updateMatch(updatedMatch) {
-  const data = getClubData();
-  data.matches = data.matches.map(m => 
-    m.id === updatedMatch.id ? { ...m, ...updatedMatch } : m
-  );
-  recalculateAllElos(data);
-  saveClubData(data);
-  return data;
+export function updateMatch(input) {
+  return change('before_update_match', data => {
+    const index = data.matches.findIndex(m => m.id === input.id);
+    if (index < 0) throw new Error('Trận đấu không còn tồn tại.');
+    const old = data.matches[index]; unlocked(data, old.eventId); unlocked(data, input.eventId ?? old.eventId); establishBaselines(data);
+    const match = { ...old, ...input, date: toInstant(input.date || old.date), played: input.played ?? true };
+    if (input.sets === undefined && (input.scoreA !== undefined || input.scoreB !== undefined) && (old.sets?.length || 0) <= 1) match.sets = [{ a: match.scoreA, b: match.scoreB }];
+    if (old.id.startsWith('match_draw_') && input.eventId !== undefined && input.eventId !== old.eventId) throw new Error('Không chuyển trận bốc thăm sang sự kiện khác.');
+    validateMatch(match, data); data.matches[index] = match; syncDraws(data); recalculateAllElos(data);
+  });
 }
-
-/**
- * Xóa một trận đấu hiện có và tính lại toàn bộ Elo
- */
-export function deleteMatch(matchId) {
-  const data = getClubData();
-  data.matches = data.matches.filter(m => m.id !== matchId);
-  recalculateAllElos(data);
-  saveClubData(data);
-  return data;
+export function deleteMatch(id) { return deleteMatches([id]); }
+export function deleteMatches(ids) {
+  return change('before_delete_matches', data => {
+    data.matches.filter(m=>ids.includes(m.id)).forEach(m=>unlocked(data,m.eventId)); establishBaselines(data);
+    data.matches = data.matches.filter(m=>!ids.includes(m.id)); removeDrawNodes(data, ids); recalculateAllElos(data);
+  });
 }
-
-/**
- * Xóa nhiều trận đấu cùng lúc và tính lại toàn bộ Elo
- */
-export function deleteMatches(matchIds) {
-  const data = getClubData();
-  data.matches = data.matches.filter(m => !matchIds.includes(m.id));
-  recalculateAllElos(data);
-  saveClubData(data);
-  return data;
+export function saveDraw(eventId, scenario, drawData) {
+  return change('before_generate_draw', data => {
+    unlocked(data, eventId);
+    if (!data.events.some(e=>e.id===eventId)) throw new Error('Chọn một sự kiện còn tồn tại.');
+    if (data.draws[eventId]?.data) throw new Error('Lịch hiện tại đã được lưu. Hãy hủy lịch có xác nhận trước khi bốc lại.');
+    data.draws[eventId] = { scenario, data: clone(drawData), generated: true };
+    const nodes = drawNodes(data.draws[eventId]);
+    const format = nodes.some(n => n.teamA.length === 2 || n.teamB.length === 2) ? 'doubles' : 'singles';
+    for (const n of nodes) {
+      if (n.isByeMatch) continue;
+      data.matches.push({ id: drawMatchId(n.matchId), eventId, type: format, date: n.date || new Date().toISOString(), teamA: clone(n.teamA), teamB: clone(n.teamB), scoreA: n.scoreA ?? 0, scoreB: n.scoreB ?? 0, played: Boolean(n.played), sets: [], eloChanges: {} });
+    }
+    syncDraws(data);
+  });
 }
-
-
-// Hỗ trợ sinh màu avatar ngẫu nhiên
-function getRandomColor() {
-  const colors = [
-    "#ff4757", // đỏ
-    "#2ed573", // xanh lá
-    "#1e90ff", // xanh dương
-    "#ffa502", // cam
-    "#9b59b6", // tím
-    "#1abc9c", // teal
-    "#e67e22", // cam đậm
-    "#fd79a8", // hồng
-    "#e84393", // hồng cánh sen
-    "#00bec4"  // cyan
-  ];
-  return colors[Math.floor(Math.random() * colors.length)];
+export function clearDraw(eventId) {
+  return change('before_clear_draw', data => {
+    unlocked(data,eventId); establishBaselines(data);
+    const ids = new Set(drawNodes(data.draws[eventId]).map(m=>drawMatchId(m.matchId)));
+    data.matches = data.matches.filter(m=>!ids.has(m.id)); delete data.draws[eventId]; recalculateAllElos(data);
+  });
 }
-
-// --- THAO TÁC THU CHI (QUỸ CLB) ---
-
-export function addTransaction(newTx) {
-  const data = getClubData();
-  if (!data.transactions) data.transactions = [];
-  const id = "tx_" + Date.now();
-  const tx = {
-    id,
-    type: newTx.type, // "income" hoặc "expense"
-    amount: parseInt(newTx.amount) || 0,
-    category: newTx.category || "Khác",
-    description: newTx.description || "",
-    date: newTx.date || new Date().toISOString().split("T")[0],
-    performedBy: newTx.performedBy || ""
-  };
-  data.transactions.push(tx);
-  saveClubData(data);
-  return data;
+export function adoptLegacyDraw(eventId) {
+  return change('before_adopt_legacy_draw', data => {
+    unlocked(data, eventId); const draw = data.draws[eventId];
+    if (!draw?.legacy) return;
+    establishBaselines(data);
+    const nodes = drawNodes(draw);
+    const type = nodes.some(n=>n.teamA.length === 2 || n.teamB.length === 2) ? 'doubles' : 'singles';
+    for (const n of nodes) {
+      const id = drawMatchId(n.matchId);
+      if (n.isByeMatch || data.matches.some(m=>m.id===id)) continue;
+      const match = { id, eventId, type, date: n.date || new Date().toISOString(), teamA: clone(n.teamA), teamB: clone(n.teamB), scoreA: n.scoreA ?? 0, scoreB: n.scoreB ?? 0, played: Boolean(n.played), sets: n.sets || [], eloChanges: {} };
+      if (match.played) validateMatch(match,data);
+      data.matches.push(match);
+    }
+    delete draw.legacy; syncDraws(data); recalculateAllElos(data);
+  });
 }
-
-export function deleteTransaction(txId) {
-  const data = getClubData();
-  if (!data.transactions) data.transactions = [];
-  data.transactions = data.transactions.filter(t => t.id !== txId);
-  saveClubData(data);
-  return data;
+function transaction(input) {
+  if (!['income','expense'].includes(input.type)) throw new Error('Chọn thu hoặc chi.');
+  return { type: input.type, amount: integer(input.amount, 'Số tiền', 1), category: requiredText(input.category || 'Khác','Danh mục'), description: input.description || '', date: input.date || localDate(), performedBy: input.performedBy || '' };
 }
-
-export function updateTransaction(updatedTx) {
-  const data = getClubData();
-  if (!data.transactions) data.transactions = [];
-  data.transactions = data.transactions.map(t =>
-    t.id === updatedTx.id 
-      ? { 
-          ...t, 
-          ...updatedTx, 
-          amount: parseInt(updatedTx.amount) || 0 
-        } 
-      : t
-  );
-  saveClubData(data);
-  return data;
+export function addTransaction(input) { return change('before_add_transaction', data => data.transactions.push({ ...transaction(input), id: newId('tx') })); }
+export function updateTransaction(input) {
+  return change('before_update_transaction', data => {
+    const t = data.transactions.find(t=>t.id===input.id); if (!t) throw new Error('Giao dịch không còn tồn tại.'); Object.assign(t, transaction(input));
+  });
 }
+export function deleteTransaction(id) { return change('before_delete_transaction', data => { data.transactions = data.transactions.filter(t=>t.id!==id); }); }

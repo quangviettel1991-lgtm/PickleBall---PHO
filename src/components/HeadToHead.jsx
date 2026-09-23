@@ -1,5 +1,8 @@
-import React, { useState, useMemo } from "react";
-import { Users, Swords, Trophy, Activity, TrendingUp, Calendar, AlertCircle } from "lucide-react";
+import PropTypes from 'prop-types';
+import './HeadToHead.css';
+import { isPlayed } from '../utils/schema.js';
+import { useState, useMemo } from "react";
+import { Users, Swords, TrendingUp, Calendar, AlertCircle } from "lucide-react";
 
 export default function HeadToHead({ data }) {
   const { members = [], matches = [] } = data;
@@ -23,10 +26,10 @@ export default function HeadToHead({ data }) {
 
     // Filter matches where BOTH players participated
     const mutualMatches = matches.filter(match => {
-      if (!match.played) return false;
+      if (!isPlayed(match)) return false;
       const teamAMembers = match.teamA || [];
       const teamBMembers = match.teamB || [];
-      
+
       const pAInA = teamAMembers.includes(playerAId);
       const pAInB = teamBMembers.includes(playerAId);
       const pBInA = teamAMembers.includes(playerBId);
@@ -57,7 +60,7 @@ export default function HeadToHead({ data }) {
       const isTeamA = teamAMembers.includes(playerAId);
       const isTeamB = teamBMembers.includes(playerAId);
       const isOpponent = (isTeamA && teamBMembers.includes(playerBId)) || (isTeamB && teamAMembers.includes(playerBId));
-      
+
       const scoreA = match.scoreA || 0;
       const scoreB = match.scoreB || 0;
       const aWon = scoreA > scoreB;
@@ -67,7 +70,7 @@ export default function HeadToHead({ data }) {
       let scoreOfB = 0;
       let isAWin = false;
       let isBWin = false;
-      
+
       if (isOpponent) {
         if (isTeamA) {
           scoreOfA = scoreA;
@@ -156,7 +159,7 @@ export default function HeadToHead({ data }) {
     if (!h2hStats) return null;
     const { winRateA, totalAgainst, singlesPlayed, singlesAWins, doublesPlayed, doublesAWins } = h2hStats;
     if (totalAgainst === 0) return "Chưa đủ dữ liệu đối đầu để đánh giá.";
-    
+
     let text = "";
     if (winRateA > 65) {
       text = "Khắc tinh hoàn toàn! Áp đảo đối thủ ở hầu hết các ván đấu.";
@@ -181,7 +184,7 @@ export default function HeadToHead({ data }) {
     if (!h2hStats) return null;
     const { winRateB, totalAgainst, singlesPlayed, singlesBWins, doublesPlayed, doublesBWins } = h2hStats;
     if (totalAgainst === 0) return "Chưa đủ dữ liệu đối đầu để đánh giá.";
-    
+
     let text = "";
     if (winRateB > 65) {
       text = "Khắc tinh hoàn toàn! Áp đảo đối thủ ở hầu hết các ván đấu.";
@@ -204,312 +207,7 @@ export default function HeadToHead({ data }) {
 
   return (
     <div className="h2h-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{__html: `
-        .h2h-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 24px;
-        }
 
-        .h2h-title-section {
-          margin-bottom: 24px;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .h2h-select-grid {
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
-          gap: 20px;
-          align-items: center;
-          margin-bottom: 24px;
-        }
-
-        .vs-badge {
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, var(--accent-neon-green), var(--accent-electric-blue));
-          color: #000;
-          font-weight: 800;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 0 15px rgba(212, 252, 52, 0.3);
-          font-size: 1.1rem;
-        }
-
-        .h2h-card {
-          padding: 24px;
-          background: rgba(13, 17, 23, 0.6);
-        }
-
-        .h2h-stats-summary {
-          display: grid;
-          grid-template-columns: 1fr auto 1fr;
-          gap: 16px;
-          align-items: center;
-          margin: 24px 0;
-        }
-
-        .h2h-player-stat-block {
-          text-align: center;
-        }
-
-        .h2h-player-name {
-          font-size: 1.4rem;
-          font-weight: 800;
-          color: #fff;
-          margin-bottom: 6px;
-        }
-
-        .h2h-player-elo {
-          font-size: 0.95rem;
-          color: var(--accent-neon-green);
-          font-weight: 600;
-        }
-
-        .h2h-winrate-circle {
-          width: 90px;
-          height: 90px;
-          border-radius: 50%;
-          border: 4px solid var(--border-color);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          margin: 12px auto;
-          background: rgba(255,255,255,0.02);
-        }
-
-        .h2h-winrate-circle.winner {
-          border-color: var(--accent-neon-green);
-          box-shadow: 0 0 15px rgba(212, 252, 52, 0.15);
-        }
-
-        .h2h-winrate-pct {
-          font-size: 1.5rem;
-          font-weight: 800;
-          color: #fff;
-        }
-
-        .h2h-winrate-label {
-          font-size: 0.65rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-        }
-
-        .h2h-progress-container {
-          grid-column: 1 / -1;
-          background: rgba(255,255,255,0.05);
-          height: 12px;
-          border-radius: 6px;
-          overflow: hidden;
-          display: flex;
-        }
-
-        .h2h-progress-bar-a {
-          background: var(--accent-neon-green);
-          height: 100%;
-          transition: width 0.5s;
-        }
-
-        .h2h-progress-bar-b {
-          background: var(--accent-electric-blue);
-          height: 100%;
-          transition: width 0.5s;
-        }
-
-        .h2h-detail-stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 16px;
-          margin-top: 24px;
-        }
-
-        .h2h-detail-stat-row {
-          background: rgba(255,255,255,0.02);
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-          padding: 16px;
-          text-align: center;
-        }
-
-        .h2h-detail-stat-title {
-          font-size: 0.85rem;
-          color: var(--text-muted);
-          margin-bottom: 8px;
-        }
-
-        .h2h-detail-stat-values {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-weight: 700;
-          font-size: 1.15rem;
-        }
-
-        .val-a { color: var(--accent-neon-green); }
-        .val-b { color: var(--accent-electric-blue); }
-        .val-mid { color: var(--text-secondary); font-size: 0.95rem; }
-
-        .h2h-assessment-box {
-          margin-top: 24px;
-          background: rgba(0, 236, 255, 0.04);
-          border: 1px solid rgba(0, 236, 255, 0.15);
-          border-radius: 12px;
-          padding: 16px;
-        }
-
-        .h2h-assessment-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-weight: 700;
-          color: var(--accent-electric-blue);
-          margin-bottom: 8px;
-          font-size: 0.95rem;
-        }
-
-        .h2h-assessment-text {
-          font-size: 0.9rem;
-          color: var(--text-secondary);
-          line-height: 1.5;
-        }
-
-        .h2h-history-section {
-          margin-top: 32px;
-        }
-
-        .h2h-history-title {
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #fff;
-          margin-bottom: 16px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .match-history-card {
-          margin-bottom: 12px;
-          border-left: 4px solid var(--border-color);
-        }
-
-        .match-history-card.win-a {
-          border-left-color: var(--accent-neon-green);
-        }
-
-        .match-history-card.win-b {
-          border-left-color: var(--accent-electric-blue);
-        }
-
-        .match-history-card.teammates-win {
-          border-left-color: var(--color-success);
-        }
-
-        .match-history-card.teammates-loss {
-          border-left-color: var(--color-danger);
-        }
-
-        .match-history-grid {
-          display: grid;
-          grid-template-columns: auto 1fr auto 1fr auto;
-          align-items: center;
-          gap: 16px;
-          padding: 16px;
-        }
-
-        .match-history-date {
-          font-size: 0.8rem;
-          color: var(--text-muted);
-        }
-
-        .match-history-team {
-          font-size: 0.9rem;
-          font-weight: 600;
-        }
-
-        .match-history-team.winner {
-          color: #fff;
-        }
-
-        .match-history-score {
-          font-size: 1.2rem;
-          font-weight: 800;
-          background: rgba(255,255,255,0.05);
-          padding: 4px 12px;
-          border-radius: 6px;
-          letter-spacing: 2px;
-          text-align: center;
-        }
-
-        .match-history-badge {
-          font-size: 0.75rem;
-          font-weight: 700;
-          padding: 3px 8px;
-          border-radius: 4px;
-          text-transform: uppercase;
-        }
-
-        .badge-opponent {
-          background: rgba(255, 71, 87, 0.1);
-          color: var(--color-danger);
-          border: 1px solid rgba(255, 71, 87, 0.2);
-        }
-
-        .badge-teammate {
-          background: rgba(46, 213, 115, 0.1);
-          color: var(--color-success);
-          border: 1px solid rgba(46, 213, 115, 0.2);
-        }
-
-        .elo-change-indicator {
-          font-size: 0.75rem;
-          font-weight: 700;
-          margin-top: 2px;
-        }
-
-        .elo-up { color: var(--color-success); }
-        .elo-down { color: var(--color-danger); }
-
-        .select-prompt-box {
-          text-align: center;
-          padding: 60px 24px;
-          background: rgba(13, 17, 23, 0.4);
-          border: 1px dashed var(--border-color);
-          border-radius: 16px;
-          color: var(--text-muted);
-        }
-
-        @media (max-width: 768px) {
-          .h2h-select-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-
-          .vs-badge {
-            margin: 0 auto;
-          }
-
-          .h2h-detail-stats-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-
-          .match-history-grid {
-            grid-template-columns: 1fr;
-            text-align: center;
-            gap: 8px;
-          }
-
-          .match-history-score {
-            width: fit-content;
-            margin: 4px auto;
-          }
-        }
-      `}} />
 
       <div className="h2h-title-section">
         <div className="tab-icon-wrapper" style={{ background: "rgba(0, 236, 255, 0.1)", border: "1px solid rgba(0, 236, 255, 0.2)" }}>
@@ -526,7 +224,7 @@ export default function HeadToHead({ data }) {
         <div className="h2h-select-grid">
           <div>
             <label className="form-label">Chọn Người chơi A</label>
-            <select
+            <select aria-label="Người chơi A"
               className="form-input"
               value={playerAId}
               onChange={(e) => setPlayerAId(e.target.value)}
@@ -544,7 +242,7 @@ export default function HeadToHead({ data }) {
 
           <div>
             <label className="form-label">Chọn Người chơi B</label>
-            <select
+            <select aria-label="Người chơi B"
               className="form-input"
               value={playerBId}
               onChange={(e) => setPlayerBId(e.target.value)}
@@ -670,7 +368,7 @@ export default function HeadToHead({ data }) {
                   <span>Khi đồng hành cùng đội (Đồng đội đấu đôi)</span>
                 </div>
                 <p className="h2h-assessment-text">
-                  Hai người chơi đã cùng chiến tuyến trong <strong>{h2hStats.asTeammatesCount}</strong> trận đôi, 
+                  Hai người chơi đã cùng chiến tuyến trong <strong>{h2hStats.asTeammatesCount}</strong> trận đôi,
                   với tỉ lệ giành chiến thắng đồng hành là <strong>{h2hStats.asTeammatesWinRate}%</strong> ({h2hStats.asTeammatesWins} trận thắng).
                 </p>
               </div>
@@ -755,3 +453,7 @@ export default function HeadToHead({ data }) {
     </div>
   );
 }
+
+HeadToHead.propTypes = {
+  data: PropTypes.object,
+};

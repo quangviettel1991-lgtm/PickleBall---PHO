@@ -1,4 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import PropTypes from 'prop-types';
+import './BackupRestore.css';
+import { CLUB_ID } from '../utils/config.js';
+import { parseBackup, MAX_IMPORT_BYTES } from '../utils/schema.js';
+import { exportBackup, downloadJson } from '../utils/storage.js';
+import { useState, useRef, useEffect } from "react";
 import {
   Database, Download, Upload, RotateCcw, Trash2,
   CheckCircle2, AlertTriangle, FileJson, Camera,
@@ -12,6 +17,7 @@ import Modal from "./Modal";
 
 export default function BackupRestore({ data, setData, isAdmin }) {
   const fileInputRef = useRef(null);
+  const [importPreview, setImportPreview] = useState(null);
 
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage]     = useState("");
@@ -61,12 +67,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
   // ── Export ───────────────────────────────────────────────
   const handleExport = () => {
     try {
-      const uri  = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
-      const name = `pickleball_backup_${new Date().toISOString().split("T")[0]}.json`;
-      const a    = document.createElement("a");
-      a.setAttribute("href", uri);
-      a.setAttribute("download", name);
-      a.click();
+      downloadJson(exportBackup(data, CLUB_ID), `pickleball_backup_${new Date().toISOString().slice(0,10)}.json`);
       showSuccess("Xuất sao lưu dữ liệu thành công! File JSON đã được tải về.");
     } catch { showError("Gặp lỗi trong quá trình xuất dữ liệu."); }
   };
@@ -74,26 +75,20 @@ export default function BackupRestore({ data, setData, isAdmin }) {
   // ── Import ───────────────────────────────────────────────
   const handleImportClick = () => fileInputRef.current.click();
 
-  const handleImportFile = (e) => {
-    const file = e.target.files[0];
+  const handleImportFile = async (e) => {
+    const file = e.target.files[0]; e.target.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target.result);
-        if (parsed && Array.isArray(parsed.members) && Array.isArray(parsed.events) && Array.isArray(parsed.matches)) {
-          if (!Array.isArray(parsed.transactions)) parsed.transactions = [];
-          saveClubData(parsed);
-          setData(parsed);
-          refreshSnapshots();
-          showSuccess("Khôi phục cơ sở dữ liệu thành công! Ứng dụng đã đồng bộ.");
-        } else {
-          showError("Cấu trúc file sao lưu không hợp lệ.");
-        }
-      } catch { showError("Lỗi đọc file JSON. Đảm bảo định dạng file chuẩn."); }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
+    try {
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('File vượt giới hạn 8 MB.');
+      setImportPreview(parseBackup(await file.text(), CLUB_ID));
+    } catch (failure) { showError(failure.message); }
+  };
+  const confirmImport = () => {
+    try {
+      const restored = saveClubData(importPreview);
+      setData(restored); setImportPreview(null); refreshSnapshots();
+      showSuccess('Đã phục hồi trên máy. Xem trạng thái đồng bộ ở đầu trang.');
+    } catch (failure) { showError(failure.message); }
   };
 
   // ── Manual Snapshot ──────────────────────────────────────
@@ -106,7 +101,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
   // ── Restore Snapshot ─────────────────────────────────────
   const handleRestoreSnapshot = () => {
     if (!restoreConfirmSnapshot) return;
-    const restored = restoreSnapshot(restoreConfirmSnapshot.timestamp);
+    const restored = restoreSnapshot(restoreConfirmSnapshot.id || restoreConfirmSnapshot.timestamp);
     if (restored) {
       setData(restored);
       setRestoreConfirmSnapshot(null);
@@ -121,13 +116,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
   // ── Download Snapshot ────────────────────────────────────
   const handleDownloadSnapshot = (snap) => {
     try {
-      const uri  = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snap.data, null, 2));
-      const ts   = snap.timestamp.replace(/[:.]/g, "-");
-      const name = `snapshot_${ts}.json`;
-      const a    = document.createElement("a");
-      a.setAttribute("href", uri);
-      a.setAttribute("download", name);
-      a.click();
+      downloadJson(exportBackup(snap.data, CLUB_ID), `snapshot_${snap.timestamp.replace(/[:.]/g, '-')}.json`);
       showSuccess("Đã tải xuống file JSON snapshot thành công!");
     } catch { showError("Không thể tải xuống snapshot này."); }
   };
@@ -166,66 +155,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
   // ═══════════════════════════════════════════════════════
   return (
     <div className="backup-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{ __html: `
-        .backup-container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
-        .backup-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-        .backup-title { font-size: 1.75rem; font-weight: 800; }
-        .backup-title svg { color: var(--accent-neon-green); }
-        .backup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 32px; }
-        .db-action-card { padding: 24px; display: flex; flex-direction: column; gap: 14px; height: 100%; }
-        .db-card-icon-title { display: flex; align-items: center; gap: 12px; }
-        .db-card-icon-wrapper { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .db-card-title { font-size: 1.1rem; font-weight: 700; color: #fff; }
-        .db-card-desc { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; flex-grow: 1; }
 
-        .export-card .db-card-icon-wrapper { background: rgba(0,236,255,0.08); color: var(--accent-electric-blue); border: 1px solid rgba(0,236,255,0.15); }
-        .import-card .db-card-icon-wrapper { background: rgba(212,252,52,0.08); color: var(--accent-neon-green); border: 1px solid rgba(212,252,52,0.15); }
-        .snapshot-card .db-card-icon-wrapper { background: rgba(155,89,182,0.1); color: #b388ff; border: 1px solid rgba(155,89,182,0.2); }
-        .reset-card .db-card-icon-wrapper { background: rgba(255,165,2,0.08); color: var(--color-warning); border: 1px solid rgba(255,165,2,0.15); }
-        .clear-card .db-card-icon-wrapper { background: rgba(255,71,87,0.08); color: var(--color-danger); border: 1px solid rgba(255,71,87,0.15); }
-
-        /* ── Snapshot Section ── */
-        .snapshot-section { margin-top: 4px; }
-        .snapshot-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
-        .snapshot-section-title { display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: 700; color: #fff; }
-        .snapshot-section-title svg { color: #9b59b6; }
-        .snapshot-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-
-        .snapshot-empty { text-align: center; padding: 48px 24px; color: var(--text-muted); border: 1px dashed var(--border-color); border-radius: 12px; }
-        .snapshot-empty svg { display: block; margin: 0 auto 12px; opacity: 0.35; }
-
-        .snapshot-table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-color); }
-        .snapshot-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
-        .snapshot-table th { background: rgba(255,255,255,0.04); padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; border-bottom: 1px solid var(--border-color); }
-        .snapshot-table td { padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
-        .snapshot-table tr:last-child td { border-bottom: none; }
-        .snapshot-table tr:hover td { background: rgba(255,255,255,0.025); }
-
-        .snap-label { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
-        .snap-stat { font-size: 0.82rem; color: var(--text-secondary); white-space: nowrap; }
-        .snap-idx { width: 26px; height: 26px; border-radius: 50%; background: rgba(155,89,182,0.15); border: 1px solid rgba(155,89,182,0.3); color: #b388ff; font-weight: 700; font-size: 0.76rem; display: flex; align-items: center; justify-content: center; }
-        .snap-btn-group { display: flex; gap: 7px; align-items: center; justify-content: flex-end; }
-
-        .btn-sm-snap { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 7px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.15s ease; white-space: nowrap; }
-        .btn-sm-restore { background: rgba(212,252,52,0.08); border-color: rgba(212,252,52,0.25); color: var(--accent-neon-green); }
-        .btn-sm-restore:hover { background: rgba(212,252,52,0.16); border-color: rgba(212,252,52,0.5); }
-        .btn-sm-dl { background: rgba(0,236,255,0.06); border-color: rgba(0,236,255,0.2); color: var(--accent-electric-blue); }
-        .btn-sm-dl:hover { background: rgba(0,236,255,0.12); border-color: rgba(0,236,255,0.4); }
-        .btn-sm-danger { background: rgba(255,71,87,0.07); border-color: rgba(255,71,87,0.25); color: var(--color-danger); }
-        .btn-sm-refresh { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.12); color: var(--text-secondary); }
-        .btn-sm-refresh:hover { background: rgba(255,255,255,0.08); color: #fff; }
-
-        /* Alert */
-        .alert-floating { position: fixed; top: 24px; right: 24px; z-index: 9999; padding: 14px 20px; border-radius: 10px; display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 0.88rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: sIA 0.3s cubic-bezier(0.16,1,0.3,1) forwards; max-width: 400px; }
-        .alert-success { background: #121824; border: 1px solid var(--accent-neon-green); color: var(--accent-neon-green); }
-        .alert-error   { background: #121824; border: 1px solid var(--color-danger);      color: var(--color-danger);      }
-        @keyframes sIA { from { transform: translateX(50px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-
-        @media (max-width: 640px) {
-          .backup-grid { grid-template-columns: 1fr; }
-          .snapshot-section-header { flex-direction: column; align-items: flex-start; }
-        }
-      ` }} />
 
       {/* ── Toast Alerts ─────────────────────────────── */}
       {successMessage && (
@@ -239,7 +169,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
         </div>
       )}
 
-      <input type="file" accept=".json" ref={fileInputRef} onChange={handleImportFile} style={{ display: "none" }} />
+      <input aria-label="Chọn bản sao lưu JSON" type="file" accept=".json" ref={fileInputRef} onChange={handleImportFile} style={{ display: "none" }} />
 
       {/* ── Header ───────────────────────────────────── */}
       <div className="backup-header">
@@ -287,7 +217,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
               <h3 className="db-card-title">Chụp Snapshot Ngay</h3>
             </div>
             <p className="db-card-desc">
-              Lưu ngay "ảnh chụp" trạng thái dữ liệu hiện tại vào danh sách lịch sử bên dưới. Nên làm trước các thao tác quan trọng.
+              Lưu ngay &quot;ảnh chụp&quot; trạng thái dữ liệu hiện tại vào danh sách lịch sử bên dưới. Nên làm trước các thao tác quan trọng.
             </p>
             <button
               onClick={handleCreateSnapshot}
@@ -323,7 +253,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
               <h3 className="db-card-title">Xóa Sạch Dữ Liệu</h3>
             </div>
             <p className="db-card-desc">
-              Xóa vĩnh viễn toàn bộ dữ liệu CLB trên trình duyệt này. Nên sao lưu hoặc chụp snapshot trước khi thực hiện.
+              Thay dữ liệu CLB bằng bản rỗng, bao gồm dữ liệu đồng bộ lên máy chủ. Nên sao lưu hoặc chụp snapshot trước khi thực hiện.
             </p>
             <button className="btn-secondary" onClick={() => setIsClearOpen(true)}
               style={{ width: "100%", justifyContent: "center", borderColor: "rgba(255,71,87,0.2)", color: "var(--color-danger)" }}>
@@ -338,7 +268,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
             <FileJson size={40} style={{ color: "var(--accent-electric-blue)", marginBottom: 16, opacity: 0.7 }} />
             <h3 className="db-card-title" style={{ marginBottom: 8 }}>Chế Độ Chỉ Đọc</h3>
             <p className="db-card-desc" style={{ maxWidth: 280, margin: "0 auto", fontSize: "0.82rem" }}>
-              Các tính năng Khôi phục, Snapshot và Xóa dữ liệu đã bị khóa. Vui lòng sử dụng mã PIN Admin để mở khóa.
+              Các tính năng Khôi phục, Snapshot và Xóa dữ liệu đã bị khóa. Vui lòng sử dụng tài khoản quản trị để mở khóa.
             </p>
           </div>
         )}
@@ -353,7 +283,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
             <History size={22} />
             <span>Lịch Sử Snapshot Tự Động</span>
             <span style={{ fontSize: "0.78rem", fontWeight: 400, color: "var(--text-muted)" }}>
-              ({snapshots.length}/14 bản)
+              ({snapshots.length}/30 bản)
             </span>
           </div>
           <div className="snapshot-actions">
@@ -375,7 +305,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
               Chưa có snapshot nào
             </p>
             <p style={{ fontSize: "0.83rem", maxWidth: 420, margin: "0 auto" }}>
-              Snapshot sẽ tự động được tạo sau mỗi lần bạn thêm thành viên, ghi nhận trận đấu, tạo sự kiện… (tối thiểu cách nhau 5 phút). Bạn cũng có thể chụp thủ công ở trên.
+              Snapshot sẽ tự động được tạo trước mỗi lần bạn thêm thành viên, ghi nhận trận đấu, tạo sự kiện… trước mỗi thay đổi. Bạn cũng có thể chụp thủ công ở trên.
             </p>
           </div>
         ) : (
@@ -396,7 +326,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
                 {snapshots.map((snap, idx) => {
                   const badge = getLabelBadge(snap.label);
                   return (
-                    <tr key={snap.timestamp}>
+                    <tr key={snap.id || snap.timestamp}>
                       <td><div className="snap-idx">{idx + 1}</div></td>
                       <td>
                         <span style={{ color: "#fff", fontWeight: 500, fontSize: "0.87rem" }}>
@@ -432,11 +362,14 @@ export default function BackupRestore({ data, setData, isAdmin }) {
         )}
 
         <p style={{ marginTop: 12, fontSize: "0.77rem", color: "var(--text-muted)", lineHeight: 1.7 }}>
-          💡 Hệ thống tự động giữ tối đa <strong>14 bản snapshot</strong> gần nhất (~2 tuần). Khi đủ 14 bản, bản cũ nhất bị xóa tự động.
-          Trước khi khôi phục, hệ thống lưu trạng thái hiện tại như bản <em>"Trước Restore"</em> để bạn có thể undo nếu cần.
+          💡 Hệ thống tự động giữ tối đa <strong>30 bản snapshot</strong> gần nhất trên trình duyệt này. Khi đủ 30 bản, bản cũ nhất bị xóa tự động.
+          Trước khi khôi phục, hệ thống lưu trạng thái hiện tại như bản <em>&quot;Trước Restore&quot;</em> để bạn có thể undo nếu cần.
         </p>
       </div>
 
+      <Modal isOpen={!!importPreview} onClose={()=>setImportPreview(null)} title="Kiểm tra trước khi phục hồi">
+        {importPreview && <><p>Bản nhập có {importPreview.members.length} thành viên, {importPreview.events.length} sự kiện, {importPreview.matches.length} trận, {importPreview.transactions.length} giao dịch và {Object.keys(importPreview.draws).length} lịch đấu.</p><p>Dữ liệu hiện tại sẽ được sao lưu trước khi thay thế. Thay đổi sẽ được đồng bộ lên máy chủ khi không có xung đột.</p><button className="btn-secondary" onClick={()=>setImportPreview(null)}>Hủy</button><button className="btn-neon-green" onClick={confirmImport}>Sao lưu và phục hồi</button></>}
+      </Modal>
       {/* ── Modal: Xác nhận Khôi phục Snapshot ────── */}
       <Modal isOpen={!!restoreConfirmSnapshot} onClose={() => setRestoreConfirmSnapshot(null)} title="Xác Nhận Khôi Phục Snapshot">
         {restoreConfirmSnapshot && (
@@ -455,7 +388,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
               </div>
             </div>
             <div style={{ background: "rgba(255,165,2,0.08)", borderRadius: 8, padding: "10px 14px", border: "1px solid rgba(255,165,2,0.2)", fontSize: "0.84rem", color: "var(--color-warning)" }}>
-              ⚠️ Dữ liệu hiện tại sẽ bị ghi đè. Tuy nhiên hệ thống sẽ tự động lưu trạng thái hiện tại như snapshot <em>"Trước Restore"</em> để bạn undo lại nếu cần.
+              ⚠️ Dữ liệu hiện tại sẽ bị ghi đè. Tuy nhiên hệ thống sẽ tự động lưu trạng thái hiện tại như snapshot <em>&quot;Trước Restore&quot;</em> để bạn undo lại nếu cần.
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
               <button className="btn-secondary" onClick={() => setRestoreConfirmSnapshot(null)}>Hủy</button>
@@ -487,7 +420,7 @@ export default function BackupRestore({ data, setData, isAdmin }) {
             Hành động này xóa vĩnh viễn toàn bộ dữ liệu thành viên, giải đấu và lịch sử trận đấu. Nhập chữ{" "}
             <strong style={{ color: "var(--color-danger)" }}>XÓA</strong> để xác nhận:
           </p>
-          <input
+          <input aria-label="Nhập XÓA để xác nhận"
             type="text"
             className="form-input"
             placeholder="Nhập XÓA để xác nhận"
@@ -529,3 +462,9 @@ export default function BackupRestore({ data, setData, isAdmin }) {
     </div>
   );
 }
+
+BackupRestore.propTypes = {
+  data: PropTypes.object,
+  setData: PropTypes.func,
+  isAdmin: PropTypes.bool,
+};

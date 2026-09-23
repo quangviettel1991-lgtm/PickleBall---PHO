@@ -1,101 +1,22 @@
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://wnmatztyaowvudlellha.supabase.co";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndubWF0enR5YW93dnVkbGVsbGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0MDg5MDcsImV4cCI6MjA5NDk4NDkwN30.l6jV2IMlYg08oz90TtaX5U-Vuineov84hNPTGut3Kns";
-
-const CLUB_ID = parseInt(import.meta.env.VITE_CLUB_ID) || 1;
-
-// Kiểm tra xem đã điền đầy đủ và đúng thông tin cấu hình chưa
-const isConfigured = 
-  supabaseUrl && 
-  supabaseAnonKey && 
-  supabaseUrl !== "https://your-project-id.supabase.co" && 
-  !supabaseUrl.includes("your-project-id") && 
-  !supabaseAnonKey.includes("your-anon-key");
-
-export const supabase = isConfigured ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
-// Ghi nhật ký trạng thái cấu hình
-if (!isConfigured) {
-  console.warn(
-    "Supabase chưa được cấu hình đầy đủ trong tệp .env. Ứng dụng sẽ tự động chạy ở chế độ Offline (LocalStorage)."
-  );
+import { createClient } from '@supabase/supabase-js';
+import { CLUB_ID, IS_CONFIGURED, SUPABASE_KEY, SUPABASE_URL } from './config.js';
+export const supabase = IS_CONFIGURED ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+export async function remoteRead(publicOnly = false) {
+  if (!supabase) throw new Error('Chưa cấu hình kết nối CLB. Dữ liệu trên máy được giữ nguyên.');
+  const { data, error } = await supabase.rpc(publicOnly ? 'club_public_read' : 'club_read', { p_club_id: Number(CLUB_ID) });
+  if (error) throw new Error('Chưa kết nối được dữ liệu CLB hoặc máy chủ chưa được nâng cấp quyền truy cập.');
+  if (!data) return { kind: 'missing' };
+  return { kind: 'found', ...data };
 }
-
-/**
- * Lấy dữ liệu từ bảng pickleball_club trên Supabase
- * @returns {Promise<{data: any, updated_at: string} | null>}
- */
-export async function fetchRemoteData() {
+export async function remoteWrite(data, revision, operationId) {
+  if (!supabase) throw new Error('Chưa cấu hình kết nối CLB.');
+  const result = await supabase.rpc('club_save', { p_club_id: Number(CLUB_ID), p_expected_revision: revision, p_data: data, p_operation_id: operationId });
+  if (result.error) throw new Error('Chưa lưu được lên máy chủ. Bản trên máy vẫn được giữ để thử lại.');
+  return result.data;
+}
+export async function getRole() {
   if (!supabase) return null;
-  try {
-    const { data, error } = await supabase
-      .from("pickleball_club")
-      .select("data, updated_at")
-      .eq("id", CLUB_ID)
-      .single();
-
-    if (error) {
-      // Nếu lỗi do bảng chưa có dòng nào, hoặc lỗi khác
-      console.error("Lỗi khi tải dữ liệu từ Supabase:", error.message);
-      return null;
-    }
-    return data;
-  } catch (err) {
-    console.error("Lỗi kết nối khi tải dữ liệu Supabase:", err);
-    return null;
-  }
-}
-
-/**
- * Lấy chỉ mốc thời gian cập nhật của dữ liệu trên Supabase
- * @returns {Promise<string | null>}
- */
-export async function fetchRemoteTimestamp() {
-  if (!supabase) return null;
-  try {
-    const { data, error } = await supabase
-      .from("pickleball_club")
-      .select("updated_at")
-      .eq("id", CLUB_ID)
-      .single();
-
-    if (error) {
-      console.error("Lỗi khi tải timestamp từ Supabase:", error.message);
-      return null;
-    }
-    return data ? data.updated_at : null;
-  } catch (err) {
-    console.error("Lỗi kết nối khi tải timestamp Supabase:", err);
-    return null;
-  }
-}
-
-/**
- * Cập nhật dữ liệu lên bảng pickleball_club trên Supabase
- * @param {object} clubData - Toàn bộ dữ liệu { members, events, matches }
- * @param {string} [customTimestamp] - Mốc thời gian cập nhật tùy chọn để đồng bộ thời gian thực nhất quán
- * @returns {Promise<boolean>} - Trạng thái thành công hay thất bại
- */
-export async function updateRemoteData(clubData, customTimestamp = null) {
-  if (!supabase) return false;
-  try {
-    const timestamp = customTimestamp || new Date().toISOString();
-    const { error } = await supabase
-      .from("pickleball_club")
-      .upsert({
-        id: CLUB_ID,
-        data: clubData,
-        updated_at: timestamp
-      });
-
-    if (error) {
-      console.error("Lỗi khi lưu dữ liệu lên Supabase:", error.message);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error("Lỗi kết nối khi lưu dữ liệu Supabase:", err);
-    return false;
-  }
+  const { data, error } = await supabase.rpc('club_my_role', { p_club_id: Number(CLUB_ID) });
+  if (error) throw new Error('Chưa xác minh được quyền quản trị. Cần cấu hình tài khoản và quyền trên máy chủ.');
+  return data;
 }

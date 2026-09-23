@@ -1,5 +1,11 @@
-import React, { useState, useMemo } from "react";
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, Search, X, Calendar, User, Tag, FileText, Check } from "lucide-react";
+import Pagination from './Pagination';
+import { usePagination } from '../hooks/usePagination';
+import PropTypes from 'prop-types';
+import './Finance.css';
+import Modal from './Modal';
+import { localDate } from '../utils/dates.js';
+import { useState, useMemo } from "react";
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Edit2, Search, Calendar, User, Tag, Check } from "lucide-react";
 import { addTransaction, deleteTransaction, updateTransaction } from "../utils/db";
 
 export default function Finance({ data, setData, isAdmin }) {
@@ -13,12 +19,12 @@ export default function Finance({ data, setData, isAdmin }) {
   // Trạng thái Form (Thêm/Sửa)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTxId, setEditingTxId] = useState(null);
-  
+
   const [txType, setTxType] = useState("expense");
   const [txAmount, setTxAmount] = useState("");
   const [txCategory, setTxCategory] = useState("Khác");
   const [txDescription, setTxDescription] = useState("");
-  const [txDate, setTxDate] = useState(new Date().toISOString().split("T")[0]);
+  const [txDate, setTxDate] = useState(localDate());
   const [txPerformedBy, setTxPerformedBy] = useState("");
 
   // Trạng thái thông báo thành công
@@ -66,7 +72,7 @@ export default function Finance({ data, setData, isAdmin }) {
     setTxAmount("");
     setTxCategory("Khác");
     setTxDescription("");
-    setTxDate(new Date().toISOString().split("T")[0]);
+    setTxDate(localDate());
     setTxPerformedBy("");
     setIsFormOpen(true);
   };
@@ -88,7 +94,7 @@ export default function Finance({ data, setData, isAdmin }) {
 
     const txData = {
       type: txType,
-      amount: parseInt(txAmount),
+      amount: Number(txAmount),
       category: txCategory,
       description: txDescription,
       date: txDate,
@@ -135,436 +141,11 @@ export default function Finance({ data, setData, isAdmin }) {
     }
   };
 
+  const pager = usePagination(filteredTransactions, `${searchQuery}|${filterType}|${filterCategory}`);
   return (
     <div className="finance-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{__html: `
-        .finance-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 24px;
-        }
+      <Pagination pager={pager} />
 
-        .finance-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 24px;
-        }
-
-        .finance-title {
-          font-size: 1.6rem;
-          font-weight: 800;
-          color: #fff;
-        }
-
-        .finance-title span {
-          color: var(--accent-neon-green);
-        }
-
-        /* Stats Cards */
-        .finance-stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-          margin-bottom: 28px;
-        }
-
-        .finance-stat-card {
-          padding: 24px;
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          position: relative;
-          overflow: hidden;
-          transition: transform var(--transition-normal);
-        }
-
-        .finance-stat-card:hover {
-          transform: translateY(-4px);
-        }
-
-        .finance-stat-icon-wrapper {
-          width: 52px;
-          height: 52px;
-          border-radius: 12px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .icon-income {
-          background: rgba(46, 213, 115, 0.1);
-          color: var(--color-success);
-          border: 1px solid rgba(46, 213, 115, 0.2);
-        }
-
-        .icon-expense {
-          background: rgba(255, 71, 87, 0.1);
-          color: var(--color-danger);
-          border: 1px solid rgba(255, 71, 87, 0.2);
-        }
-
-        .icon-balance {
-          background: rgba(0, 230, 118, 0.15);
-          color: var(--accent-neon-green);
-          border: 1px solid rgba(0, 230, 118, 0.3);
-          box-shadow: 0 0 15px rgba(0, 230, 118, 0.1);
-        }
-
-        .stat-details {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .stat-label-light {
-          font-size: 0.82rem;
-          color: var(--text-muted);
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          margin-bottom: 4px;
-        }
-
-        .stat-value-large {
-          font-size: 1.6rem;
-          font-weight: 800;
-          color: #fff;
-        }
-
-        .value-income {
-          color: var(--color-success);
-        }
-
-        .value-expense {
-          color: var(--color-danger);
-        }
-
-        .value-balance {
-          color: var(--accent-neon-green);
-          text-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
-        }
-
-        /* Filters & Operations */
-        .finance-ops-panel {
-          padding: 20px;
-          margin-bottom: 24px;
-          display: flex;
-          flex-wrap: wrap;
-          gap: 16px;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .finance-filters {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 12px;
-          flex-grow: 1;
-        }
-
-        .search-input-wrapper {
-          position: relative;
-          min-width: 260px;
-        }
-
-        .search-input-wrapper input {
-          width: 100%;
-          padding-left: 36px;
-        }
-
-        .search-input-wrapper svg {
-          position: absolute;
-          left: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--text-muted);
-        }
-
-        .filter-select {
-          min-width: 130px;
-        }
-
-        /* History Table */
-        .finance-table-wrapper {
-          overflow-x: auto;
-          margin-bottom: 80px; /* Bớt khoảng trống dưới chân */
-        }
-
-        .finance-table {
-          width: 100%;
-          border-collapse: collapse;
-          text-align: left;
-        }
-
-        .finance-table th {
-          padding: 16px 20px;
-          font-size: 0.82rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          color: var(--text-muted);
-          border-bottom: 1px solid var(--border-color);
-        }
-
-        .finance-table td {
-          padding: 16px 20px;
-          font-size: 0.92rem;
-          color: var(--text-secondary);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-          vertical-align: middle;
-        }
-
-        .finance-table tr:hover td {
-          background: rgba(255, 255, 255, 0.01);
-        }
-
-        .tx-badge {
-          display: inline-flex;
-          align-items: center;
-          padding: 4px 10px;
-          border-radius: 12px;
-          font-size: 0.76rem;
-          font-weight: 700;
-        }
-
-        .tx-badge-income {
-          background: rgba(46, 213, 115, 0.1);
-          color: var(--color-success);
-        }
-
-        .tx-badge-expense {
-          background: rgba(255, 71, 87, 0.1);
-          color: var(--color-danger);
-        }
-
-        .tx-amount-text {
-          font-weight: 800;
-        }
-
-        .tx-amount-income {
-          color: var(--color-success);
-        }
-
-        .tx-amount-expense {
-          color: var(--color-danger);
-        }
-
-        .action-icon-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 6px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          background: rgba(255, 255, 255, 0.02);
-          color: var(--text-muted);
-          cursor: pointer;
-          transition: all 0.2s;
-          margin-right: 8px;
-        }
-
-        .action-icon-btn:hover {
-          color: #fff;
-          background: rgba(255, 255, 255, 0.08);
-        }
-
-        .btn-delete-tx:hover {
-          color: var(--color-danger);
-          background: rgba(255, 71, 87, 0.1);
-          border-color: rgba(255, 71, 87, 0.2);
-        }
-
-        /* Success Toast */
-        .success-toast {
-          position: fixed;
-          top: 24px;
-          right: 24px;
-          background: rgba(46, 213, 115, 0.95);
-          backdrop-filter: blur(8px);
-          color: #000;
-          font-weight: 700;
-          padding: 12px 24px;
-          border-radius: 8px;
-          box-shadow: 0 10px 30px rgba(46, 213, 115, 0.3);
-          z-index: 2000;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        /* Overlay/Form Modal */
-        .finance-modal-overlay {
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.7);
-          backdrop-filter: blur(8px);
-          -webkit-backdrop-filter: blur(8px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          padding: 16px;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-
-        .finance-modal-card {
-          width: 100%;
-          max-width: 500px;
-          padding: 28px;
-          position: relative;
-          margin: auto;
-        }
-
-        .modal-form-grid {
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 16px;
-          margin-bottom: 24px;
-        }
-
-        .modal-form-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-        }
-
-        .type-selector-tab {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid var(--border-color);
-          border-radius: 8px;
-          padding: 4px;
-        }
-
-        .type-tab-btn {
-          padding: 10px;
-          border: none;
-          background: transparent;
-          color: var(--text-muted);
-          font-weight: 700;
-          font-size: 0.9rem;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-        }
-
-        .type-tab-btn.active-income {
-          background: var(--color-success);
-          color: #000;
-        }
-
-        .type-tab-btn.active-expense {
-          background: var(--color-danger);
-          color: #fff;
-        }
-
-        /* Mobile Transactions Cards */
-        .finance-mobile-list {
-          display: none;
-          flex-direction: column;
-          gap: 12px;
-          margin-bottom: 80px;
-        }
-
-        .mobile-tx-card {
-          padding: 16px;
-          position: relative;
-        }
-
-        .mobile-tx-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          margin-bottom: 8px;
-        }
-
-        .mobile-tx-title {
-          font-weight: 700;
-          color: #fff;
-          font-size: 0.96rem;
-        }
-
-        .mobile-tx-details {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          font-size: 0.8rem;
-          color: var(--text-muted);
-        }
-
-        .mobile-tx-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-
-        .mobile-tx-actions {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 12px;
-          border-top: 1px solid rgba(255, 255, 255, 0.03);
-          padding-top: 10px;
-        }
-
-        /* Responsive Layouts */
-        @media (max-width: 1024px) {
-          .finance-stats-grid {
-            gap: 16px;
-          }
-          .finance-stat-card {
-            padding: 16px;
-            gap: 12px;
-          }
-          .stat-value-large {
-            font-size: 1.3rem;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .finance-container {
-            padding: 16px 12px;
-          }
-          .finance-stats-grid {
-            grid-template-columns: 1fr;
-            gap: 12px;
-          }
-          .finance-ops-panel {
-            flex-direction: column;
-            align-items: stretch;
-            padding: 12px;
-          }
-          .finance-filters {
-            flex-direction: column;
-          }
-          .search-input-wrapper {
-            min-width: 100%;
-          }
-          .filter-select {
-            width: 100%;
-          }
-          .finance-table-wrapper {
-            display: none;
-          }
-          .finance-mobile-list {
-            display: flex;
-          }
-          .btn-add-tx {
-            width: 100%;
-            justify-content: center;
-          }
-          .finance-header {
-            margin-bottom: 16px;
-          }
-          .finance-title {
-            font-size: 1.3rem;
-          }
-        }
-      `}} />
 
       {/* Success Notification */}
       {showSuccess && (
@@ -625,16 +206,16 @@ export default function Finance({ data, setData, isAdmin }) {
         <div className="finance-filters">
           <div className="search-input-wrapper">
             <Search size={16} />
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="Tìm kiếm nội dung, người chi..." 
+            <input aria-label="Tìm kiếm"
+              type="text"
+              className="form-input"
+              placeholder="Tìm kiếm nội dung, người chi..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
           </div>
 
-          <select 
+          <select aria-label="Lọc theo loại giao dịch"
             className="form-select filter-select"
             value={filterType}
             onChange={e => setFilterType(e.target.value)}
@@ -644,7 +225,7 @@ export default function Finance({ data, setData, isAdmin }) {
             <option value="expense">Các khoản chi (-)</option>
           </select>
 
-          <select 
+          <select aria-label="Lọc theo danh mục"
             className="form-select filter-select"
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
@@ -675,7 +256,7 @@ export default function Finance({ data, setData, isAdmin }) {
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map(tx => (
+              {pager.items.map(tx => (
                 <tr key={tx.id}>
                   <td>{tx.date}</td>
                   <td>
@@ -715,7 +296,7 @@ export default function Finance({ data, setData, isAdmin }) {
         {filteredTransactions.length === 0 ? (
           <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "30px 0" }}>Không có giao dịch nào phù hợp.</p>
         ) : (
-          filteredTransactions.map(tx => (
+          pager.items.map(tx => (
             <div key={tx.id} className="glass-panel mobile-tx-card">
               <div className="mobile-tx-header">
                 <div className="mobile-tx-title">{tx.description}</div>
@@ -723,7 +304,7 @@ export default function Finance({ data, setData, isAdmin }) {
                   {tx.type === "income" ? "Thu" : "Chi"}
                 </span>
               </div>
-              
+
               <div className="mobile-tx-details">
                 <div className="mobile-tx-row">
                   <Calendar size={12} />
@@ -762,22 +343,13 @@ export default function Finance({ data, setData, isAdmin }) {
       </div>
 
       {/* Floating Add/Edit Modal */}
-      {isFormOpen && (
-        <div className="finance-modal-overlay">
-          <div className="glass-panel finance-modal-card glow-border-green animate-slide-up">
-            <button className="admin-modal-close" onClick={() => setIsFormOpen(false)} style={{ top: "18px", right: "18px" }}>
-              <X size={18} />
-            </button>
-            <h3 className="finance-title" style={{ fontSize: "1.25rem", marginBottom: "20px" }}>
-              {editingTxId ? "Cập Nhật Khoản Giao Dịch" : "Ghi Nhận Giao Dịch Mới"}
-            </h3>
-
+      <Modal isOpen={isFormOpen} onClose={()=>setIsFormOpen(false)} title={editingTxId ? "Cập Nhật Giao Dịch" : "Ghi Nhận Giao Dịch"}>
             <form onSubmit={handleSubmit}>
               <div className="modal-form-grid">
                 {/* Thu/Chi selector */}
                 <div className="type-selector-tab">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className={`type-tab-btn ${txType === "income" ? "active-income" : ""}`}
                     onClick={() => {
                       setTxType("income");
@@ -788,8 +360,8 @@ export default function Finance({ data, setData, isAdmin }) {
                   >
                     <TrendingUp size={16} /> Thu Nhập (+)
                   </button>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className={`type-tab-btn ${txType === "expense" ? "active-expense" : ""}`}
                     onClick={() => {
                       setTxType("expense");
@@ -806,25 +378,25 @@ export default function Finance({ data, setData, isAdmin }) {
                 <div className="form-group">
                   <label className="form-label">Số tiền (VNĐ) <span style={{ color: "var(--color-danger)" }}>*</span></label>
                   <div style={{ position: "relative" }}>
-                    <input 
-                      type="number" 
+                    <input aria-label="Số tiền (VNĐ)"
+                      type="number"
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      className="form-input" 
-                      placeholder="Ví dụ: 100000" 
+                      className="form-input"
+                      placeholder="Ví dụ: 100000"
                       required
                       min="1"
                       value={txAmount}
-                      onChange={e => setTxAmount(e.target.value.replace(/\D/g, ""))}
+                      onChange={e => setTxAmount(e.target.value)}
                       onFocus={handleInputFocus}
                     />
                     {txAmount && (
-                      <span 
-                        style={{ 
-                          position: "absolute", 
-                          right: "12px", 
-                          top: "50%", 
-                          transform: "translateY(-50%)", 
+                      <span
+                        style={{
+                          position: "absolute",
+                          right: "12px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
                           fontSize: "0.82rem",
                           fontWeight: "700",
                           color: txType === "income" ? "var(--color-success)" : "var(--color-danger)"
@@ -839,7 +411,7 @@ export default function Finance({ data, setData, isAdmin }) {
                 {/* Danh mục */}
                 <div className="form-group">
                   <label className="form-label">Danh mục quỹ</label>
-                  <select 
+                  <select aria-label="Danh mục"
                     className="form-select"
                     value={txCategory}
                     onChange={e => setTxCategory(e.target.value)}
@@ -853,9 +425,9 @@ export default function Finance({ data, setData, isAdmin }) {
                 {/* Ngày giao dịch */}
                 <div className="form-group">
                   <label className="form-label">Ngày giao dịch</label>
-                  <input 
-                    type="date" 
-                    className="form-input" 
+                  <input aria-label="Ngày giao dịch"
+                    type="date"
+                    className="form-input"
                     value={txDate}
                     onChange={e => setTxDate(e.target.value)}
                   />
@@ -865,9 +437,9 @@ export default function Finance({ data, setData, isAdmin }) {
                 <div className="form-group">
                   <label className="form-label">Người thực hiện</label>
                   <div style={{ position: "relative" }}>
-                    <input 
-                      type="text" 
-                      className="form-input" 
+                    <input aria-label="Người thực hiện"
+                      type="text"
+                      className="form-input"
                       placeholder="Tên thành viên hoặc đối tác..."
                       value={txPerformedBy}
                       onChange={e => setTxPerformedBy(e.target.value)}
@@ -886,8 +458,8 @@ export default function Finance({ data, setData, isAdmin }) {
                 {/* Nội dung chi tiết */}
                 <div className="form-group">
                   <label className="form-label">Nội dung chi tiết</label>
-                  <textarea 
-                    className="form-input" 
+                  <textarea aria-label="Nội dung giao dịch"
+                    className="form-input"
                     style={{ minHeight: "80px", resize: "vertical" }}
                     placeholder="Mô tả cụ thể giao dịch..."
                     value={txDescription}
@@ -902,9 +474,13 @@ export default function Finance({ data, setData, isAdmin }) {
                 <button type="submit" className="btn-neon-green">Xác nhận</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }
+
+Finance.propTypes = {
+  data: PropTypes.object,
+  setData: PropTypes.func,
+  isAdmin: PropTypes.bool,
+};

@@ -1,0 +1,316 @@
+
+        .events-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 32px 24px;
+        }
+
+        .sort-header {
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          user-select: none;
+          transition: color 0.15s;
+        }
+
+        .sort-header:hover {
+          color: var(--accent-neon-green);
+        }
+
+        .sort-header.active {
+          color: var(--accent-neon-green);
+          font-weight: 700;
+        }
+
+        .events-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 28px;
+        }
+
+        .events-title {
+          font-size: 1.75rem;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .events-title svg {
+          color: var(--accent-neon-green);
+        }
+
+        /* Lưới danh sách sự kiện */
+        .events-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+          gap: 20px;
+        }
+
+        .event-card {
+          padding: 24px;
+          cursor: pointer;
+          position: relative;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .event-card-header {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+        }
+
+        .event-card-date {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.8rem;
+          color: var(--accent-electric-blue);
+          font-weight: 600;
+        }
+
+        .event-card-name {
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #fff;
+          line-height: 1.3;
+          margin-top: 4px;
+        }
+
+        .event-card-desc {
+          font-size: 0.88rem;
+          color: var(--text-secondary);
+          line-height: 1.5;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          min-height: 42px;
+        }
+
+        .event-card-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-top: 1px solid var(--border-color);
+          padding-top: 14px;
+          margin-top: 6px;
+        }
+
+        .event-match-count {
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        .event-action-delete {
+          color: var(--text-muted);
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+          transition: all 0.2s;
+        }
+
+        .event-action-delete:hover {
+          color: var(--color-danger);
+          background: rgba(255, 71, 87, 0.1);
+        }
+
+        /* --- LAYOUT XEM CHI TIẾT SỰ KIỆN --- */
+        .event-detail-layout {
+          display: flex;
+          flex-direction: column;
+          gap: 28px;
+        }
+
+        .back-button-row {
+          margin-bottom: -10px;
+        }
+
+        .btn-back {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--text-secondary);
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 0.9rem;
+          transition: color 0.15s;
+        }
+
+        .btn-back:hover {
+          color: #fff;
+        }
+
+        .event-detail-header-card {
+          padding: 32px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .event-detail-header-card::before {
+          content: '';
+          position: absolute;
+          width: 300px;
+          height: 300px;
+          background: var(--accent-electric-blue);
+          filter: blur(160px);
+          top: -150px;
+          right: -100px;
+          opacity: 0.12;
+          pointer-events: none;
+        }
+
+        .event-detail-grid {
+          display: grid;
+          grid-template-columns: 3fr 2fr;
+          gap: 28px;
+        }
+
+        .event-section-title {
+          font-size: 1.2rem;
+          font-weight: 700;
+          margin-bottom: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .event-section-title svg {
+          color: var(--accent-neon-green);
+        }
+
+        .event-table-panel {
+          padding: 24px;
+        }
+
+        /* Nút hành động sửa/xóa trận đấu */
+        .event-action-btn-edit, .event-action-btn-delete {
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-secondary);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .event-action-btn-edit:hover {
+          color: var(--accent-electric-blue);
+          background: rgba(0, 236, 255, 0.08);
+          border-color: rgba(0, 236, 255, 0.2);
+          box-shadow: 0 0 10px rgba(0, 236, 255, 0.15);
+        }
+
+        .event-action-btn-delete:hover {
+          color: var(--color-danger);
+          background: rgba(255, 71, 87, 0.08);
+          border-color: rgba(255, 71, 87, 0.2);
+          box-shadow: 0 0 10px rgba(255, 71, 87, 0.15);
+        }
+
+        .event-matches-scroll {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 480px;
+          overflow-y: auto;
+          padding-right: 10px;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar {
+          width: 12px;
+          display: block;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.45);
+          border: 2px solid rgba(0, 0, 0, 0.2);
+          border-radius: 6px;
+          transition: background-color 0.2s ease;
+        }
+
+        .event-matches-scroll::-webkit-scrollbar-thumb:hover {
+          background: var(--accent-neon-green);
+          box-shadow: 0 0 10px var(--accent-neon-green);
+        }
+
+        /* Responsive & Table Alignment overrides matching main Leaderboard */
+        .show-text-on-mobile {
+          display: none;
+        }
+
+        .hide-text-on-mobile {
+          display: inline;
+        }
+
+        .hide-on-mobile {
+          display: table-cell;
+        }
+
+        @media (max-width: 900px) {
+          .event-detail-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 768px) {
+          .hide-on-mobile {
+            display: table-cell !important; /* Luôn hiển thị cột trên di động giống BXH */
+          }
+
+          .show-text-on-mobile {
+            display: inline !important;
+          }
+
+          .hide-text-on-mobile {
+            display: none !important;
+          }
+
+          .custom-table td, .custom-table th {
+            padding: 8px 3px !important; /* Kích thước siêu gọn trên di động */
+            font-size: 0.7rem !important;
+          }
+
+          .player-name-cell {
+            max-width: 80px;
+            font-size: 0.72rem !important;
+          }
+
+          .rank-col {
+            width: 24px !important;
+          }
+
+          .player-avatar-sm {
+            display: none !important; /* Ẩn avatar trên di động */
+          }
+        }
+
+        @media (max-width: 600px) {
+          .events-grid {
+            grid-template-columns: 1fr;
+          }
+          .event-detail-header-card {
+            padding: 20px;
+          }
+        }

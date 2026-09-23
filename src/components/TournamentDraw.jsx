@@ -1,152 +1,33 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Shuffle, Users, Calendar, Trophy, Play, Check, HelpCircle, Plus, Minus, Trash2, Swords, Award, Lock, Unlock } from "lucide-react";
-import { recordMatch, recalculateAllElos, saveClubData } from "../utils/db";
+import PropTypes from 'prop-types';
+import './TournamentDraw.css';
+import Modal from './Modal';
+import { useState, useEffect, useMemo } from "react";
+import { Shuffle, Check, Plus, Minus, Trash2, Swords, Award } from "lucide-react";
+import { saveDraw, clearDraw, updateMatch, deleteMatch, adoptLegacyDraw } from "../utils/db";
+import { keys } from "../utils/config";
+import { drawMatchId } from "../utils/draws";
+import { scoreFromSets } from "../utils/schema";
 
 export default function TournamentDraw({ data, setData, isAdmin }) {
-  const { members, events } = data;
-
-  // --- TRẠNG THÁI CHÍNH ---
-  const [selectedEventId, setSelectedEventId] = useState(() => {
-    return localStorage.getItem("draw_selected_event_id") || "";
-  });
-
-  const selectedEventObj = useMemo(() => {
-    return events.find(e => e.id === selectedEventId) || null;
-  }, [events, selectedEventId]);
-
+  const { events } = data;
+  const members = useMemo(()=>data.members.filter(m=>!m.archivedAt), [data.members]);
+  const [selectedEventId, setSelectedEventId] = useState(() => localStorage.getItem(keys.drawEvent) || localStorage.getItem('draw_selected_event_id') || '');
+  const selectedEventObj = events.find(e=>e.id===selectedEventId);
   const isEventLocked = selectedEventObj?.isLocked || false;
-
-  // Hàm helper dùng để lấy giá trị từ localStorage với cơ chế phân vùng và fallback thông minh
-  const getLocalStorageFallback = (key, defaultVal, isJson = false) => {
-    const defaultEventId = localStorage.getItem("draw_selected_event_id") || "";
-    if (defaultEventId) {
-      const val = localStorage.getItem(`${key}_${defaultEventId}`);
-      if (val !== null) {
-        if (isJson) {
-          try { return JSON.parse(val) || defaultVal; } catch (e) { return defaultVal; }
-        }
-        return val;
-      }
-      
-      // Nếu đã có bất kỳ sự kiện nào có dữ liệu phân vùng, chứng tỏ ta đang ở chế độ nhiều sự kiện
-      // Lúc này, một sự kiện mới không có key riêng thì KHÔNG được lấy key global (vì key global thuộc về sự kiện khác cũ)
-      const keys = Object.keys(localStorage);
-      const hasAnySpecific = keys.some(k => k.startsWith("draw_data_e_") || k.startsWith("draw_generated_e_"));
-      if (!hasAnySpecific) {
-        const globalVal = localStorage.getItem(key);
-        if (globalVal !== null) {
-          if (isJson) {
-            try { return JSON.parse(globalVal) || defaultVal; } catch (e) { return defaultVal; }
-          }
-          return globalVal;
-        }
-      }
-    } else {
-      // Chưa chọn sự kiện nào, dùng global
-      const globalVal = localStorage.getItem(key);
-      if (globalVal !== null) {
-        if (isJson) {
-          try { return JSON.parse(globalVal) || defaultVal; } catch (e) { return defaultVal; }
-        }
-        return globalVal;
-      }
-    }
-    return defaultVal;
-  };
-
-  const [activeScenario, setActiveScenario] = useState(() => {
-    return getLocalStorageFallback("draw_active_scenario", "mixer");
-  });
-
-  const [selectedMemberIds, setSelectedMemberIds] = useState(() => {
-    return getLocalStorageFallback("draw_selected_member_ids", [], true);
-  });
-  
-  // Trạng thái bốc thăm
-  const [drawGenerated, setDrawGenerated] = useState(() => {
-    return getLocalStorageFallback("draw_generated", "false") === "true";
-  });
-
-  const [drawData, setDrawData] = useState(() => {
-    return getLocalStorageFallback("draw_data", null, true);
-  });
-
-  const [loadedEventId, setLoadedEventId] = useState(() => {
-    return localStorage.getItem("draw_selected_event_id") || "";
-  });
-
-  // --- LƯU TRỮ BỀN BỈ & CÔ LẬP TRÊN MOBILE (LOCALSTORAGE) ---
-  useEffect(() => {
-    if (selectedEventId && selectedEventId === loadedEventId) {
-      localStorage.setItem(`draw_active_scenario_${selectedEventId}`, activeScenario);
-    }
-  }, [activeScenario, selectedEventId, loadedEventId]);
-
-  useEffect(() => {
-    localStorage.setItem("draw_selected_event_id", selectedEventId);
-  }, [selectedEventId]);
-
-  useEffect(() => {
-    if (selectedEventId && selectedEventId === loadedEventId) {
-      localStorage.setItem(`draw_selected_member_ids_${selectedEventId}`, JSON.stringify(selectedMemberIds));
-    }
-  }, [selectedMemberIds, selectedEventId, loadedEventId]);
-
-  useEffect(() => {
-    if (selectedEventId && selectedEventId === loadedEventId) {
-      localStorage.setItem(`draw_generated_${selectedEventId}`, drawGenerated ? "true" : "false");
-    }
-  }, [drawGenerated, selectedEventId, loadedEventId]);
-
-  useEffect(() => {
-    if (selectedEventId && selectedEventId === loadedEventId) {
-      localStorage.setItem(`draw_data_${selectedEventId}`, JSON.stringify(drawData));
-    }
-  }, [drawData, selectedEventId, loadedEventId]);
-
-  // --- TẢI DỮ LIỆU RIÊNG CHO SỰ KIỆN KHI ĐỔI SỰ KIỆN ---
-  useEffect(() => {
-    if (!selectedEventId) {
-      setLoadedEventId("");
-      return;
-    }
-
-    const getValWithFallback = (key, defaultVal, isJson = false) => {
-      const val = localStorage.getItem(`${key}_${selectedEventId}`);
-      if (val !== null) {
-        if (isJson) {
-          try { return JSON.parse(val) || defaultVal; } catch (e) { return defaultVal; }
-        }
-        return val;
-      }
-      
-      const keys = Object.keys(localStorage);
-      const hasAnySpecific = keys.some(k => k.startsWith("draw_data_e_") || k.startsWith("draw_generated_e_"));
-      if (!hasAnySpecific) {
-        const globalVal = localStorage.getItem(key);
-        if (globalVal !== null) {
-          if (isJson) {
-            try { return JSON.parse(globalVal) || defaultVal; } catch (e) { return defaultVal; }
-          }
-          return globalVal;
-        }
-      }
-      return defaultVal;
-    };
-
-    setActiveScenario(getValWithFallback("draw_active_scenario", "mixer"));
-    setSelectedMemberIds(getValWithFallback("draw_selected_member_ids", [], true));
-    setDrawGenerated(getValWithFallback("draw_generated", "false") === "true");
-    setDrawData(getValWithFallback("draw_data", null, true));
-
-    setLoadedEventId(selectedEventId);
-  }, [selectedEventId]);
-  
+  const [scenario, setScenario] = useState('mixer');
+  const savedDraw = data.draws?.[selectedEventId];
+  const activeScenario = savedDraw?.scenario || scenario;
+  const setActiveScenario = next => { if (savedDraw?.data) { alert('Hủy lịch hiện tại có xác nhận trước khi đổi thể thức.'); return; } setScenario(next); };
+  const [selectedMemberIds, setSelectedMemberIds] = useState([]);
+  const drawData = savedDraw?.data || null;
+  const drawGenerated = Boolean(drawData);
+  const setDrawData = next => setData(saveDraw(selectedEventId, activeScenario, next));
+  useEffect(()=>{ localStorage.setItem(keys.drawEvent, selectedEventId); }, [selectedEventId]);
   // Trạng thái cấu hình phụ cho từng kịch bản
   // 1. Kịch bản Mixer
   const [mixerCourts, setMixerCourts] = useState(1);
   const [mixerRounds, setMixerRounds] = useState(4);
-  
+
   // 2. Kịch bản Vòng tròn (Round Robin)
   const [rrFormat, setRrFormat] = useState("doubles"); // singles, doubles
   const [rrDoublesMode, setRrDoublesMode] = useState("auto"); // auto (tự ghép cặp ngẫu nhiên), fixed (cặp đấu cố định)
@@ -202,7 +83,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
   // --- HÀM XỬ LÝ LỰA CHỌN THÀNH VIÊN ---
   const handleToggleMember = (id) => {
-    setSelectedMemberIds(prev => 
+    setSelectedMemberIds(prev =>
       prev.includes(id) ? prev.filter(mId => mId !== id) : [...prev, id]
     );
   };
@@ -436,7 +317,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     }
 
     setDrawData(rounds);
-    setDrawGenerated(true);
+
   };
 
   // --- 2. THUẬT TOÁN KỊCH BẢN 1: VÒNG TRÒN (ROUND ROBIN) ---
@@ -533,7 +414,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     }
 
     setDrawData({ rounds, teams });
-    setDrawGenerated(true);
+
   };
 
   // --- 3. THUẬT TOÁN KỊCH BẢN 3: LOẠI TRỰC TIẾP (SINGLE ELIMINATION) ---
@@ -713,7 +594,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     }
 
     setDrawData({ rounds, teams });
-    setDrawGenerated(true);
+
   };
 
   const getRoundName = (totalSlots, roundIdx) => {
@@ -747,44 +628,19 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   };
 
   const handleClearDraw = () => {
-    if (isEventLocked) {
-      alert("Sự kiện này đã bị khóa. Không thể hủy lịch đấu.");
-      return;
-    }
-
-    if (window.confirm("Bạn có chắc muốn hủy lịch đấu vừa bốc thăm? Tất cả các trận đấu đã ghi nhận điểm từ lịch đấu này cũng sẽ bị xóa khỏi hệ thống và tính lại Elo.")) {
-      setDrawGenerated(false);
-      setDrawData(null);
-      setActiveScoringMatch(null);
-
-      // --- ĐỒNG BỘ XÓA TẤT CẢ TRẬN ĐẤU BỐC THĂM CỦA SỰ KIỆN NÀY ---
-      if (selectedEventId) {
-        const updatedData = { ...data };
-        if (updatedData.matches) {
-          const initialLength = updatedData.matches.length;
-          updatedData.matches = updatedData.matches.filter(
-            m => !(m.eventId === selectedEventId && m.id.startsWith("match_draw_"))
-          );
-
-          if (updatedData.matches.length !== initialLength) {
-            const finalData = recalculateAllElos(updatedData);
-            saveClubData(finalData);
-            setData(finalData);
-          }
-        }
-      }
-    }
+    if (window.confirm('Hủy lịch đấu này và các kết quả thuộc lịch? Hệ thống sẽ lưu bản sao trước thao tác.')) setData(clearDraw(selectedEventId));
   };
 
   // --- XỬ LÝ NHẬP ĐIỂM SỐ CHO TRẬN BỐC THĂM ---
   const handleOpenScoring = (match) => {
+    if (savedDraw?.legacy) { alert("Chọn chốt lịch để đối chiếu và tiếp tục lịch cũ trước khi ghi điểm."); return; }
     if (isEventLocked) {
       alert("Sự kiện này đã bị khóa. Không thể thay đổi hoặc ghi điểm số.");
       return;
     }
 
     if (!isAdmin) {
-      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để ghi kết quả thi đấu.");
+      alert("Vui lòng mở khóa tài khoản quản trị trên thanh menu để ghi kết quả thi đấu.");
       return;
     }
     setActiveScoringMatch(match);
@@ -794,673 +650,26 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   };
 
   const handleSaveScore = () => {
-    const scoreA = parseInt(set1A) || 0;
-    const scoreB = parseInt(set1B) || 0;
-
-    if (scoreA === scoreB) {
-      setScoringError("Trận đấu Pickleball không thể có kết quả hòa.");
-      return;
-    }
-
-    const { matchId, teamA, teamB, teamAName, teamBName } = activeScoringMatch;
-    const playedDate = new Date().toISOString();
-    
-    // Cập nhật trạng thái trận đấu trong Draw dữ liệu nội bộ
-    if (activeScenario === "mixer") {
-      setDrawData(prev => 
-        prev.map(round => ({
-          ...round,
-          matches: round.matches.map(m => 
-            m.matchId === matchId ? { ...m, scoreA, scoreB, played: true, date: playedDate } : m
-          )
-        }))
-      );
-    } else if (activeScenario === "roundrobin") {
-      setDrawData(prev => ({
-        ...prev,
-        rounds: prev.rounds.map(round => ({
-          ...round,
-          matches: round.matches.map(m => 
-            m.matchId === matchId ? { ...m, scoreA, scoreB, played: true, date: playedDate } : m
-          )
-        }))
-      }));
-    } else if (activeScenario === "elimination") {
-      // Vừa cập nhật tỉ số, vừa tự động tiến cử đội thắng lên vòng sau
-      const winnerName = scoreA > scoreB ? teamAName : teamBName;
-      const winnerPlayers = scoreA > scoreB ? teamA : teamB;
-
-      setDrawData(prev => {
-        const nextRounds = prev.rounds.map((round, rIdx) => {
-          // 1. Cập nhật trận vừa đấu ở vòng này
-          const nextMatches = round.matches.map(m => {
-            if (m.matchId === matchId) {
-              return { ...m, scoreA, scoreB, played: true, date: playedDate, winner: winnerName, winnerPlayers };
-            }
-            return m;
-          });
-
-          // 2. Tự động chuyển tiếp kết quả lên trận nguồn của vòng tiếp theo
-          const updatedMatches = nextMatches.map(m => m);
-          return { ...round, matches: updatedMatches };
-        });
-
-        // Tìm trận đấu ở vòng sau sử dụng sourceMatchA hoặc sourceMatchB trùng với matchId này để điền tên đội thắng
-        const finalRounds = nextRounds.map((round, rIdx) => {
-          if (rIdx === 0) return round;
-          const nextMatches = round.matches.map(m => {
-            let updatedM = { ...m };
-            if (m.sourceMatchA === matchId) {
-              updatedM.teamA = winnerPlayers;
-              updatedM.teamAName = winnerName;
-            }
-            if (m.sourceMatchB === matchId) {
-              updatedM.teamB = winnerPlayers;
-              updatedM.teamBName = winnerName;
-            }
-            return updatedM;
-          });
-          return { ...round, matches: nextMatches };
-        });
-
-        return { ...prev, rounds: finalRounds };
-      });
-    }
-
-    // --- ĐỒNG BỘ TỨC THÌ VÀO DATABASE TOÀN CỤC CỦA CLB ---
-    if (selectedEventId && teamA && teamB && teamA.length > 0 && teamB.length > 0) {
-      const syncId = matchId.startsWith("match_") ? `match_draw_${matchId.substring(6)}` : `match_draw_${matchId}`;
-      const formattedMatch = {
-        id: syncId,
-        eventId: selectedEventId,
-        type: teamA.length === 1 ? "singles" : "doubles",
-        date: playedDate,
-        teamA,
-        teamB,
-        scoreA,
-        scoreB,
-        sets: [{ a: scoreA, b: scoreB }],
-        played: true
-      };
-
-      const updatedData = { ...data };
-      if (!updatedData.matches) updatedData.matches = [];
-
-      const idx = updatedData.matches.findIndex(m => m.id === syncId);
-      if (idx !== -1) {
-        updatedData.matches[idx] = {
-          ...updatedData.matches[idx],
-          ...formattedMatch
-        };
-      } else {
-        updatedData.matches.push(formattedMatch);
-      }
-
-      // Tính toán lại Elo và lưu dữ liệu toàn cục
-      const finalData = recalculateAllElos(updatedData);
-      saveClubData(finalData);
-      setData(finalData);
-    }
-
-    // Đóng giao diện nhập điểm
-    setActiveScoringMatch(null);
-    setScoringError("");
+    try {
+      const outcome = scoreFromSets([{ a: set1A, b: set1B }]);
+      setData(updateMatch({ id: drawMatchId(activeScoringMatch.matchId), ...outcome, date: new Date().toISOString() }));
+      setActiveScoringMatch(null); setScoringError('');
+    } catch (e) { setScoringError(e.message); }
   };
-
-  const handleDeleteMatch = (matchId) => {
-    if (isEventLocked) {
-      alert("Sự kiện này đã bị khóa. Không thể xóa trận đấu.");
-      return;
-    }
-
-    if (!isAdmin) {
-      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để xóa trận đấu.");
-      return;
-    }
-    if (!window.confirm("Bạn có chắc muốn xóa trận đấu này khỏi lịch thi đấu bốc thăm?")) return;
-    
-    if (activeScenario === "mixer") {
-      setDrawData(prev => {
-        if (!prev) return null;
-        return prev.map(round => ({
-          ...round,
-          matches: round.matches.filter(m => m.matchId !== matchId)
-        }));
-      });
-    } else if (activeScenario === "roundrobin") {
-      setDrawData(prev => {
-        if (!prev || !prev.rounds) return null;
-        return {
-          ...prev,
-          rounds: prev.rounds.map(round => ({
-            ...round,
-            matches: round.matches.filter(m => m.matchId !== matchId)
-          }))
-        };
-      });
-    } else if (activeScenario === "elimination") {
-      setDrawData(prev => {
-        if (!prev || !prev.rounds) return null;
-        return {
-          ...prev,
-          rounds: prev.rounds.map(round => ({
-            ...round,
-            matches: round.matches.filter(m => m.matchId !== matchId)
-          }))
-        };
-      });
-    }
-
-    // --- ĐỒNG BỘ XÓA TỨC THÌ VÀO DATABASE TOÀN CỤC CỦA CLB ---
-    if (selectedEventId) {
-      const syncId = matchId.startsWith("match_") ? `match_draw_${matchId.substring(6)}` : `match_draw_${matchId}`;
-      const updatedData = { ...data };
-      if (updatedData.matches) {
-        const initialLength = updatedData.matches.length;
-        updatedData.matches = updatedData.matches.filter(m => m.id !== syncId);
-        
-        if (updatedData.matches.length !== initialLength) {
-          const finalData = recalculateAllElos(updatedData);
-          saveClubData(finalData);
-          setData(finalData);
-        }
-      }
-    }
+  const handleDeleteMatch = id => {
+    if (window.confirm('Xóa trận khỏi lịch và lịch sử? Bản trước thay đổi sẽ được sao lưu.')) setData(deleteMatch(drawMatchId(id)));
   };
-
   const handleFinalizeDraw = () => {
-    if (isEventLocked) {
-      alert("Sự kiện này đã bị khóa. Không thể chốt kết quả lịch đấu.");
+    if (savedDraw?.legacy) {
+      if (window.confirm('Đưa lịch cũ trên máy vào dữ liệu chung? Các trận chưa có trong lịch sử sẽ được thêm; kết quả đã có trong lịch sử được ưu tiên. Hệ thống sẽ lưu bản sao trước khi thực hiện.')) setData(adoptLegacyDraw(selectedEventId));
       return;
     }
-
-    if (!isAdmin) {
-      alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để chốt kết quả bốc thăm.");
-      return;
-    }
-
-    if (!selectedEventId) {
-      alert("Vui lòng liên kết với một Sự kiện / Giải đấu trước khi chốt kết quả.");
-      return;
-    }
-
-    let allDrawMatches = [];
-    
-    if (activeScenario === "mixer") {
-      if (drawData) {
-        drawData.forEach(round => {
-          round.matches.forEach(m => {
-            allDrawMatches.push(m);
-          });
-        });
-      }
-    } else if (activeScenario === "roundrobin") {
-      if (drawData && drawData.rounds) {
-        drawData.rounds.forEach(round => {
-          round.matches.forEach(m => {
-            allDrawMatches.push(m);
-          });
-        });
-      }
-    } else if (activeScenario === "elimination") {
-      if (drawData && drawData.rounds) {
-        drawData.rounds.forEach(round => {
-          round.matches.forEach(m => {
-            if (!m.isByeMatch) allDrawMatches.push(m);
-          });
-        });
-      }
-    }
-
-    if (allDrawMatches.length === 0) {
-      alert("Không tìm thấy lịch đấu nào để đồng bộ. Vui lòng phát sinh lịch đấu trước.");
-      return;
-    }
-
-    const eventName = events.find(ev => ev.id === selectedEventId)?.name || "sự kiện đã chọn";
-    const playedCount = allDrawMatches.filter(m => m.played).length;
-    const unplayedCount = allDrawMatches.length - playedCount;
-
-    if (!window.confirm(`Bạn có chắc chắn muốn chốt lịch thi đấu này vào sự kiện "${eventName}"?\n- Tổng số: ${allDrawMatches.length} trận (${playedCount} trận đã đấu, ${unplayedCount} trận chưa đấu).\n- Các trận chưa đấu sẽ hiển thị "Chưa đấu" và có thể cập nhật kết quả sau.\n- Điểm Elo sẽ chỉ tính toán cho các trận đấu đã ghi nhận điểm.`)) {
-      return;
-    }
-
-    // Định dạng các trận đấu theo chuẩn của database
-    const formattedMatches = allDrawMatches.map(m => {
-      const syncId = m.matchId.startsWith("match_") ? `match_draw_${m.matchId.substring(6)}` : `match_draw_${m.matchId}`;
-      const isPlayed = m.played || false;
-      return {
-        id: syncId,
-        eventId: selectedEventId,
-        type: m.teamA.length === 1 ? "singles" : "doubles",
-        date: m.date || new Date().toISOString(),
-        teamA: m.teamA,
-        teamB: m.teamB,
-        scoreA: isPlayed ? (parseInt(m.scoreA) || 0) : 0,
-        scoreB: isPlayed ? (parseInt(m.scoreB) || 0) : 0,
-        sets: isPlayed ? [{ a: parseInt(m.scoreA) || 0, b: parseInt(m.scoreB) || 0 }] : [],
-        played: isPlayed
-      };
-    });
-
-    // Sao chép dữ liệu hiện tại
-    const updatedData = { ...data };
-    if (!updatedData.matches) updatedData.matches = [];
-
-    // Nhập các trận đấu vào danh sách chung, cập nhật nếu đã tồn tại
-    let newCount = 0;
-    let updateCount = 0;
-
-    formattedMatches.forEach(newMatch => {
-      const idx = updatedData.matches.findIndex(m => m.id === newMatch.id);
-      if (idx !== -1) {
-        updatedData.matches[idx] = {
-          ...updatedData.matches[idx],
-          ...newMatch
-        };
-        updateCount++;
-      } else {
-        updatedData.matches.push(newMatch);
-        newCount++;
-      }
-    });
-
-    // Tính toán lại Elo và lưu dữ liệu toàn cục
-    const finalData = recalculateAllElos(updatedData);
-    saveClubData(finalData);
-    setData(finalData);
-
-    alert(`🎉 Đồng bộ thành công!\n- Đã ghi nhận ${newCount} trận đấu mới.\n- Cập nhật ${updateCount} trận đấu cũ.\nVào sự kiện "${eventName}". Điểm Elo đã được cập nhật chính xác!`);
+    alert('Lịch và kết quả đã dùng chung dữ liệu. Xem trạng thái đồng bộ ở đầu trang để biết đã lưu trên máy chủ hay đang chờ.');
   };
 
   return (
     <div className="draw-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{__html: `
-        .draw-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          padding: 32px 24px;
-        }
 
-        .draw-header {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin-bottom: 24px;
-        }
-
-        .draw-title {
-          font-size: 1.75rem;
-          font-weight: 800;
-        }
-
-        .draw-title svg {
-          color: var(--accent-neon-green);
-        }
-
-        /* Toggle Kịch bản bốc thăm */
-        .scenario-toggle {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          background: rgba(0, 0, 0, 0.2);
-          border: 1px solid var(--border-color);
-          border-radius: 12px;
-          padding: 6px;
-          margin-bottom: 28px;
-          gap: 8px;
-        }
-
-        .scenario-btn {
-          padding: 14px;
-          border-radius: 8px;
-          background: transparent;
-          border: none;
-          color: var(--text-secondary);
-          font-weight: 700;
-          cursor: pointer;
-          transition: all var(--transition-fast);
-          text-align: center;
-          font-family: var(--font-primary);
-          font-size: 0.95rem;
-        }
-
-        .scenario-btn:hover {
-          color: #fff;
-          background: rgba(255,255,255,0.02);
-        }
-
-        .scenario-btn.active {
-          background: rgba(212, 252, 52, 0.06);
-          color: var(--accent-neon-green);
-          border: 1px solid rgba(212, 252, 52, 0.15);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        /* Lưới thiết lập cấu hình bốc thăm */
-        .setup-grid {
-          display: grid;
-          grid-template-columns: 1.2fr 1fr;
-          gap: 28px;
-          margin-bottom: 32px;
-        }
-
-        .config-card {
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          gap: 18px;
-        }
-
-        .member-selector-card {
-          padding: 24px;
-          display: flex;
-          flex-direction: column;
-          max-height: 480px;
-        }
-
-        .member-checkbox-list {
-          overflow-y: auto;
-          flex-grow: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-          padding-right: 6px;
-          margin-top: 12px;
-        }
-
-        .member-check-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 10px 12px;
-          border-radius: 8px;
-          background: rgba(255,255,255,0.01);
-          border: 1px solid rgba(255,255,255,0.02);
-          cursor: pointer;
-          transition: all 0.15s;
-          user-select: none;
-        }
-
-        .member-check-item:hover {
-          background: rgba(255,255,255,0.03);
-          border-color: rgba(255,255,255,0.05);
-        }
-
-        .member-check-item.selected {
-          background: rgba(0, 236, 255, 0.04);
-          border-color: rgba(0, 236, 255, 0.15);
-        }
-
-        .member-check-item input {
-          width: 16px;
-          height: 16px;
-          accent-color: var(--accent-electric-blue);
-          cursor: pointer;
-        }
-
-        .fixed-team-creator {
-          background: rgba(0,0,0,0.2);
-          padding: 16px;
-          border-radius: 10px;
-          border: 1px solid var(--border-color);
-          margin-top: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        /* Giao diện kết quả lịch bốc thăm */
-        .draw-results-container {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        .draw-actions-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .round-box {
-          padding: 8px 12px;
-          margin-bottom: 8px;
-        }
-
-        .round-title {
-          font-size: 0.92rem;
-          font-weight: 800;
-          color: var(--accent-neon-green);
-          margin-bottom: 6px;
-          border-bottom: 1px solid var(--border-color);
-          padding-bottom: 4px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .mixer-sitout-badge {
-          font-size: 0.72rem;
-          color: var(--text-muted);
-          font-weight: 500;
-        }
-
-        .round-matches-list {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-          gap: 8px;
-        }
-
-        .match-draw-card {
-          padding: 6px 10px;
-          background: rgba(255,255,255,0.015);
-          border: 1px solid rgba(255,255,255,0.04);
-          border-radius: 8px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          position: relative;
-        }
-
-        .match-court-header {
-          font-size: 0.68rem;
-          text-transform: uppercase;
-          color: var(--text-muted);
-          font-weight: 750;
-          letter-spacing: 0.05em;
-        }
-
-        .match-teams-score-row {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-
-        .draw-team-box {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          flex: 1;
-        }
-
-        .draw-team-name {
-          font-weight: 700;
-          font-size: 0.85rem;
-          color: #fff;
-        }
-
-        .draw-team-members {
-          font-size: 0.75rem;
-          color: var(--text-secondary);
-        }
-
-        .draw-score-box {
-          font-size: 1.35rem;
-          font-weight: 850;
-          width: 36px;
-          text-align: center;
-          color: var(--accent-neon-green);
-        }
-
-        .btn-draw-record {
-          align-self: flex-end;
-          padding: 4px 10px;
-          font-size: 0.75rem;
-          display: flex;
-          align-items: center;
-          gap: 4px;
-        }
-
-        .match-badge-played {
-          font-size: 0.72rem;
-          padding: 3px 6px;
-          background: rgba(46, 213, 115, 0.08);
-          border: 1px solid rgba(46, 213, 115, 0.2);
-          color: var(--color-success);
-          font-weight: 700;
-          border-radius: 6px;
-          align-self: flex-end;
-        }
-
-        /* Bracket Sơ đồ loại trực tiếp (Kịch bản 3) */
-        .bracket-scroll-container {
-          overflow-x: auto;
-          display: flex;
-          gap: 40px;
-          padding: 20px 0;
-          min-height: 480px;
-        }
-
-        .bracket-round-column {
-          display: flex;
-          flex-direction: column;
-          justify-content: space-around;
-          min-width: 280px;
-        }
-
-        .bracket-match-wrapper {
-          padding: 10px 0;
-        }
-
-        /* Giao diện Nhập điểm Popup */
-        .scoring-popup-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 1100;
-          background: rgba(4, 5, 8, 0.8);
-          backdrop-filter: blur(12px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 16px;
-        }
-
-        .scoring-popup-card {
-          width: 100%;
-          max-width: 440px;
-          padding: 28px;
-        }
-
-        .score-adjust-flex {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          gap: 20px;
-          margin: 24px 0;
-        }
-
-        .score-team-panel {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-          flex: 1;
-        }
-
-        .score-adjust-btn {
-          width: 32px;
-          height: 32px;
-          border-radius: 6px;
-          border: 1px solid var(--border-color);
-          background: rgba(255,255,255,0.03);
-          color: #fff;
-          cursor: pointer;
-          font-weight: 700;
-        }
-
-        .score-adjust-btn:hover {
-          background: rgba(255,255,255,0.08);
-        }
-
-        .score-num-display {
-          font-size: 2.25rem;
-          font-weight: 800;
-          color: #fff;
-        }
-
-        /* Stepper Control */
-        .stepper-container {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          background: var(--bg-input);
-          border: 1px solid var(--border-color);
-          border-radius: 8px;
-          padding: 4px;
-          width: 100%;
-          height: 42px;
-          box-sizing: border-box;
-        }
-
-        .stepper-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid var(--border-color);
-          color: var(--text-primary);
-          border-radius: 6px;
-          width: 32px;
-          height: 32px;
-          cursor: pointer;
-          transition: all var(--transition-fast);
-        }
-
-        .stepper-btn:hover:not(:disabled) {
-          background: rgba(255, 255, 255, 0.1);
-          border-color: rgba(255, 255, 255, 0.2);
-          color: var(--accent-electric-blue);
-        }
-
-        .stepper-btn:active:not(:disabled) {
-          transform: scale(0.95);
-        }
-
-        .stepper-btn:disabled {
-          opacity: 0.3;
-          cursor: not-allowed;
-        }
-
-        .stepper-value {
-          font-family: var(--font-primary);
-          font-size: 1.1rem;
-          font-weight: 700;
-          color: var(--text-primary);
-          user-select: none;
-        }
-
-        /* Responsive */
-        @media (max-width: 860px) {
-          .setup-grid {
-            grid-template-columns: 1fr;
-          }
-          .scenario-btn {
-            font-size: 0.82rem;
-            padding: 10px 4px;
-          }
-        }
-      `}} />
 
       <div className="draw-header">
         <Shuffle size={28} />
@@ -1469,19 +678,19 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
       {/* CHỌN KỊCH BẢN ĐẤU */}
       <div className="scenario-toggle">
-        <button 
+        <button
           className={`scenario-btn ${activeScenario === "mixer" ? "active" : ""}`}
           onClick={() => { if (!drawGenerated) { setActiveScenario("mixer"); } else { alert("Vui lòng hủy lịch đấu hiện tại trước khi đổi thể thức."); } }}
         >
           Kịch bản 1: Xoay Tua
         </button>
-        <button 
+        <button
           className={`scenario-btn ${activeScenario === "roundrobin" ? "active" : ""}`}
           onClick={() => { if (!drawGenerated) { setActiveScenario("roundrobin"); } else { alert("Vui lòng hủy lịch đấu hiện tại trước khi đổi thể thức."); } }}
         >
           Kịch bản 2: Vòng Tròn
         </button>
-        <button 
+        <button
           className={`scenario-btn ${activeScenario === "elimination" ? "active" : ""}`}
           onClick={() => { if (!drawGenerated) { setActiveScenario("elimination"); } else { alert("Vui lòng hủy lịch đấu hiện tại trước khi đổi thể thức."); } }}
         >
@@ -1499,7 +708,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             {/* Chọn Giải đấu / Sự kiện */}
             <div className="form-group">
               <label className="form-label">Sự kiện / Giải đấu liên kết</label>
-              <select className="form-select" value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>
+              <select aria-label="Sự kiện liên kết" className="form-select" value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>
                 <option value="">-- Chọn sự kiện liên kết --</option>
                 {events.map(ev => (
                   <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -1514,18 +723,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   <div className="form-group">
                     <label className="form-label">Số lượng sân thi đấu</label>
                     <div className="stepper-container">
-                      <button 
-                        type="button" 
-                        className="stepper-btn" 
+                      <button aria-label="Giảm số sân"
+                        type="button"
+                        className="stepper-btn"
                         onClick={() => setMixerCourts(prev => Math.max(1, prev - 1))}
                         disabled={mixerCourts <= 1}
                       >
                         <Minus size={16} />
                       </button>
                       <span className="stepper-value">{mixerCourts}</span>
-                      <button 
-                        type="button" 
-                        className="stepper-btn" 
+                      <button aria-label="Tăng số sân"
+                        type="button"
+                        className="stepper-btn"
                         onClick={() => setMixerCourts(prev => prev + 1)}
                       >
                         <Plus size={16} />
@@ -1539,12 +748,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Số lượt trận muốn sinh</label>
-                    <input 
-                      type="number" 
-                      min={1} 
-                      max={12} 
-                      className="form-input" 
-                      value={mixerRounds} 
+                    <input aria-label="Số vòng đấu"
+                      type="number"
+                      min={1}
+                      max={12}
+                      className="form-input"
+                      value={mixerRounds}
                       onChange={e => {
                         const val = e.target.value;
                         if (val === '') {
@@ -1577,7 +786,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   <div className="form-group">
                     <label className="form-label">Thể thức thi đấu</label>
-                    <select className="form-select" value={rrFormat} onChange={e => setRrFormat(e.target.value)}>
+                    <select aria-label="Thể thức vòng tròn" className="form-select" value={rrFormat} onChange={e => setRrFormat(e.target.value)}>
                       <option value="doubles">Đánh Đôi (2v2)</option>
                       <option value="singles">Đánh Đơn (1v1)</option>
                     </select>
@@ -1585,7 +794,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   {rrFormat === "doubles" && (
                     <div className="form-group">
                       <label className="form-label">Lập cặp đôi</label>
-                      <select className="form-select" value={rrDoublesMode} onChange={e => setRrDoublesMode(e.target.value)}>
+                      <select aria-label="Cách ghép đôi vòng tròn" className="form-select" value={rrDoublesMode} onChange={e => setRrDoublesMode(e.target.value)}>
                         <option value="auto">Tự động ghép ngẫu nhiên</option>
                         <option value="fixed">Ghép cặp cố định thủ công</option>
                       </select>
@@ -1598,22 +807,22 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   <div className="fixed-team-creator">
                     <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "var(--accent-electric-blue)" }}>Thêm Cặp Đôi Cố Định</span>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                      <select className="form-select" value={rrTempP1} onChange={e => setRrTempP1(e.target.value)}>
+                      <select aria-label="Thành viên thứ nhất" className="form-select" value={rrTempP1} onChange={e => setRrTempP1(e.target.value)}>
                         <option value="">-- Đấu thủ 1 --</option>
                         {selectedMemberIds.map(id => (
                           <option key={id} value={id}>{getPlayerName(id)}</option>
                         ))}
                       </select>
-                      <select className="form-select" value={rrTempP2} onChange={e => setRrTempP2(e.target.value)}>
+                      <select aria-label="Thành viên thứ hai" className="form-select" value={rrTempP2} onChange={e => setRrTempP2(e.target.value)}>
                         <option value="">-- Đấu thủ 2 --</option>
                         {selectedMemberIds.map(id => (
                           <option key={id} value={id}>{getPlayerName(id)}</option>
                         ))}
                       </select>
                     </div>
-                    <input 
-                      type="text" 
-                      className="form-input" 
+                    <input aria-label="Tên đội vòng tròn"
+                      type="text"
+                      className="form-input"
                       placeholder="Tên đội (Mặc định: Tên hai người)"
                       value={rrTempTeamName}
                       onChange={e => setRrTempTeamName(e.target.value)}
@@ -1630,7 +839,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           {rrFixedTeams.map(team => (
                             <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", background: "rgba(255,255,255,0.02)", borderRadius: "4px" }}>
                               <span style={{ fontSize: "0.82rem", fontWeight: "600" }}>{team.name}</span>
-                              <button onClick={() => handleRemoveFixedTeam("rr", team.id)} style={{ background: "transparent", border: "none", color: "var(--color-danger)", cursor: "pointer" }}>
+                              <button aria-label={`Xóa đội ${team.name || team.id}`} onClick={() => handleRemoveFixedTeam("rr", team.id)} style={{ background: "transparent", border: "none", color: "var(--color-danger)", cursor: "pointer" }}>
                                 <Trash2 size={14} />
                               </button>
                             </div>
@@ -1649,14 +858,14 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   <div className="form-group">
                     <label className="form-label">Thể thức thi đấu</label>
-                    <select className="form-select" value={elimFormat} onChange={e => setElimFormat(e.target.value)}>
+                    <select aria-label="Thể thức loại trực tiếp" className="form-select" value={elimFormat} onChange={e => setElimFormat(e.target.value)}>
                       <option value="doubles">Đánh Đôi (2v2)</option>
                       <option value="singles">Đánh Đơn (1v1)</option>
                     </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Xếp lịch hạt giống</label>
-                    <select className="form-select" value={elimSeeding} onChange={e => setElimSeeding(e.target.value)}>
+                    <select aria-label="Cách xếp hạt giống" className="form-select" value={elimSeeding} onChange={e => setElimSeeding(e.target.value)}>
                       <option value="elo">Theo điểm xếp hạng ELO</option>
                       <option value="random">Bốc thăm ngẫu nhiên</option>
                     </select>
@@ -1666,7 +875,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 {elimFormat === "doubles" && (
                   <div className="form-group">
                     <label className="form-label">Lập cặp đôi</label>
-                    <select className="form-select" value={elimDoublesMode} onChange={e => setElimDoublesMode(e.target.value)}>
+                    <select aria-label="Cách ghép đôi loại trực tiếp" className="form-select" value={elimDoublesMode} onChange={e => setElimDoublesMode(e.target.value)}>
                       <option value="auto">Tự động ghép ngẫu nhiên</option>
                       <option value="fixed">Ghép cặp cố định thủ công</option>
                     </select>
@@ -1678,22 +887,22 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   <div className="fixed-team-creator">
                     <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "var(--accent-electric-blue)" }}>Thêm Cặp Đôi Loại Trực Tiếp</span>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                      <select className="form-select" value={elimTempP1} onChange={e => setElimTempP1(e.target.value)}>
+                      <select aria-label="Thành viên thứ nhất" className="form-select" value={elimTempP1} onChange={e => setElimTempP1(e.target.value)}>
                         <option value="">-- Đấu thủ 1 --</option>
                         {selectedMemberIds.map(id => (
                           <option key={id} value={id}>{getPlayerName(id)}</option>
                         ))}
                       </select>
-                      <select className="form-select" value={elimTempP2} onChange={e => setElimTempP2(e.target.value)}>
+                      <select aria-label="Thành viên thứ hai" className="form-select" value={elimTempP2} onChange={e => setElimTempP2(e.target.value)}>
                         <option value="">-- Đấu thủ 2 --</option>
                         {selectedMemberIds.map(id => (
                           <option key={id} value={id}>{getPlayerName(id)}</option>
                         ))}
                       </select>
                     </div>
-                    <input 
-                      type="text" 
-                      className="form-input" 
+                    <input aria-label="Tên đội loại trực tiếp"
+                      type="text"
+                      className="form-input"
                       placeholder="Tên đội (Mặc định: Tên hai người)"
                       value={elimTempTeamName}
                       onChange={e => setElimTempTeamName(e.target.value)}
@@ -1710,7 +919,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           {elimFixedTeams.map(team => (
                             <div key={team.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", background: "rgba(255,255,255,0.02)", borderRadius: "4px" }}>
                               <span style={{ fontSize: "0.82rem", fontWeight: "600" }}>{team.name}</span>
-                              <button onClick={() => handleRemoveFixedTeam("elim", team.id)} style={{ background: "transparent", border: "none", color: "var(--color-danger)", cursor: "pointer" }}>
+                              <button aria-label={`Xóa đội ${team.name || team.id}`} onClick={() => handleRemoveFixedTeam("elim", team.id)} style={{ background: "transparent", border: "none", color: "var(--color-danger)", cursor: "pointer" }}>
                                 <Trash2 size={14} />
                               </button>
                             </div>
@@ -1724,9 +933,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             )}
 
             {/* Nút hành động */}
-            <button 
-              className="btn-neon-green" 
-              onClick={handleGenerateDraw} 
+            <button
+              className="btn-neon-green"
+              onClick={handleGenerateDraw}
               style={{ marginTop: "12px", width: "100%", justifyContent: "center" }}
               disabled={selectedMemberIds.length === 0}
             >
@@ -1742,18 +951,18 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 {selectedMemberIds.length === members.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
               </button>
             </div>
-            
+
             <div className="member-checkbox-list">
               {members.map(member => {
                 const isSelected = selectedMemberIds.includes(member.id);
                 return (
-                  <div 
-                    key={member.id} 
+                  <div
+                    key={member.id}
                     className={`member-check-item ${isSelected ? "selected" : ""}`}
                     onClick={() => handleToggleMember(member.id)}
                   >
-                    <input 
-                      type="checkbox" 
+                    <input aria-label={`Chọn ${member.name}`}
+                      type="checkbox"
                       checked={isSelected}
                       onChange={() => {}} // Đã được xử lý bởi onClick cha
                     />
@@ -1790,26 +999,26 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 Sự kiện: <strong>{events.find(ev => ev.id === selectedEventId)?.name || "Chưa gắn kết"}</strong>
               </span>
             </div>
-            
+
             <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
               {isAdmin ? (
-                <button 
-                  className="btn-neon-green" 
-                  onClick={handleFinalizeDraw} 
+                <button
+                  className="btn-neon-green"
+                  onClick={handleFinalizeDraw}
                   style={{ boxShadow: "0 0 15px rgba(212, 252, 52, 0.25)", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
                   disabled={isEventLocked}
                 >
                   <Check size={16} /> Chốt Kết Quả Lịch Đấu
                 </button>
               ) : (
-                <button className="btn-neon-green" onClick={() => alert("Vui lòng mở khóa quyền Admin (PIN) trên thanh menu để chốt kết quả bốc thăm.")} style={{ opacity: 0.55 }}>
+                <button className="btn-neon-green" onClick={() => alert("Vui lòng mở khóa tài khoản quản trị trên thanh menu để chốt kết quả bốc thăm.")} style={{ opacity: 0.55 }}>
                   <Check size={16} /> Chốt Kết Quả Lịch Đấu (Yêu cầu Admin)
                 </button>
               )}
-              
-              <button 
-                className="btn-secondary" 
-                onClick={handleClearDraw} 
+
+              <button
+                className="btn-secondary"
+                onClick={handleClearDraw}
                 style={{ borderColor: "rgba(255, 71, 87, 0.2)", color: "var(--color-danger)", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
                 disabled={isEventLocked}
               >
@@ -1819,7 +1028,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           </div>
 
           {/* =======================================================
-              HIỂN THỊ KỊCH BẢN 1: XOAY TUA (DANH SÁCH CÁC LƯỢT ĐẤU) 
+              HIỂN THỊ KỊCH BẢN 1: XOAY TUA (DANH SÁCH CÁC LƯỢT ĐẤU)
               ======================================================= */}
           {activeScenario === "mixer" && drawData.map((round) => (
             <div key={round.roundIndex} className="glass-panel round-box animate-fade-in">
@@ -1831,7 +1040,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   </span>
                 )}
               </div>
-              
+
               <div className="round-matches-list">
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
@@ -1841,9 +1050,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                         {match.played ? (
                           <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
                         ) : (
-                          <button 
-                            className="btn-neon-green btn-draw-record" 
-                            onClick={() => handleOpenScoring(match)} 
+                          <button
+                            className="btn-neon-green btn-draw-record"
+                            onClick={() => handleOpenScoring(match)}
                             style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
                             disabled={isEventLocked}
                           >
@@ -1851,15 +1060,15 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           </button>
                         )}
                         {isAdmin && (
-                          <button 
-                            onClick={() => handleDeleteMatch(match.matchId)} 
-                            style={{ 
-                              background: "transparent", 
-                              border: "none", 
-                              color: "var(--color-danger)", 
-                              cursor: isEventLocked ? "not-allowed" : "pointer", 
-                              display: "flex", 
-                              alignItems: "center", 
+                          <button
+                            onClick={() => handleDeleteMatch(match.matchId)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "var(--color-danger)",
+                              cursor: isEventLocked ? "not-allowed" : "pointer",
+                              display: "flex",
+                              alignItems: "center",
                               padding: "4px",
                               transition: "transform 0.15s ease",
                               borderRadius: "4px",
@@ -1875,7 +1084,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="match-teams-score-row">
                       {/* Đội A */}
                       <div className="draw-team-box" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -1897,7 +1106,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           Tổng Elo: <span style={{ color: "var(--accent-neon-green)" }}>{match.teamA.reduce((sum, id) => sum + (members.find(m => m.id === id)?.elo || 1200), 0)}</span>
                         </span>
                       </div>
-                      
+
                       {/* Điểm số */}
                       {match.played ? (
                         <div className="draw-score-box">
@@ -1935,12 +1144,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           ))}
 
           {/* =======================================================
-              HIỂN THỊ KỊCH BẢN 2: VÒNG TRÒN (ĐẤU VÒNG TRÒN) 
+              HIỂN THỊ KỊCH BẢN 2: VÒNG TRÒN (ĐẤU VÒNG TRÒN)
               ======================================================= */}
           {activeScenario === "roundrobin" && drawData.rounds.map((round) => (
             <div key={round.roundIndex} className="glass-panel round-box animate-fade-in">
               <div className="round-title">Vòng Đấu Thứ {round.roundIndex}</div>
-              
+
               <div className="round-matches-list">
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
@@ -1950,9 +1159,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                         {match.played ? (
                           <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
                         ) : (
-                          <button 
-                            className="btn-neon-green btn-draw-record" 
-                            onClick={() => handleOpenScoring(match)} 
+                          <button
+                            className="btn-neon-green btn-draw-record"
+                            onClick={() => handleOpenScoring(match)}
                             style={{ alignSelf: "auto", margin: 0, padding: "4px 8px", fontSize: "0.72rem", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
                             disabled={isEventLocked}
                           >
@@ -1960,15 +1169,15 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           </button>
                         )}
                         {isAdmin && (
-                          <button 
-                            onClick={() => handleDeleteMatch(match.matchId)} 
-                            style={{ 
-                              background: "transparent", 
-                              border: "none", 
-                              color: "var(--color-danger)", 
-                              cursor: isEventLocked ? "not-allowed" : "pointer", 
-                              display: "flex", 
-                              alignItems: "center", 
+                          <button
+                            onClick={() => handleDeleteMatch(match.matchId)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "var(--color-danger)",
+                              cursor: isEventLocked ? "not-allowed" : "pointer",
+                              display: "flex",
+                              alignItems: "center",
                               padding: "4px",
                               transition: "transform 0.15s ease",
                               borderRadius: "4px",
@@ -1995,7 +1204,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                           </span>
                         )}
                       </div>
-                      
+
                       {/* Điểm số */}
                       {match.played ? (
                         <div className="draw-score-box">
@@ -2022,7 +1231,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           ))}
 
           {/* =======================================================
-              HIỂN THỊ KỊCH BẢN 3: ELIMINATION (SƠ ĐỒ CÂY LOẠI TRỰC TIẾP) 
+              HIỂN THỊ KỊCH BẢN 3: ELIMINATION (SƠ ĐỒ CÂY LOẠI TRỰC TIẾP)
               ======================================================= */}
           {activeScenario === "elimination" && (
             <div className="glass-panel round-box bracket-scroll-container animate-fade-in">
@@ -2031,35 +1240,35 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   <div style={{ textAlign: "center", fontWeight: "800", color: "var(--accent-neon-green)", marginBottom: "20px", textTransform: "uppercase", fontSize: "0.9rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "6px" }}>
                     {round.roundName}
                   </div>
-                  
+
                   {round.matches.map((match) => {
                     const isAEmpty = !match.teamA || match.teamA.length === 0;
                     const isBEmpty = !match.teamB || match.teamB.length === 0;
-                    
+
                     return (
                       <div key={match.matchId} className="bracket-match-wrapper">
-                        <div 
-                          className="match-draw-card" 
-                          style={{ 
-                            minWidth: "250px", 
-                            padding: "14px", 
+                        <div
+                          className="match-draw-card"
+                          style={{
+                            minWidth: "250px",
+                            padding: "14px",
                             opacity: (isAEmpty || isBEmpty) ? 0.4 : 1,
                             borderColor: match.winner ? "rgba(46, 213, 115, 0.2)" : "rgba(255,255,255,0.03)"
                           }}
                         >
                           {isAdmin && !match.isByeMatch && (
-                            <button 
-                              onClick={() => handleDeleteMatch(match.matchId)} 
-                              style={{ 
+                            <button
+                              onClick={() => handleDeleteMatch(match.matchId)}
+                              style={{
                                 position: "absolute",
                                 top: "8px",
                                 right: "8px",
-                                background: "transparent", 
-                                border: "none", 
-                                color: "var(--color-danger)", 
-                                cursor: isEventLocked ? "not-allowed" : "pointer", 
-                                display: "flex", 
-                                alignItems: "center", 
+                                background: "transparent",
+                                border: "none",
+                                color: "var(--color-danger)",
+                                cursor: isEventLocked ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
                                 padding: "4px",
                                 transition: "transform 0.15s ease",
                                 zIndex: 10,
@@ -2083,7 +1292,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                               </div>
                               {match.played && <span style={{ fontWeight: "850", color: "var(--accent-electric-blue)", fontSize: "1.1rem" }}>{match.scoreA}</span>}
                             </div>
-                            
+
                             <div style={{ height: "1px", background: "rgba(255,255,255,0.04)" }} />
 
                             {/* Team B */}
@@ -2099,9 +1308,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
                           {/* Nhập điểm (nếu có đủ 2 đội và chưa đấu, và không phải trận đấu tự động Bye) */}
                           {!match.played && !isAEmpty && !isBEmpty && !match.isByeMatch && (
-                            <button 
-                              className="btn-neon-green btn-draw-record" 
-                              onClick={() => handleOpenScoring(match)} 
+                            <button
+                              className="btn-neon-green btn-draw-record"
+                              onClick={() => handleOpenScoring(match)}
                               style={{ marginTop: "8px", opacity: isEventLocked ? 0.4 : 1, cursor: isEventLocked ? "not-allowed" : "pointer" }}
                               disabled={isEventLocked}
                             >
@@ -2135,12 +1344,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           POPUP NHẬP ĐIỂM SỐ TRỰC TIẾP
           ======================================================= */}
       {activeScoringMatch && (
-        <div className="scoring-popup-overlay">
+        <Modal isOpen={!!activeScoringMatch} onClose={()=>setActiveScoringMatch(null)} title="Ghi kết quả trận đấu">
           <div className="glass-panel scoring-popup-card glow-border-green animate-slide-up">
             <h3 style={{ fontSize: "1.25rem", fontWeight: "800", textOrigin: "center", textAlign: "center" }}>
               Ghi Kết Quả Trận Đấu
             </h3>
-            
+
             <div style={{ textAlign: "center", marginTop: "8px", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
               Sự kiện: {events.find(ev => ev.id === selectedEventId)?.name}
             </div>
@@ -2188,8 +1397,14 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );
 }
+
+TournamentDraw.propTypes = {
+  data: PropTypes.object,
+  setData: PropTypes.func,
+  isAdmin: PropTypes.bool,
+};

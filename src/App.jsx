@@ -1,351 +1,61 @@
-import React, { useState, useEffect } from "react";
-import Navbar from "./components/Navbar";
-import Dashboard from "./components/Dashboard";
-import Leaderboard from "./components/Leaderboard";
-import MatchRecorder from "./components/MatchRecorder";
-import Members from "./components/Members";
-import Events from "./components/Events";
-import BackupRestore from "./components/BackupRestore";
-import TournamentDraw from "./components/TournamentDraw";
-import Finance from "./components/Finance";
-import HeadToHead from "./components/HeadToHead";
-import { getClubData } from "./utils/db";
-import { fetchRemoteData, updateRemoteData, fetchRemoteTimestamp, supabase } from "./utils/supabase";
-import { Lock } from "lucide-react";
-
-const CLUB_ID = import.meta.env.VITE_CLUB_ID || "1";
-const STORAGE_KEY = `pickleball_club_data_${CLUB_ID}`;
-const UPDATED_AT_KEY = `pickleball_club_data_updated_at_${CLUB_ID}`;
-const IS_ADMIN_KEY = `pickleball_is_admin_${CLUB_ID}`;
-const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "PICKLEBALL PHỞ";
-
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import Navbar from './components/Navbar';
+import AuthDialog from './components/AuthDialog';
+import { useClub } from './hooks/useClub';
+import { CLUB_NAME } from './utils/config';
+import { readState } from './utils/storage';
+const screens = {
+  dashboard: lazy(() => import('./components/Dashboard')),
+  leaderboard: lazy(() => import('./components/Leaderboard')),
+  recorder: lazy(() => import('./components/MatchRecorder')),
+  members: lazy(() => import('./components/Members')),
+  events: lazy(() => import('./components/Events')),
+  draw: lazy(() => import('./components/TournamentDraw')),
+  finance: lazy(() => import('./components/Finance')),
+  backup: lazy(() => import('./components/BackupRestore')),
+  h2h: lazy(() => import('./components/HeadToHead')),
+};
+const tabFromHash = () => Object.hasOwn(screens, location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard';
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [data, setData] = useState({ members: [], events: [], matches: [], transactions: [] });
-  // Tạm thời mặc định mở khóa toàn bộ quyền Admin theo yêu cầu của người dùng
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [recorderSubTab, setRecorderSubTab] = useState("record");
+  const club = useClub();
+  const [activeTab, setActiveTab] = useState(tabFromHash);
+  const [recorderSubTab, setRecorderSubTab] = useState('record');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
-  const handleSetAdmin = (val) => {
-    setIsAdmin(val);
-    localStorage.setItem(IS_ADMIN_KEY, val ? "true" : "false");
-  };
-
-  // Hàm kiểm tra xem dữ liệu có phải là dữ liệu mẫu mặc định (mock) hay không
-  const isMockData = (clubData) => {
-    if (!clubData) return true;
-    if (!clubData.members || clubData.members.length === 0) return true;
-    
-    // Nếu chứa bất kỳ ID nào bắt đầu bằng "m_", "e_", hoặc "match_", đây chắc chắn là dữ liệu thực tế của người dùng
-    const hasRealMembers = clubData.members.some(m => m.id && m.id.startsWith("m_"));
-    const hasRealEvents = clubData.events && clubData.events.some(e => e.id && e.id.startsWith("e_"));
-    const hasRealMatches = clubData.matches && clubData.matches.some(m => m.id && m.id.startsWith("match_"));
-    
-    return !(hasRealMembers || hasRealEvents || hasRealMatches);
-  };
-
-
-  // Tải dữ liệu ban đầu khi ứng dụng khởi chạy và thiết lập các bộ lắng nghe đồng bộ
+  const dirty = useRef(false);
+  const main = useRef(null);
   useEffect(() => {
-    // 1. Tải từ localStorage trước để hiển thị ngay lập tức
-    const clubData = getClubData();
-    setData(clubData);
-
-    // Lấy nhãn thời gian cục bộ (nếu chưa có thì coi như cực kỳ cũ)
-    let localUpdatedAt = localStorage.getItem(UPDATED_AT_KEY);
-    if (!localUpdatedAt) {
-      localUpdatedAt = new Date(0).toISOString();
-      localStorage.setItem(UPDATED_AT_KEY, localUpdatedAt);
-    }
-
-    // 2. Đồng bộ bất đồng bộ từ đám mây Supabase ngay khi mở ứng dụng
-    fetchRemoteData().then(remoteResult => {
-      if (remoteResult && remoteResult.data) {
-        const remoteUpdatedAt = remoteResult.updated_at || new Date(0).toISOString();
-        
-        console.log(`Đồng bộ ban đầu - Local updated_at: ${localUpdatedAt}, Remote updated_at: ${remoteUpdatedAt}`);
-
-        if (isMockData(remoteResult.data) && !isMockData(clubData)) {
-          // Trường hợp đặc biệt: Trên đám mây là dữ liệu mẫu (mock), dưới máy là dữ liệu thực tế -> Ưu tiên đẩy dữ liệu thực tế lên mây!
-          console.log("Phát hiện dữ liệu trên đám mây là dữ liệu mẫu, trong khi dữ liệu cục bộ là thực tế. Tự động khôi phục dữ liệu thực tế lên đám mây!");
-          const newTimestamp = new Date().toISOString();
-          localStorage.setItem(UPDATED_AT_KEY, newTimestamp);
-          updateRemoteData(clubData, newTimestamp);
-        } else if (new Date(remoteUpdatedAt) > new Date(localUpdatedAt)) {
-          // Trường hợp 1: Trên đám mây mới hơn -> Tải về thiết bị
-          console.log("Dữ liệu đám mây mới hơn dữ liệu cục bộ. Tự động tải về thiết bị!");
-          setData(remoteResult.data);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteResult.data));
-          localStorage.setItem(UPDATED_AT_KEY, remoteUpdatedAt);
-        } else if (new Date(localUpdatedAt) > new Date(remoteUpdatedAt)) {
-          // Trường hợp 2: Dưới máy cục bộ mới hơn -> Đẩy lên đám mây
-          if (!isMockData(clubData)) {
-            console.log("Dữ liệu cục bộ mới hơn dữ liệu đám mây. Tự động tải lên Supabase!");
-            updateRemoteData(clubData, localUpdatedAt);
-          } else {
-            console.log("Dữ liệu cục bộ là dữ liệu mẫu, tự động tải ngược dữ liệu thực tế từ đám mây về.");
-            setData(remoteResult.data);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteResult.data));
-            localStorage.setItem(UPDATED_AT_KEY, remoteUpdatedAt);
-          }
-        } else {
-          console.log("Dữ liệu cục bộ và đám mây đã đồng nhất!");
-        }
-      } else {
-        // Nếu kết nối được Supabase nhưng chưa có dữ liệu (Supabase trống), khởi tạo bằng dữ liệu local hiện tại (chỉ khi là dữ liệu thực)
-        if (clubData && !isMockData(clubData)) {
-          console.log("Khởi tạo dữ liệu đám mây Supabase từ LocalStorage thực tế...");
-          updateRemoteData(clubData, localUpdatedAt);
-        }
-      }
-    });
-
-    // 3. Đăng ký kênh Realtime để nhận thông báo thay đổi tức thời từ Supabase
-    let subscription = null;
-    if (supabase) {
-      console.log("Đang thiết lập Supabase Realtime channel cho bảng pickleball_club...");
-      subscription = supabase
-        .channel("pickleball_club_changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "pickleball_club",
-            filter: `id=eq.${CLUB_ID}`
-          },
-          (payload) => {
-            console.log("Nhận được thay đổi realtime từ Supabase:", payload);
-            const remoteUpdatedAt = payload.new.updated_at;
-            const currentLocalUpdatedAt = localStorage.getItem(UPDATED_AT_KEY) || new Date(0).toISOString();
-
-            if (remoteUpdatedAt && new Date(remoteUpdatedAt) > new Date(currentLocalUpdatedAt)) {
-              if (payload.new.data) {
-                const currentLocalData = getClubData();
-                if (isMockData(payload.new.data) && !isMockData(currentLocalData)) {
-                  console.log("Realtime: Phát hiện đám mây chứa dữ liệu mẫu, nhưng local có dữ liệu thực tế. Bỏ qua ghi đè, tự động khôi phục đám mây...");
-                  const newTimestamp = new Date().toISOString();
-                  localStorage.setItem(UPDATED_AT_KEY, newTimestamp);
-                  updateRemoteData(currentLocalData, newTimestamp);
-                } else {
-                  console.log("Cập nhật dữ liệu từ thông báo Realtime...");
-                  setData(payload.new.data);
-                  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload.new.data));
-                  localStorage.setItem(UPDATED_AT_KEY, remoteUpdatedAt);
-                }
-              } else {
-                // Đề phòng data không đi kèm trong payload, gọi fetch full data
-                console.log("Realtime: Đang tải toàn bộ dữ liệu do payload thiếu trường data...");
-                fetchRemoteData().then(res => {
-                  if (res && res.data) {
-                    const currentLocalData = getClubData();
-                    if (isMockData(res.data) && !isMockData(currentLocalData)) {
-                      console.log("Realtime (Fetch): Phát hiện đám mây chứa dữ liệu mẫu, nhưng local có dữ liệu thực tế. Tự động khôi phục đám mây...");
-                      const newTimestamp = new Date().toISOString();
-                      localStorage.setItem(UPDATED_AT_KEY, newTimestamp);
-                      updateRemoteData(currentLocalData, newTimestamp);
-                    } else {
-                      setData(res.data);
-                      localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data));
-                      localStorage.setItem(UPDATED_AT_KEY, res.updated_at);
-                    }
-                  }
-                });
-              }
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log("Trạng thái kết nối Realtime channel:", status);
-        });
-    }
-
-    // 4. Cơ chế Polling ngầm nhẹ mỗi 10 giây để kiểm tra chéo (Đề phòng Realtime bị tắt hoặc lỗi)
-    const pollInterval = setInterval(() => {
-      const currentLocalUpdatedAt = localStorage.getItem(UPDATED_AT_KEY) || new Date(0).toISOString();
-      
-      fetchRemoteTimestamp().then(remoteUpdatedAt => {
-        if (remoteUpdatedAt && new Date(remoteUpdatedAt) > new Date(currentLocalUpdatedAt)) {
-          console.log(`Polling phát hiện dữ liệu đám mây mới hơn (${remoteUpdatedAt} > ${currentLocalUpdatedAt}). Tiến hành tải dữ liệu...`);
-          fetchRemoteData().then(res => {
-            if (res && res.data) {
-              const currentLocalData = getClubData();
-              if (isMockData(res.data) && !isMockData(currentLocalData)) {
-                console.log("Polling: Phát hiện đám mây chứa dữ liệu mẫu, nhưng local có dữ liệu thực tế. Tự động khôi phục đám mây...");
-                const newTimestamp = new Date().toISOString();
-                localStorage.setItem(UPDATED_AT_KEY, newTimestamp);
-                updateRemoteData(currentLocalData, newTimestamp);
-              } else {
-                setData(res.data);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data));
-                localStorage.setItem(UPDATED_AT_KEY, res.updated_at);
-                console.log("Đã cập nhật dữ liệu mới nhất từ Polling thành công!");
-              }
-            }
-          });
-        }
-      });
-    }, 10000);
-
-    // Dọn dẹp subscription và interval khi unmount
-    return () => {
-      if (subscription && supabase) {
-        supabase.removeChannel(subscription);
-      }
-      clearInterval(pollInterval);
+    const hash = () => {
+      if (dirty.current && !window.confirm('Biểu mẫu có nội dung chưa lưu. Rời màn hình này?')) { history.replaceState(null, '', `#${activeTab}`); return; }
+      dirty.current = false; setActiveTab(tabFromHash()); main.current?.focus();
     };
-  }, []);
-
-  const renderActiveTab = () => {
-    // Các tab được phép truy cập tự do không cần Admin key
-    const publicTabs = ["dashboard", "leaderboard", "h2h"];
-    
-    // Nếu tab không phải là public và chưa có quyền Admin, hiển thị màn hình khóa
-    if (!publicTabs.includes(activeTab) && !isAdmin) {
-      return (
-        <div className="admin-lock-screen animate-fade-in">
-          <style dangerouslySetInnerHTML={{__html: `
-            .admin-lock-screen {
-              max-width: 480px;
-              margin: 80px auto;
-              padding: 40px 24px;
-              text-align: center;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              gap: 20px;
-            }
-            .lock-screen-icon {
-              width: 76px;
-              height: 76px;
-              border-radius: 50%;
-              background: rgba(255, 71, 87, 0.08);
-              border: 1px solid rgba(255, 71, 87, 0.2);
-              color: var(--color-danger);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              box-shadow: 0 0 20px rgba(255, 71, 87, 0.15);
-              margin-bottom: 8px;
-            }
-            .lock-screen-title {
-              font-size: 1.4rem;
-              font-weight: 800;
-              color: #fff;
-            }
-            .lock-screen-desc {
-              font-size: 0.9rem;
-              color: var(--text-secondary);
-              line-height: 1.6;
-              margin-bottom: 8px;
-            }
-            @media (max-width: 768px) {
-              .admin-lock-screen {
-                margin: 40px auto;
-                padding: 32px 16px;
-              }
-            }
-          `}} />
-          <div className="lock-screen-icon">
-            <Lock size={32} />
-          </div>
-          <h2 className="lock-screen-title">Quyền Admin Đã Khóa</h2>
-          <p className="lock-screen-desc">
-            Tính năng này yêu cầu quyền quản trị (Admin). Vui lòng nhấp nút bên dưới và nhập mã PIN để mở khóa toàn bộ hệ thống.
-          </p>
-          <button 
-            className="btn-neon-green" 
-            onClick={() => setIsAuthModalOpen(true)}
-            style={{ padding: "12px 28px", fontWeight: "700" }}
-          >
-            Nhập mã PIN
-          </button>
-        </div>
-      );
-    }
-
-    switch (activeTab) {
-      case "dashboard":
-        return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} setRecorderSubTab={setRecorderSubTab} />;
-      case "leaderboard":
-        return <Leaderboard data={data} />;
-      case "recorder":
-        return <MatchRecorder data={data} setData={setData} setActiveTab={setActiveTab} isAdmin={isAdmin} setIsAdmin={handleSetAdmin} subTab={recorderSubTab} setSubTab={setRecorderSubTab} />;
-      case "members":
-        return <Members data={data} setData={setData} isAdmin={isAdmin} />;
-      case "events":
-        return <Events data={data} setData={setData} isAdmin={isAdmin} setActiveTab={setActiveTab} />;
-      case "draw":
-        return <TournamentDraw data={data} setData={setData} isAdmin={isAdmin} />;
-      case "finance":
-        return <Finance data={data} setData={setData} isAdmin={isAdmin} />;
-      case "backup":
-        return <BackupRestore data={data} setData={setData} isAdmin={isAdmin} />;
-      case "h2h":
-        return <HeadToHead data={data} />;
-      default:
-        return <Dashboard data={data} setData={setData} setActiveTab={setActiveTab} setRecorderSubTab={setRecorderSubTab} />;
-    }
-  };
-
-  return (
-    <div className="app-layout">
-      <style dangerouslySetInnerHTML={{__html: `
-        .app-layout {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .app-main-content {
-          flex-grow: 1;
-        }
-
-        .app-footer {
-          border-top: 1px solid var(--border-color);
-          background: rgba(8, 9, 13, 0.95);
-          padding: 24px;
-          text-align: center;
-          font-size: 0.8rem;
-          color: var(--text-muted);
-        }
-
-        .footer-brand {
-          font-weight: 700;
-          color: var(--text-secondary);
-          margin-bottom: 4px;
-        }
-
-        .footer-brand span {
-          color: var(--accent-neon-green);
-        }
-      `}} />
-      
-      {/* Thanh Điều hướng Đầu trang */}
-      <Navbar 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        isAdmin={isAdmin} 
-        setIsAdmin={handleSetAdmin} 
-        isModalOpen={isAuthModalOpen}
-        setIsModalOpen={setIsAuthModalOpen}
-      />
-      
-      {/* Nội dung trang hiện tại */}
-      <main className="app-main-content">
-        {renderActiveTab()}
-      </main>
-
-      {/* Chân trang (Footer) */}
-      <footer className="app-footer">
-        <div className="footer-brand">
-          {CLUB_NAME} <span>PRO RANK</span>
-        </div>
-        <div>
-          Hệ thống Quản lý và Xếp hạng Thành viên chuyên nghiệp. Thiết kế bởi Antigravity AI.
-        </div>
-      </footer>
+    const unload = event => {
+      let pending = false; try { pending = club.isAdmin && readState().pending; } catch { /* Do not mask recovery UI. */ }
+      if (dirty.current || pending) { event.preventDefault(); event.returnValue = ''; }
+    };
+    window.addEventListener('hashchange', hash); window.addEventListener('beforeunload', unload);
+    return () => { window.removeEventListener('hashchange', hash); window.removeEventListener('beforeunload', unload); };
+  }, [activeTab, club.isAdmin]);
+  const navigate = tab => { location.hash = tab; };
+  const Screen = screens[activeTab];
+  const locked = !club.isAdmin && !['dashboard','leaderboard','h2h'].includes(activeTab);
+  return <div className="app-layout">
+    <a className="skip-link" href="#main-content" onClick={event=>{ event.preventDefault(); main.current?.focus(); }}>Đến nội dung chính</a>
+    <Navbar activeTab={activeTab} setActiveTab={navigate} isAdmin={club.isAdmin} setIsAdmin={value=>value ? setIsAuthModalOpen(true) : club.logout()} isModalOpen={false} setIsModalOpen={setIsAuthModalOpen} />
+    <div className={`sync-status sync-${club.status.kind}`} role="status" aria-live="polite">
+      <span>{club.status.message}</span>
+      {club.status.kind === 'error' && <button onClick={club.exportRecovery}>Tải bản cứu hộ trên thiết bị này</button>}
+      {club.isAdmin && <><button onClick={club.exportLocal}>Tải bản sao lưu</button><button onClick={club.retry}>Kiểm tra đồng bộ</button></>}
+      {club.isAdmin && club.status.kind === 'conflict' && <><button onClick={club.exportRemote}>Tải bản máy chủ</button><button onClick={club.useRemote}>Chọn bản máy chủ</button></>}
+      {club.session && !club.isAdmin && <button onClick={club.logout}>Đăng xuất tài khoản</button>}
     </div>
-  );
+    {club.error && <div className="operation-error" role="alert">{club.error}<button onClick={club.clearError}>Đóng thông báo</button></div>}
+    <main id="main-content" ref={main} tabIndex={-1} className="app-main-content"
+      onChangeCapture={e=>{ if (e.target.closest('form')) dirty.current = true; }}
+      onSubmitCapture={()=>{ let generation; try { generation = readState().generation; } catch { return; } queueMicrotask(()=>{ if (readState().generation !== generation) dirty.current = false; }); }}>
+      {locked ? <div className="recovery-panel"><h1>Đăng nhập để quản lý CLB</h1><p>Bạn có thể xem Tổng Quan, Xếp Hạng và Đối Đầu mà không cần đăng nhập.</p><button className="btn-neon-green" onClick={()=>setIsAuthModalOpen(true)}>Đăng nhập quản trị</button></div>
+        : <Suspense fallback={<p className="recovery-panel" role="status">Đang mở màn hình…</p>}><Screen data={club.data} setData={club.setData} isAdmin={club.isAdmin} setIsAdmin={()=>setIsAuthModalOpen(true)} setActiveTab={navigate} setRecorderSubTab={setRecorderSubTab} subTab={recorderSubTab} setSubTab={setRecorderSubTab} /></Suspense>}
+    </main>
+    <AuthDialog isOpen={isAuthModalOpen} onClose={()=>setIsAuthModalOpen(false)} />
+    <footer className="app-footer"><strong>{CLUB_NAME} PRO RANK</strong><p>Quản lý và xếp hạng CLB Pickleball</p></footer>
+  </div>;
 }

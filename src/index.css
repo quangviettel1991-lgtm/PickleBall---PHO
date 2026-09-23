@@ -20,7 +20,7 @@
   --color-success: #2ed573;
   --color-danger: #ff4757;
   --color-warning: #ffa502;
-  
+
   /* Text */
   --text-primary: #ffffff;
   --text-secondary: #a0aec0;
@@ -28,12 +28,12 @@
 
   /* Font */
   --font-primary: 'Outfit', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  
+
   /* Hiệu ứng chuyển động */
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  
+
   /* Bóng mờ & Blur */
   --glass-blur: 16px;
   --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
@@ -56,7 +56,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   line-height: 1.5;
-  background-image: 
+  background-image:
     radial-gradient(circle at 10% 20%, rgba(212, 252, 52, 0.03) 0%, transparent 40%),
     radial-gradient(circle at 90% 80%, rgba(0, 236, 255, 0.03) 0%, transparent 40%);
   background-attachment: fixed;
@@ -350,4 +350,39 @@ body {
   .backup-container {
     padding: 12px 8px !important;
   }
+}
+
+/* Shared application and keyboard behavior */
+.app-layout { min-height: 100vh; display: flex; flex-direction: column; }
+.app-main-content { flex: 1; min-width: 0; }
+.app-footer { text-align: center; border-top: 1px solid var(--border-color); padding: 24px; color: var(--text-secondary); }
+.sync-status { padding: 10px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: #141d29; color: #c8d4e4; font-size: .85rem; }
+.sync-status button, .operation-error button { padding: 8px 12px; border: 1px solid #526178; background: #182333; color: #fff; border-radius: 6px; cursor: pointer; }
+.sync-conflict, .sync-error { background: #35280f; color: #ffdf9e; }
+.operation-error { margin: 12px auto; padding: 16px; max-width: 1100px; color: #ffc8ce; background: #321b23; border: 1px solid #99475a; border-radius: 8px; }
+.recovery-panel { padding: 48px 24px; margin: auto; max-width: 800px; line-height: 1.7; }
+.recovery-panel button { margin: 12px 12px 0 0; }
+.skip-link { position: fixed; top: -100px; left: 12px; z-index: 1000; padding: 12px; background: #d4fc34; color: #08090d; }
+.skip-link:focus { top: 12px; }
+:where(button,a,input,select,textarea,[tabindex]):focus-visible { outline: 3px solid #00ecff; outline-offset: 3px; }
+button:disabled, [aria-disabled="true"] { cursor: not-allowed; opacity: .55; }
+dialog.modal-backdrop { max-width: none; max-height: none; width: 100%; height: 100%; border: 0; color: var(--text-primary); margin: 0; }
+dialog.modal-backdrop:not([open]) { display: none; }
+dialog::backdrop { background: rgba(0,0,0,.65); }
+.modal-body label { margin-top: 10px; }
+.modal-body p { margin: 12px 0; }
+.modal-body .scoring-popup-card { width: 100%; padding: 0; border: none; background: transparent; }
+.set-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.set-row label { min-width: 0; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 16px; flex-wrap: wrap; }
+.pagination button { padding: 10px 16px; }
+@media (max-width: 600px) {
+  .sync-status { padding: 10px 12px; }
+  button { min-height: 36px; }
+  input, select, textarea { font-size: 16px; }
+  .modal-wrapper { max-height: 88dvh; }
+  .modal-body { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

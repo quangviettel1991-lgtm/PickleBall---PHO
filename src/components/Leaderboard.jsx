@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from "react";
-import { Trophy, Calendar, Filter, ArrowUpDown, Clock } from "lucide-react";
+import './Leaderboard.css';
+import PropTypes from 'prop-types';
+import { useState, useMemo } from "react";
+import { Trophy, Filter, ArrowUpDown, Clock } from "lucide-react";
 
 export default function Leaderboard({ data }) {
   const { members, matches, events } = data;
@@ -23,12 +25,12 @@ export default function Leaderboard({ data }) {
   const dateRange = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
+
     // Đầu tuần (thứ 2)
     const day = now.getDay();
     const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const startOfWeek = new Date(now.getFullYear(), now.getMonth(), diff);
-    
+
     // Đầu tháng
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -74,7 +76,7 @@ export default function Leaderboard({ data }) {
 
   // Tính toán thống kê xếp hạng của từng thành viên dựa trên các trận đấu đã lọc
   const leaderboardData = useMemo(() => {
-    const list = members.map(member => {
+    const list = members.filter(m=>!m.archivedAt).map(member => {
       let played = 0;
       let won = 0;
       let lost = 0;
@@ -139,7 +141,7 @@ export default function Leaderboard({ data }) {
     }
 
     return filteredList;
-  }, [members, filteredMatches, filterEvent, showGuests]);
+  }, [members, filteredMatches, filterEvent, showGuests, filterType]);
 
   // Sắp xếp dữ liệu bảng xếp hạng
   const sortedLeaderboard = useMemo(() => {
@@ -227,266 +229,7 @@ export default function Leaderboard({ data }) {
 
   return (
     <div className="leaderboard-container animate-fade-in">
-      <style dangerouslySetInnerHTML={{__html: `
-        .leaderboard-container {
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 24px 16px;
-        }
 
-        .leaderboard-header-section {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-
-        .leaderboard-title {
-          font-size: 1.5rem;
-          font-weight: 800;
-          letter-spacing: -0.02em;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .leaderboard-title svg {
-          color: var(--accent-neon-green);
-        }
-
-        /* Thanh bộ lọc ngang cao cấp */
-        .filters-panel {
-          padding: 20px;
-          margin-bottom: 24px;
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 16px;
-          transition: all 0.3s ease;
-        }
-
-        .filter-group {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .custom-range-inputs {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-top: 4px;
-        }
-
-        .custom-range-inputs input {
-          width: 50%;
-        }
-
-        /* Nút toggle bộ lọc trên di động */
-        .mobile-filter-toggle {
-          display: none;
-          width: 100%;
-          padding: 12px;
-          background: rgba(255, 255, 255, 0.02);
-          border: 1px solid var(--border-color);
-          border-radius: 10px;
-          color: #fff;
-          font-weight: 600;
-          font-size: 0.9rem;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          cursor: pointer;
-          margin-bottom: 16px;
-          transition: all 0.2s;
-        }
-
-        .mobile-filter-toggle:hover {
-          background: rgba(255, 255, 255, 0.05);
-        }
-
-        /* Thiết kế bảng xếp hạng */
-        .board-panel {
-          padding: 20px;
-        }
-
-        .sort-header {
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          user-select: none;
-          transition: color 0.15s;
-        }
-
-        .sort-header:hover {
-          color: var(--accent-neon-green);
-        }
-
-        .sort-header.active {
-          color: var(--accent-neon-green);
-          font-weight: 700;
-        }
-
-        /* Hạng */
-        .rank-col {
-          font-weight: 700;
-          font-size: 1.05rem;
-          width: 50px;
-          text-align: center;
-        }
-
-        .rank-medal {
-          font-size: 1.25rem;
-        }
-
-        .rank-1 { color: var(--accent-neon-green); }
-        .rank-2 { color: #cbd5e1; }
-        .rank-3 { color: #b45309; }
-
-        /* Cột người chơi */
-        .player-info-cell {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .player-info-details {
-          display: flex;
-          flex-direction: column;
-        }
-
-        .player-name-cell {
-          font-weight: 700;
-          color: #fff;
-          font-size: 0.92rem;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 150px;
-        }
-
-        .player-gender-cell {
-          font-size: 0.72rem;
-          color: var(--text-muted);
-        }
-
-        /* Biến động Elo */
-        .elo-change-badge {
-          display: inline-flex;
-          align-items: center;
-          font-weight: 700;
-          padding: 3px 8px;
-          border-radius: 6px;
-          font-size: 0.8rem;
-        }
-
-        .elo-change-up {
-          background: rgba(46, 213, 115, 0.08);
-          color: var(--color-success);
-          border: 1px solid rgba(46, 213, 115, 0.15);
-        }
-
-        .elo-change-down {
-          background: rgba(255, 71, 87, 0.08);
-          color: var(--color-danger);
-          border: 1px solid rgba(255, 71, 87, 0.15);
-        }
-
-        .elo-change-none {
-          background: rgba(255, 255, 255, 0.03);
-          color: var(--text-muted);
-          border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .active-filter-desc {
-          margin-top: -8px;
-          margin-bottom: 16px;
-          font-size: 0.8rem;
-          color: var(--text-secondary);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-wrap: wrap;
-        }
-
-        .show-on-mobile {
-          display: none;
-        }
-
-        .show-text-on-mobile {
-          display: none;
-        }
-
-        .hide-text-on-mobile {
-          display: inline;
-        }
-
-        /* Ẩn cột trên di động */
-        .hide-on-mobile {
-          display: table-cell;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-          .hide-on-mobile {
-            display: table-cell !important; /* Luôn hiển thị cột trên di động */
-          }
-
-          .show-text-on-mobile {
-            display: inline !important;
-          }
-
-          .hide-text-on-mobile {
-            display: none !important;
-          }
-
-          .mobile-filter-toggle {
-            display: flex;
-          }
-
-          .filters-panel {
-            display: ${showMobileFilters ? "grid" : "none"};
-            grid-template-columns: 1fr;
-            padding: 16px;
-            gap: 12px;
-          }
-
-          .leaderboard-title {
-            font-size: 1.3rem;
-          }
-
-          .board-panel {
-            padding: 8px !important;
-          }
-
-          .custom-table td, .custom-table th {
-            padding: 8px 3px !important; /* Rất bé như yêu cầu */
-            font-size: 0.7rem !important; /* Giảm font như yêu cầu */
-          }
-
-          .player-name-cell {
-            max-width: 80px;
-            font-size: 0.72rem !important;
-          }
-
-          .rank-col {
-            width: 24px !important;
-          }
-
-          .player-avatar-sm {
-            display: none !important; /* Ẩn avatar trên di động để nhường chỗ */
-          }
-
-          .player-info-cell {
-            gap: 4px !important;
-          }
-
-          .show-on-mobile {
-            display: inline-block !important;
-          }
-        }
-
-      `}} />
 
       <div className="leaderboard-header-section">
         <h1 className="leaderboard-title">
@@ -494,9 +237,9 @@ export default function Leaderboard({ data }) {
         </h1>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }} className="match-event-tag">
           <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-            <input 
-              type="checkbox" 
-              checked={showGuests} 
+            <input
+              type="checkbox"
+              checked={showGuests}
               onChange={e => setShowGuests(e.target.checked)}
               style={{ accentColor: "var(--accent-neon-green)", cursor: "pointer" }}
             />
@@ -507,20 +250,20 @@ export default function Leaderboard({ data }) {
       </div>
 
       {/* Nút bật tắt bộ lọc trên di động */}
-      <button 
+      <button
         className="mobile-filter-toggle"
         onClick={() => setShowMobileFilters(!showMobileFilters)}
       >
-        <Filter size={16} /> 
+        <Filter size={16} />
         {showMobileFilters ? "Ẩn công cụ lọc" : "Lọc bảng xếp hạng..."}
       </button>
 
       {/* Thanh Bộ lọc */}
-      <div className="glass-panel filters-panel">
+      <div className={`glass-panel filters-panel ${showMobileFilters ? "mobile-filters-open" : ""}`}>
         {/* Bộ lọc Thể thức */}
         <div className="filter-group">
           <label className="form-label">Thể thức đấu</label>
-          <select className="form-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <select aria-label="Lọc theo thể thức" className="form-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
             <option value="all">Tất cả thể thức</option>
             <option value="singles">Đánh Đơn (1v1)</option>
             <option value="doubles">Đánh Đôi (2v2)</option>
@@ -530,7 +273,7 @@ export default function Leaderboard({ data }) {
         {/* Bộ lọc Giải đấu / Sự kiện */}
         <div className="filter-group">
           <label className="form-label">Sự kiện / Giải đấu</label>
-          <select className="form-select" value={filterEvent} onChange={e => setFilterEvent(e.target.value)}>
+          <select aria-label="Lọc theo sự kiện" className="form-select" value={filterEvent} onChange={e => setFilterEvent(e.target.value)}>
             <option value="all">Tất cả sự kiện</option>
             {events.map(ev => (
               <option key={ev.id} value={ev.id}>{ev.name}</option>
@@ -541,7 +284,7 @@ export default function Leaderboard({ data }) {
         {/* Bộ lọc Mốc thời gian */}
         <div className="filter-group">
           <label className="form-label">Khoảng thời gian</label>
-          <select className="form-select" value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}>
+          <select aria-label="Lọc theo thời gian" className="form-select" value={filterPeriod} onChange={e => setFilterPeriod(e.target.value)}>
             <option value="all">Tất cả thời gian</option>
             <option value="today">Hôm nay</option>
             <option value="week">Tuần này</option>
@@ -556,18 +299,18 @@ export default function Leaderboard({ data }) {
             <>
               <label className="form-label">Chọn ngày bắt đầu & kết thúc</label>
               <div className="custom-range-inputs">
-                <input 
-                  type="date" 
-                  className="form-input" 
-                  value={customStart} 
-                  onChange={e => setCustomStart(e.target.value)} 
+                <input aria-label="Từ ngày"
+                  type="date"
+                  className="form-input"
+                  value={customStart}
+                  onChange={e => setCustomStart(e.target.value)}
                 />
                 <span style={{ color: "var(--text-muted)" }}>-</span>
-                <input 
-                  type="date" 
-                  className="form-input" 
-                  value={customEnd} 
-                  onChange={e => setCustomEnd(e.target.value)} 
+                <input aria-label="Đến ngày"
+                  type="date"
+                  className="form-input"
+                  value={customEnd}
+                  onChange={e => setCustomEnd(e.target.value)}
                 />
               </div>
             </>
@@ -575,9 +318,9 @@ export default function Leaderboard({ data }) {
             <div style={{ opacity: 0.3, pointerEvents: "none" }}>
               <label className="form-label">Chọn ngày (Không kích hoạt)</label>
               <div className="custom-range-inputs">
-                <input type="date" className="form-input" disabled />
+                <input aria-label="Từ ngày" type="date" className="form-input" disabled />
                 <span style={{ color: "var(--text-muted)" }}>-</span>
-                <input type="date" className="form-input" disabled />
+                <input aria-label="Đến ngày" type="date" className="form-input" disabled />
               </div>
             </div>
           )}
@@ -590,7 +333,7 @@ export default function Leaderboard({ data }) {
           <Clock size={12} />
           Đang lọc:{" "}
           <strong>{filterType === "singles" ? "Đánh đơn" : filterType === "doubles" ? "Đánh đôi" : "Đơn & Đôi"}</strong>
-          {filterEvent !== "all" && <> tại giải <strong>"{getEventName(filterEvent)}"</strong></>}
+          {filterEvent !== "all" && <> tại giải <strong>&quot;{getEventName(filterEvent)}&quot;</strong></>}
           {filterPeriod !== "all" && (
             <>
               {" "}trong{" "}
@@ -617,7 +360,7 @@ export default function Leaderboard({ data }) {
                   <span className="show-text-on-mobile">Tên</span>
                 </th>
                 <th style={{ width: "60px" }}>
-                  <div 
+                  <div
                     className={`sort-header ${sortBy === "elo" ? "active" : ""}`}
                     onClick={() => toggleSort("elo")}
                   >
@@ -625,7 +368,7 @@ export default function Leaderboard({ data }) {
                   </div>
                 </th>
                 <th style={{ width: "65px", textAlign: "center" }}>
-                  <div 
+                  <div
                     className={`sort-header ${sortBy === "eloChange" ? "active" : ""}`}
                     onClick={() => toggleSort("eloChange")}
                   >
@@ -634,7 +377,7 @@ export default function Leaderboard({ data }) {
                   </div>
                 </th>
                 <th style={{ width: "55px", textAlign: "center" }}>
-                  <div 
+                  <div
                     className={`sort-header ${sortBy === "matchesPlayed" ? "active" : ""}`}
                     onClick={() => toggleSort("matchesPlayed")}
                   >
@@ -643,7 +386,7 @@ export default function Leaderboard({ data }) {
                   </div>
                 </th>
                 <th style={{ width: "65px", textAlign: "center" }}>
-                  <div 
+                  <div
                     className={`sort-header ${sortBy === "won" ? "active" : ""}`}
                     onClick={() => toggleSort("won")}
                   >
@@ -656,7 +399,7 @@ export default function Leaderboard({ data }) {
                   <span className="show-text-on-mobile">HS</span>
                 </th>
                 <th style={{ width: "70px", textAlign: "center" }}>
-                  <div 
+                  <div
                     className={`sort-header ${sortBy === "winRate" ? "active" : ""}`}
                     onClick={() => toggleSort("winRate")}
                   >
@@ -676,7 +419,7 @@ export default function Leaderboard({ data }) {
               ) : (
                 sortedLeaderboard.map((member, index) => {
                   const rank = index + 1;
-                  
+
                   return (
                     <tr key={member.id}>
                       {/* Cột thứ hạng */}
@@ -695,8 +438,8 @@ export default function Leaderboard({ data }) {
                       {/* Cột người chơi */}
                       <td>
                         <div className="player-info-cell">
-                          <div 
-                            className="player-avatar player-avatar-sm" 
+                          <div
+                            className="player-avatar player-avatar-sm"
                             style={{ backgroundColor: member.avatarColor }}
                           >
                             {member.name.charAt(0)}
@@ -800,3 +543,7 @@ export default function Leaderboard({ data }) {
     </div>
   );
 }
+
+Leaderboard.propTypes = {
+  data: PropTypes.object,
+};
