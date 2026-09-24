@@ -19,6 +19,17 @@ create table if not exists club_private.memberships (
   role text not null check(role in ('admin','viewer')),
   primary key(club_id, user_id)
 );
+-- Refuse to change public access unless the intended owner can administer club 1.
+-- This runs in the same transaction as the policy replacement.
+do $$
+declare owner_id uuid;
+begin
+  select id into owner_id from auth.users where lower(email)='amaquangvp@gmail.com';
+  if owner_id is null then raise exception 'Create the owner account in Supabase Auth first'; end if;
+  if not exists(select 1 from public.pickleball_club where id=1) then raise exception 'Club 1 not found'; end if;
+  insert into club_private.memberships(club_id,user_id,role) values(1,owner_id,'admin')
+    on conflict(club_id,user_id) do update set role='admin';
+end $$;
 create table if not exists club_private.history (
   id bigint generated always as identity primary key,
   club_id bigint not null,

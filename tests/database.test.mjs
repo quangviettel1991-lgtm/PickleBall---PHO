@@ -52,3 +52,20 @@ test('PostgreSQL migration: data preservation, auth, privacy, conflict and idemp
   assert.deepEqual((await pg.query('select data from club_private.history where revision=0')).rows[0].data,original);
   await pg.close();
 });
+
+test('migration rolls back entirely if the intended admin account does not exist',async()=>{
+  const pg=new PGlite();
+  await pg.exec(`create role anon; create role authenticated; create schema auth;
+    create table auth.users(id uuid primary key,email text);
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+    create table public.pickleball_club(id bigint primary key,data jsonb,updated_at timestamptz);`);
+  const original=fixture();
+  await pg.query('insert into public.pickleball_club values(1,$1,now())',[original]);
+  const migration=await fs.readFile('supabase/migrations/202609230001_safe_club.sql','utf8');
+  await assert.rejects(()=>pg.exec(migration));
+  await pg.exec('rollback');
+  assert.deepEqual((await pg.query('select data from public.pickleball_club where id=1')).rows[0].data,original);
+  assert.equal((await pg.query("select count(*) from information_schema.columns where table_schema='public' and table_name='pickleball_club' and column_name='revision'")).rows[0].count,0);
+  assert.equal((await pg.query("select count(*) from pg_namespace where nspname='club_private'")).rows[0].count,0);
+  await pg.close();
+});

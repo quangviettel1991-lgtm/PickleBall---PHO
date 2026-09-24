@@ -6,9 +6,10 @@
 - Đã sao chép mã nguồn/cấu hình trước sửa vào `backups/source-20260923-212653`. Thư mục này có `.env`, được gitignore; không đưa lên Vercel/GitHub hoặc chia sẻ công khai.
 - Đã xác nhận dự án Supabase `wnmatztyaowvudlellha` thuộc tài khoản `quangviettel1991-lgtm` và đang Healthy. Bản sao dòng CLB 1 mới nhất nằm tại `backups/2026-09-23T23-12-56-803Z/remote-row.json`, manifest SHA-256 đã đối chiếu; gồm 22 thành viên, 8 sự kiện, 90 trận, 8 giao dịch. Bản sao này có dữ liệu của một dòng CLB, chưa phải backup toàn bộ database hoặc dữ liệu còn riêng trên thiết bị khác.
 - Dashboard Supabase xác nhận gói Free **không có project backups**. Bảng ứng dụng duy nhất trong schema `public` là `pickleball_club` với các cột `id bigint`, `data jsonb`, `updated_at timestamptz`; không có trigger tùy chỉnh, hàm public hoặc Storage bucket. Chính sách RLS hiện hành `Allow public insert and update` cho phép role `public` thực hiện ALL với `USING true` và `WITH CHECK true`; `Allow public read access` cho SELECT công khai. Đây là lỗ hổng production cần siết bằng migration sau khi sẵn sàng client và tài khoản quản trị.
-- Đã chạy thử migration trên PostgreSQL nhúng bằng đúng JSON của bản sao này. Dòng dữ liệu không đổi và bản trước migration được lưu trong bảng riêng. Chưa áp dụng lên Supabase thật.
+- Đã chạy thử migration trên PostgreSQL nhúng bằng đúng JSON của bản sao này. Dòng dữ liệu không đổi và bản trước migration được lưu trong bảng riêng. Migration nay kiểm tra tài khoản quản trị và cấp quyền trong cùng transaction trước khi thay chính sách; bài kiểm thử bổ sung xác nhận thiếu tài khoản thì toàn bộ migration rollback. Chưa áp dụng lên Supabase thật.
 - Supabase Auth hiện hiển thị chưa có người dùng. Đã chuẩn bị biểu mẫu tạo tài khoản cho `amaquangvp@gmail.com`; chủ tài khoản cần tự nhập mật khẩu riêng. Chưa cấp quyền trên cloud.
 - Vercel đã xác nhận các biến môi trường cần thiết của `pickle-ball-pho` tồn tại ở Production và Preview. Cả dự án này lẫn `pickle-ball-a-son` cùng liên kết repository `quangviettel1991-lgtm/PickleBall---PHO`, nên không push trực tiếp lên `main` trước khi cách ly quy trình triển khai. Bản production của Phở vẫn ở commit `53fbddb`.
+- Đã push commit `5eee6e2` lên nhánh `codex/safe-club-upgrade`; Vercel báo preview của Phở **Ready**, chưa promote. Website A Sơn đang dùng cùng Supabase project nhưng `VITE_CLUB_ID=2`, trong khi bảng hiện chỉ có dòng ID 1. Chủ dự án xác nhận A Sơn hiện không dùng và có thể tạm ngừng; sau migration, client cũ của A Sơn sẽ không ghi được cho đến khi được nâng cấp và cấp quyền thích hợp.
 
 ## Đối chiếu 24 phát hiện
 
@@ -30,7 +31,7 @@
 
 ## Kiểm chứng
 
-Kết quả cuối: `npm run lint` và `npm run build` đạt; `npm test` đạt 31/31; Playwright đạt 15 bài, bỏ qua 1 bản chạy accessibility trùng lặp trên mobile (bản desktop đã đạt); `npm audit --json` báo 0 lỗ hổng trong dependency tại thời điểm kiểm tra.
+Kết quả cuối: `npm run lint` và `npm run build` đạt; `npm test` đạt 32/32; Playwright đạt 15 bài, bỏ qua 1 bản chạy accessibility trùng lặp trên mobile (bản desktop đã đạt); `npm audit --json` báo 0 lỗ hổng trong dependency tại thời điểm kiểm tra.
 
 Các lệnh kiểm chứng nằm trong `package.json`; dùng dữ liệu giả, không gửi thao tác ghi tới database thật. Các test bao gồm giữ Elo khi đổi tên, snapshot/restore, nhập sai không đổi byte đã lưu, lỗi quota, lịch sử thành viên đã xóa, sơ đồ, mất phản hồi, đồng thời, SQL RLS/quyền/riêng tư/revision và trình duyệt desktop/mobile. Kiểm tra accessibility bao gồm 9 màn hình và 4 dialog quản lý, không thấy vi phạm trong tập quy tắc WCAG A/AA tự động đã chạy.
 
