@@ -46,6 +46,10 @@ create table if not exists club_private.operations (
   revision bigint not null,
   primary key(club_id, operation_id)
 );
+alter table club_private.pre_migration_backup enable row level security;
+alter table club_private.memberships enable row level security;
+alter table club_private.history enable row level security;
+alter table club_private.operations enable row level security;
 revoke all on all tables in schema club_private from public, anon, authenticated;
 
 create or replace function public.club_my_role(p_club_id bigint)

@@ -1,6 +1,18 @@
-# Kết quả xử lý — 24/09/2026
+# Kết quả xử lý — 28/09/2026
 
-## Trạng thái dữ liệu và triển khai
+## Cập nhật production ngày 28/09
+
+- Đã push commit `df47ffc` lên nhánh `codex/safe-club-upgrade`. Vercel đã triển khai commit này cho riêng dự án Phở; [pickle-ball-pho.vercel.app](https://pickle-ball-pho.vercel.app/) hoạt động. Deployment production `7XvxeDbWkhbFaMsPA5qBNhcVrwju` ở trạng thái Ready. Nhánh `main` và deployment A Sơn không bị thay đổi.
+- Migration `supabase/migrations/202609230001_safe_club.sql` đã chạy thành công trên Supabase `wnmatztyaowvudlellha`. Truy vấn hậu migration xác nhận CLB 1 vẫn có đúng JSON ban đầu (`data_unchanged=true`, revision 0) và có một bản chụp nguyên dòng trong `club_private.pre_migration_backup`.
+- Bản sao độc lập gần nhất trước migration: `backups/2026-09-28T14-41-00-612Z/remote-row.json`, SHA-256 `b397809bfda9b4b2f85d98232c09c68bdd9802b88f36d65c8ba7650f6865fb6f`. Bản này chứa 22 thành viên tổng cộng, 9 sự kiện, 90 trận, 8 giao dịch. File được gitignore và không được đưa lên GitHub/Vercel. Bản sao trước đó ngày 24/09 có 8 sự kiện.
+- `amaquangvp@gmail.com` có một quyền `admin` cho CLB 1. Cả bốn bảng `club_private` đều bật RLS. Role `anon` không có quyền dùng schema riêng, SELECT/UPDATE trực tiếp bảng CLB hoặc gọi RPC ghi; chỉ gọi được RPC đọc công khai.
+- Preview và production đều tải dữ liệu sau migration. Trang Tổng Quan production hiển thị 10 thành viên đang hoạt động, 90 trận và 9 sự kiện. Số 22 trong backup gồm cả thành viên cũ/đã lưu trữ. Kiểm tra đăng nhập bằng mật khẩu của chủ tài khoản và một thao tác ghi thực tế vẫn cần hoàn tất.
+- Trước deployment, `npm run lint`, `npm test` (32/32), `npm run build` và dry run migration với bản JSON ngày 28/09 đều đạt. Dry run giữ nguyên dữ liệu và chụp bản trước migration.
+- Gói Supabase Free không có full project backup/PITR. `remote-row.json` chỉ sao lưu dòng dữ liệu ứng dụng trên cloud, không bao gồm Auth hoặc dữ liệu chưa đồng bộ trên thiết bị khác. Không xóa localStorage hay file backup.
+
+## Nhật ký kiểm tra và triển khai ngày 24/09 (trạng thái lịch sử)
+
+### Trạng thái dữ liệu và triển khai
 
 - Đã sửa mã nguồn trong workspace, chưa commit/push/deploy và chưa chạy SQL trên Supabase thật.
 - Đã sao chép mã nguồn/cấu hình trước sửa vào `backups/source-20260923-212653`. Thư mục này có `.env`, được gitignore; không đưa lên Vercel/GitHub hoặc chia sẻ công khai.
@@ -11,7 +23,7 @@
 - Vercel đã xác nhận các biến môi trường cần thiết của `pickle-ball-pho` tồn tại ở Production và Preview. Cả dự án này lẫn `pickle-ball-a-son` cùng liên kết repository `quangviettel1991-lgtm/PickleBall---PHO`, nên không push trực tiếp lên `main` trước khi cách ly quy trình triển khai. Bản production của Phở vẫn ở commit `53fbddb`.
 - Đã push commit `5eee6e2` lên nhánh `codex/safe-club-upgrade`; Vercel báo preview của Phở **Ready**, chưa promote. Website A Sơn đang dùng cùng Supabase project nhưng `VITE_CLUB_ID=2`, trong khi bảng hiện chỉ có dòng ID 1. Chủ dự án xác nhận A Sơn hiện không dùng và có thể tạm ngừng; sau migration, client cũ của A Sơn sẽ không ghi được cho đến khi được nâng cấp và cấp quyền thích hợp.
 
-## Đối chiếu 24 phát hiện
+### Đối chiếu 24 phát hiện
 
 | Mục báo cáo | Thay đổi đã có trong mã nguồn |
 |---|---|
@@ -25,11 +37,11 @@
 | 23: thời gian | Ngày mặc định theo địa phương; timestamp trận mới có timezone. Không tự viết lại ngày lịch sử. |
 | 24: khóa sự kiện | Kiểm tra ở lớp dữ liệu và SQL; mở khóa riêng trước khi đổi kết quả; lựa chọn sự kiện lấy bản mới nhất. |
 
-## Giao diện và vận hành
+### Giao diện và vận hành
 
 Đã thêm lazy loading theo màn hình, tách CSS, phân trang danh sách chính, Error Boundary, điều hướng hash/Back/reload, cảnh báo dữ liệu chưa lưu, dialog có focus/ESC, nhãn điều khiển, reduced motion, sửa tương phản, favicon/ảnh chia sẻ và security headers/CSP trong cấu hình Vercel. README có môi trường, thứ tự backup/migration/deploy, xử lý xung đột và rollback.
 
-## Kiểm chứng
+### Kiểm chứng
 
 Kết quả cuối: `npm run lint` và `npm run build` đạt; `npm test` đạt 32/32; Playwright đạt 15 bài, bỏ qua 1 bản chạy accessibility trùng lặp trên mobile (bản desktop đã đạt); `npm audit --json` báo 0 lỗ hổng trong dependency tại thời điểm kiểm tra.
 
@@ -37,6 +49,6 @@ Các lệnh kiểm chứng nằm trong `package.json`; dùng dữ liệu giả, 
 
 Bundle đầu vào sau tách màn hình khoảng 394 kB (gzip 115 kB), so với 673 kB (gzip 169 kB) trước sửa. Đây là kích thước build, không phải kết quả Core Web Vitals. Kiểm tra accessibility tự động có phạm vi màn hình và dialog đã mở trong test, không chứng nhận toàn bộ WCAG.
 
-## Chưa thể xác nhận
+### Chưa thể xác nhận
 
 Đã sao lưu dòng CLB thật và thử migration trên bản sao, nhưng gói Free không cung cấp full project backup/PITR, và chưa khôi phục trên Supabase staging. Dữ liệu chưa đồng bộ chỉ có trên thiết bị khác không nằm trong bản sao cloud. Chưa đo Lighthouse/Core Web Vitals production, chưa thử trên thiết bị iOS/Safari thật. JSON toàn CLB vẫn là một bản ghi có revision; phù hợp phạm vi hiện tại nhưng cần tách bảng khi dữ liệu lớn. Chưa thể coi lỗi production đã được khắc phục trước khi migration, cấp quyền và triển khai client mới thành công.
