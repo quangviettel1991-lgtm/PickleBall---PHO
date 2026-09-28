@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import Navbar from './components/Navbar';
 import AuthDialog from './components/AuthDialog';
+import PasswordResetPage from './components/PasswordResetPage';
 import { useClub } from './hooks/useClub';
 import { CLUB_NAME } from './utils/config';
 import { readState } from './utils/storage';
@@ -17,6 +18,10 @@ const screens = {
 };
 const tabFromHash = () => Object.hasOwn(screens, location.hash.slice(1)) ? location.hash.slice(1) : 'dashboard';
 export default function App() {
+  if (new URLSearchParams(window.location.search).get('auth') === 'reset') return <PasswordResetPage />;
+  return <ClubApp />;
+}
+function ClubApp() {
   const club = useClub();
   const [activeTab, setActiveTab] = useState(tabFromHash);
   const [recorderSubTab, setRecorderSubTab] = useState('record');

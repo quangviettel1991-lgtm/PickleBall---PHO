@@ -23,3 +23,20 @@ test('public visitors neither load private local data nor call private RPCs',asy
   await expect(page.getByLabel('Email')).toBeVisible();await expect(page.getByLabel('Mật khẩu')).toBeVisible();
   await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).toHaveCount(0);
 });
+
+test('password setup requests a recovery link back to the Phở website',async({page})=>{
+  let recoveryUrl;
+  await page.route(/^https:/,route=>{
+    const url=route.request().url();
+    if(url.includes('/auth/v1/recover')) { recoveryUrl=url; return route.fulfill({json:{}}); }
+    if(url.endsWith('/rest/v1/rpc/club_public_read')) return route.fulfill({json:{revision:0,data:fixture()}});
+    return route.abort();
+  });
+  await page.goto('/#finance');
+  await page.getByRole('button',{name:'Đăng nhập quản trị',exact:true}).click();
+  await page.getByRole('button',{name:'Chưa có hoặc quên mật khẩu?'}).click();
+  await page.getByLabel('Email').fill('amaquangvp@gmail.com');
+  await page.getByRole('button',{name:'Gửi liên kết đặt mật khẩu'}).click();
+  await expect(page.getByText('Nếu email này có tài khoản')).toBeVisible();
+  expect(new URL(recoveryUrl).searchParams.get('redirect_to')).toBe('http://127.0.0.1:4176/?auth=reset');
+});

@@ -362,6 +362,7 @@ body {
 .operation-error { margin: 12px auto; padding: 16px; max-width: 1100px; color: #ffc8ce; background: #321b23; border: 1px solid #99475a; border-radius: 8px; }
 .recovery-panel { padding: 48px 24px; margin: auto; max-width: 800px; line-height: 1.7; }
 .recovery-panel button { margin: 12px 12px 0 0; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .skip-link { position: fixed; top: -100px; left: 12px; z-index: 1000; padding: 12px; background: #d4fc34; color: #08090d; }
 .skip-link:focus { top: 12px; }
 :where(button,a,input,select,textarea,[tabindex]):focus-visible { outline: 3px solid #00ecff; outline-offset: 3px; }
