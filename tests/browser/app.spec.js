@@ -62,7 +62,29 @@ test('second tab is read-only and cannot overwrite first tab changes',async({pag
   await second.getByRole('dialog').locator('button[type="submit"]').click();
   await expect(second.getByRole('dialog').getByRole('alert')).toContainText('tab khác');
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pickleball_state_v2_1')).data.members[0].name)).toBe('Player a');
+  await page.close();
+  await expect(second.getByText('Chế độ thử trên máy — không kết nối dữ liệu CLB.')).toBeVisible({timeout:10000});
+  await second.getByRole('dialog').locator('button[type="submit"]').click();
+  await expect(second.getByRole('dialog')).toHaveCount(0);
+  expect(await second.evaluate(()=>JSON.parse(localStorage.getItem('pickleball_state_v2_1')).data.members[0].name)).toBe('Must not save');
   await second.close();
+});
+
+test('a single tab can acquire the writer lock after a slow browser response',async({page})=>{
+  await page.addInitScript(()=>{
+    const request=navigator.locks.request.bind(navigator.locks);
+    navigator.locks.request=(...args)=>new Promise((resolve,reject)=>{
+      setTimeout(()=>request(...args).then(resolve,reject),800);
+    });
+  });
+  await page.goto('/#members');
+  await expect(page.getByText('Chế độ thử trên máy — không kết nối dữ liệu CLB.')).toBeVisible();
+  await page.getByRole('button',{name:'Sửa thành viên',exact:true}).first().click();
+  const modal=page.getByRole('dialog');
+  await modal.locator('input[type="text"]').first().fill('Slow lock acquired');
+  await modal.locator('button[type="submit"]').click();
+  await expect(modal).toHaveCount(0);
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pickleball_state_v2_1')).data.members[0].name)).toBe('Slow lock acquired');
 });
 
 test('screens and management dialogs expose accessible names and contrast',async({page},info)=>{

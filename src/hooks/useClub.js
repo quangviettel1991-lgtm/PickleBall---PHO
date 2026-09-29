@@ -26,23 +26,60 @@ export function useClub() {
     return () => { alive = false; subscription.subscription.unsubscribe(); };
   }, []);
   useEffect(() => {
-    let alive = true, timeout, channel, releaseLease, leaseAbort, adminSession = false;
+    let alive = true, timeout, channel, releaseLease, adminSession = false, claimingLease = false, localLoaded = false, localWritable = false;
     const claimLease = () => new Promise(resolve => {
       if (!navigator.locks) { resolve(false); return; }
-      leaseAbort = new AbortController();
-      const deadline = setTimeout(() => leaseAbort.abort(), 500);
-      navigator.locks.request(`pickleball-writer-${CLUB_ID}`, { signal: leaseAbort.signal }, async lock => {
-        clearTimeout(deadline);
+      navigator.locks.request(`pickleball-writer-${CLUB_ID}`, { ifAvailable: true }, async lock => {
         if (!lock || !alive) { resolve(false); return; }
         await new Promise(release => { releaseLease = release; resolve(true); });
-      }).catch(() => { clearTimeout(deadline); resolve(false); });
+      }).catch(() => resolve(false));
     });
     const loadLocal = () => { try { setData(readState().data); } catch (e) { setError(`Không đọc được dữ liệu trên máy: ${e.message} Bản gốc chưa bị thay thế.`); } };
     let failures = 0;
+    const clearResolvedError = previous => previous.startsWith('Cần kết nối và đối chiếu dữ liệu máy chủ trước khi chỉnh sửa.') || previous.startsWith('Một tab khác đang quản lý CLB.') ? '' : previous;
+    const startLocal = async () => {
+      if (!alive || claimingLease || localWritable) return;
+      claimingLease = true;
+      const writable = await claimLease();
+      claimingLease = false;
+      if (!alive) return;
+      setAccess({ role: 'admin', local: true, userId: 'local', writable });
+      if (!localLoaded) { loadLocal(); localLoaded = true; }
+      localWritable = writable;
+      if (writable) setError(clearResolvedError);
+      setStatus({ kind: 'local', message: writable ? 'Chế độ thử trên máy — không kết nối dữ liệu CLB.' : 'Tab chỉ đọc: đóng tab quản lý khác rồi tải lại để chỉnh sửa.' });
+    };
+    const startAdminSync = async () => {
+      if (!alive || claimingLease || engine.current) return;
+      claimingLease = true;
+      const writable = await claimLease();
+      claimingLease = false;
+      if (!alive) return;
+      setAccess({ role: 'admin', userId: session.user.id, writable });
+      setRole('admin');
+      if (!localLoaded) { loadLocal(); localLoaded = true; }
+      if (!writable) {
+        setStatus({ kind: 'readonly', message: 'Tab chỉ đọc: đang chờ quyền chỉnh sửa từ tab quản lý khác.' });
+        return;
+      }
+      setError(clearResolvedError);
+      engine.current = createSyncEngine({ read: () => remoteRead(false), write: remoteWrite, canWrite: () => alive,
+        canApplyRemote: () => !document.querySelector('main form'),
+        status: next => {
+          if (alive) {
+            setStatus(next);
+            if (next.kind === 'saved') setError(clearResolvedError);
+            failures = next.kind === 'error' ? failures + 1 : 0;
+          }
+        } });
+      if (supabase) channel = supabase.channel(`club-${CLUB_ID}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pickleball_club', filter: `id=eq.${CLUB_ID}` }, schedule).subscribe();
+    };
     const tick = async () => {
       clearTimeout(timeout);
       if (!alive) return;
       if (!document.hidden && navigator.onLine !== false) {
+        if (LOCAL_MODE && !localWritable) await startLocal();
+        if (adminSession && !engine.current) await startAdminSync();
         if (engine.current) await engine.current.sync();
         else if (!LOCAL_MODE && !adminSession) {
           try {
@@ -51,7 +88,7 @@ export function useClub() {
           } catch (e) { if (alive) { failures++; setStatus({ kind: 'error', message: e.message }); } }
         }
       }
-      if (alive && !LOCAL_MODE) timeout = setTimeout(tick, Math.min(300000, 60000 * 2 ** failures));
+      if (alive && (LOCAL_MODE ? !localWritable : true)) timeout = setTimeout(tick, LOCAL_MODE || adminSession && !engine.current ? 2500 : Math.min(300000, 60000 * 2 ** failures));
     };
     const schedule = () => { clearTimeout(timeout); timeout = setTimeout(tick, 400); };
     const changed = () => { if (adminSession || LOCAL_MODE) loadLocal(); schedule(); };
@@ -60,32 +97,17 @@ export function useClub() {
     setRole(LOCAL_MODE ? 'admin' : null); setData(emptyClub());
     async function start() {
       if (LOCAL_MODE) {
-        const writable = await claimLease(); if (!alive) return;
-        setAccess({ role: 'admin', local: true, userId: 'local', writable });
-        loadLocal(); setStatus({ kind: 'local', message: writable ? 'Chế độ thử trên máy — không kết nối dữ liệu CLB.' : 'Tab chỉ đọc: đóng tab quản lý khác rồi tải lại để chỉnh sửa.' }); return;
+        await startLocal(); if (alive && !localWritable) timeout = setTimeout(tick, 2500); return;
       }
       if (session) {
         try {
           const nextRole = await getRole();
           if (!alive) return;
-          setRole(nextRole); setAccess({ role: nextRole, userId: session.user.id, writable: false });
+          setAccess({ role: nextRole, userId: session.user.id, writable: false });
           if (nextRole === 'admin') {
             adminSession = true;
-            const writable = await claimLease(); if (!alive) return;
-            setAccess({ role: nextRole, userId: session.user.id, writable });
-            loadLocal();
-            if (!writable) { setStatus({ kind: 'readonly', message: 'Tab chỉ đọc: đóng tab quản lý khác rồi tải lại để chỉnh sửa.' }); return; }
-            engine.current = createSyncEngine({ read: () => remoteRead(false), write: remoteWrite, canWrite: () => alive,
-              canApplyRemote: () => !document.querySelector('main form'),
-              status: next => {
-                if (alive) {
-                  setStatus(next);
-                  if (next.kind === 'saved') setError(previous => previous.startsWith('Cần kết nối và đối chiếu dữ liệu máy chủ trước khi chỉnh sửa.') ? '' : previous);
-                  failures = next.kind === 'error' ? failures + 1 : 0;
-                }
-              } });
-            if (supabase) channel = supabase.channel(`club-${CLUB_ID}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pickleball_club', filter: `id=eq.${CLUB_ID}` }, schedule).subscribe();
-          }
+            await startAdminSync(); if (!alive) return;
+          } else setRole(nextRole);
         } catch (e) { if (alive) setError(e.message); }
       }
       if (alive) tick();
@@ -98,7 +120,6 @@ export function useClub() {
     return () => {
       alive = false; clearTimeout(timeout); engine.current?.stop(); engine.current = null;
       releaseLease?.();
-      leaseAbort?.abort();
       setAccess({});
       window.removeEventListener('club-data-change', changed); window.removeEventListener('storage', storageChanged);
       window.removeEventListener('online', schedule); document.removeEventListener('visibilitychange', schedule);
