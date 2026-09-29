@@ -46,13 +46,13 @@ function ClubApp() {
   return <div className="app-layout">
     <a className="skip-link" href="#main-content" onClick={event=>{ event.preventDefault(); main.current?.focus(); }}>Đến nội dung chính</a>
     <Navbar activeTab={activeTab} setActiveTab={navigate} isAdmin={club.isAdmin} setIsAdmin={value=>value ? setIsAuthModalOpen(true) : club.logout()} isModalOpen={false} setIsModalOpen={setIsAuthModalOpen} />
-    <div className={`sync-status sync-${club.status.kind}`} role="status" aria-live="polite">
+    {club.status.kind !== 'saved' && <div className={`sync-status sync-${club.status.kind}`} role="status" aria-live="polite">
       <span>{club.status.message}</span>
       {club.status.kind === 'error' && <button onClick={club.exportRecovery}>Tải bản cứu hộ trên thiết bị này</button>}
       {club.isAdmin && <><button onClick={club.exportLocal}>Tải bản sao lưu</button><button onClick={club.retry}>Kiểm tra đồng bộ</button></>}
       {club.isAdmin && club.status.kind === 'conflict' && <><button onClick={club.exportRemote}>Tải bản máy chủ</button><button onClick={club.useRemote}>Chọn bản máy chủ</button></>}
       {club.session && !club.isAdmin && <button onClick={club.logout}>Đăng xuất tài khoản</button>}
-    </div>
+    </div>}
     {club.error && <div className="operation-error" role="alert">{club.error}<button onClick={club.clearError}>Đóng thông báo</button></div>}
     <main id="main-content" ref={main} tabIndex={-1} className="app-main-content"
       onChangeCapture={e=>{ if (e.target.closest('form')) dirty.current = true; }}
