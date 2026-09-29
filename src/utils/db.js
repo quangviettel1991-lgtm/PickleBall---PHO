@@ -1,7 +1,7 @@
 import { initialMembers, initialEvents, initialMatches, initialTransactions } from './mockData.js';
 import { calculateSinglesElo, calculateDoublesElo } from './elo.js';
 import { keys, LOCAL_MODE } from './config.js';
-import { getAccess, requireWrite } from './access.js';
+import { getAccess, requireWrite, requireOwner } from './access.js';
 import { readState, commitState, readSnapshots, snapshot, newId } from './storage.js';
 import { clone, emptyClub, normalizeClub, integer, requiredText, validateMatch, isPlayed, stableJson } from './schema.js';
 import { localDate, toInstant } from './dates.js';
@@ -31,19 +31,20 @@ function change(action, mutate) {
 }
 export function saveClubData(data) { return replaceClubData(data, 'before_import'); }
 export function replaceClubData(input, action = 'before_restore') {
-  requireWrite();
+  requireOwner();
   const clean = normalizeClub(input, { strict: true });
   const state = readState();
   return persist(state, clean, action);
 }
 export const getSnapshots = readSnapshots;
-export function createManualSnapshot(data, label = 'manual') { requireWrite(); return snapshot(data, label); }
+export function createManualSnapshot(data, label = 'manual') { requireOwner(); return snapshot(data, label); }
 export function restoreSnapshot(id) {
+  requireOwner();
   const found = readSnapshots().find(s => s.id === id || s.timestamp === id);
   if (!found) throw new Error('Không tìm thấy bản sao lưu.');
   return replaceClubData(found.data, 'before_restore');
 }
-export function clearSnapshots() { requireWrite(); localStorage.setItem(keys.snapshots, '[]'); }
+export function clearSnapshots() { requireOwner(); localStorage.setItem(keys.snapshots, '[]'); }
 export function resetToDemoData() {
   const data = normalizeClub({ members: initialMembers, events: initialEvents, matches: initialMatches, transactions: initialTransactions });
   recalculateAllElos(data);
@@ -218,10 +219,11 @@ function transaction(input) {
   if (!['income','expense'].includes(input.type)) throw new Error('Chọn thu hoặc chi.');
   return { type: input.type, amount: integer(input.amount, 'Số tiền', 1), category: requiredText(input.category || 'Khác','Danh mục'), description: input.description || '', date: input.date || localDate(), performedBy: input.performedBy || '' };
 }
-export function addTransaction(input) { return change('before_add_transaction', data => data.transactions.push({ ...transaction(input), id: newId('tx') })); }
+export function addTransaction(input) { requireOwner(); return change('before_add_transaction', data => data.transactions.push({ ...transaction(input), id: newId('tx') })); }
 export function updateTransaction(input) {
+  requireOwner();
   return change('before_update_transaction', data => {
     const t = data.transactions.find(t=>t.id===input.id); if (!t) throw new Error('Giao dịch không còn tồn tại.'); Object.assign(t, transaction(input));
   });
 }
-export function deleteTransaction(id) { return change('before_delete_transaction', data => { data.transactions = data.transactions.filter(t=>t.id!==id); }); }
+export function deleteTransaction(id) { requireOwner(); return change('before_delete_transaction', data => { data.transactions = data.transactions.filter(t=>t.id!==id); }); }

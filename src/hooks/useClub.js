@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { CLUB_ID, LOCAL_MODE, keys } from '../utils/config.js';
+import { CLUB_ID, LOCAL_MODE } from '../utils/config.js';
 import { supabase, remoteRead, remoteWrite, getRole } from '../utils/supabase.js';
 import { setAccess } from '../utils/access.js';
 import { emptyClub, normalizeClub } from '../utils/schema.js';
-import { readState, downloadJson, exportBackup, recoveryBundle } from '../utils/storage.js';
+import { activeKeys, readState, downloadJson, exportBackup, recoveryBundle } from '../utils/storage.js';
 import { createSyncEngine } from '../utils/sync.js';
 
 export function useClub() {
   const [data, setData] = useState(emptyClub);
   const [session, setSession] = useState(null);
-  const [role, setRole] = useState(LOCAL_MODE ? 'admin' : null);
+  const [role, setRole] = useState(null);
   const [status, setStatus] = useState({ kind: 'loading', message: 'Đang tải dữ liệu…' });
   const [error, setError] = useState('');
   const engine = useRef(null);
@@ -26,7 +26,7 @@ export function useClub() {
     return () => { alive = false; subscription.subscription.unsubscribe(); };
   }, []);
   useEffect(() => {
-    let alive = true, timeout, channel, releaseLease, adminSession = false, claimingLease = false, localLoaded = false, localWritable = false;
+    let alive = true, timeout, channel, releaseLease, editorRole = null, claimingLease = false, localLoaded = false, localWritable = false;
     const claimLease = () => new Promise(resolve => {
       if (!navigator.locks) { resolve(false); return; }
       navigator.locks.request(`pickleball-writer-${CLUB_ID}`, { ifAvailable: true }, async lock => {
@@ -46,22 +46,23 @@ export function useClub() {
       setAccess({ role: 'admin', local: true, userId: 'local', writable });
       if (!localLoaded) { loadLocal(); localLoaded = true; }
       localWritable = writable;
+      if (writable) setRole('admin');
       if (writable) setError(clearResolvedError);
       setStatus({ kind: 'local', message: writable ? 'Chế độ thử trên máy — không kết nối dữ liệu CLB.' : 'Tab chỉ đọc: đóng tab quản lý khác rồi tải lại để chỉnh sửa.' });
     };
-    const startAdminSync = async () => {
+    const startEditorSync = async () => {
       if (!alive || claimingLease || engine.current) return;
       claimingLease = true;
       const writable = await claimLease();
       claimingLease = false;
       if (!alive) return;
-      setAccess({ role: 'admin', userId: session.user.id, writable });
-      setRole('admin');
+      setAccess({ role: editorRole, userId: session.user.id, writable });
       if (!localLoaded) { loadLocal(); localLoaded = true; }
       if (!writable) {
         setStatus({ kind: 'readonly', message: 'Tab chỉ đọc: đang chờ quyền chỉnh sửa từ tab quản lý khác.' });
         return;
       }
+      setRole(editorRole);
       setError(clearResolvedError);
       engine.current = createSyncEngine({ read: () => remoteRead(false), write: remoteWrite, canWrite: () => alive,
         canApplyRemote: () => !document.querySelector('main form'),
@@ -79,22 +80,22 @@ export function useClub() {
       if (!alive) return;
       if (!document.hidden && navigator.onLine !== false) {
         if (LOCAL_MODE && !localWritable) await startLocal();
-        if (adminSession && !engine.current) await startAdminSync();
+        if (editorRole && !engine.current) await startEditorSync();
         if (engine.current) await engine.current.sync();
-        else if (!LOCAL_MODE && !adminSession) {
+        else if (!LOCAL_MODE && !editorRole) {
           try {
             const remote = await remoteRead(true);
             if (alive) { setData(remote.kind === 'found' ? normalizeClub(remote.data) : emptyClub()); setStatus({ kind: 'public', message: 'Chế độ xem công khai.' }); failures = 0; }
           } catch (e) { if (alive) { failures++; setStatus({ kind: 'error', message: e.message }); } }
         }
       }
-      if (alive && (LOCAL_MODE ? !localWritable : true)) timeout = setTimeout(tick, LOCAL_MODE || adminSession && !engine.current ? 2500 : Math.min(300000, 60000 * 2 ** failures));
+      if (alive && (LOCAL_MODE ? !localWritable : true)) timeout = setTimeout(tick, LOCAL_MODE || editorRole && !engine.current ? 2500 : Math.min(300000, 60000 * 2 ** failures));
     };
     const schedule = () => { clearTimeout(timeout); timeout = setTimeout(tick, 400); };
-    const changed = () => { if (adminSession || LOCAL_MODE) loadLocal(); schedule(); };
-    const storageChanged = e => { if (e.key === keys.state) changed(); };
+    const changed = () => { if (editorRole || LOCAL_MODE) loadLocal(); schedule(); };
+    const storageChanged = e => { if (e.key === activeKeys().state) changed(); };
     setAccess(LOCAL_MODE ? { role: 'admin', local: true, userId: 'local', writable: false } : {});
-    setRole(LOCAL_MODE ? 'admin' : null); setData(emptyClub());
+    setRole(null); setData(emptyClub());
     async function start() {
       if (LOCAL_MODE) {
         await startLocal(); if (alive && !localWritable) timeout = setTimeout(tick, 2500); return;
@@ -104,9 +105,9 @@ export function useClub() {
           const nextRole = await getRole();
           if (!alive) return;
           setAccess({ role: nextRole, userId: session.user.id, writable: false });
-          if (nextRole === 'admin') {
-            adminSession = true;
-            await startAdminSync(); if (!alive) return;
+          if (nextRole === 'admin' || nextRole === 'manager') {
+            editorRole = nextRole;
+            await startEditorSync(); if (!alive) return;
           } else setRole(nextRole);
         } catch (e) { if (alive) setError(e.message); }
       }
@@ -131,7 +132,7 @@ export function useClub() {
     window.addEventListener('error', onError);
     return () => window.removeEventListener('error', onError);
   }, []);
-  return { data, setData, isAdmin: role === 'admin', session, status, error, clearError: () => setError(''),
+  return { data, setData, isAdmin: role === 'admin' || role === 'manager', isOwner: role === 'admin', session, status, error, clearError: () => setError(''),
     retry: () => engine.current?.sync(),
     exportLocal: () => downloadJson(exportBackup(readState().data, CLUB_ID), 'pickleball-local-backup.json'),
     exportRecovery: () => downloadJson(recoveryBundle(), 'pickleball-device-recovery.json'),

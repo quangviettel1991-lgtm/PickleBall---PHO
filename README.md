@@ -42,6 +42,12 @@ Playwright chạy hai máy chủ thử localhost với dữ liệu giả và ch�
 - Nếu giao diện lỗi, dùng nút tải bản cứu hộ. File `pickleball-raw-recovery` giữ nguyên chuỗi localStorage, cần đối chiếu kỹ thuật; không phải file nhập trực tiếp. Không xóa cache để chữa lỗi trước khi tải bản cứu hộ.
 - Nếu cần rollback, giữ chế độ bảo trì; export cả trạng thái hiện tại và history trước khi phục hồi. Ưu tiên sửa tiến bản mới. Chạy frontend cũ với policy mới sẽ không ghi được; **không khôi phục quyền ghi công khai** để làm frontend cũ hoạt động. Phục hồi dữ liệu từ bản đã xác minh trên staging rồi thực hiện có đối chiếu, không chạy DROP/TRUNCATE/reset trên production.
 
+## Tài khoản quản lý phụ
+
+Migration `supabase/migrations/202609290001_manager_role.sql` thêm vai trò `manager`, chụp bản dữ liệu hiện tại vào `club_private.pre_migration_backup` và không sửa JSON CLB. Vai trò này được đọc dữ liệu CLB không có `transactions`; khi lưu thay đổi thành viên, trận hoặc sự kiện, máy chủ ghép lại nguyên giao dịch hiện có. Xung đột phiên bản cũng chỉ trả về bản đã loại giao dịch. Trang Thu Chi và CSDL bị ẩn/chặn; bản lưu trên trình duyệt của tài khoản phụ dùng khóa riêng theo user ID.
+
+Đăng nhập tài khoản phụ bằng tên `quanly`. Ứng dụng ánh xạ tên này tới tài khoản Auth kỹ thuật `amaquangvp+phoquanly@gmail.com`, nhận thư ở hộp thư Gmail của quản trị viên chủ. Tạo tài khoản Auth riêng với mật khẩu mạnh tối thiểu 8 ký tự và xác nhận email trước khi chạy `supabase/grant-manager.sql`. Không dùng mã PIN bốn số, không hạ chính sách mật khẩu của dự án và không lưu mật khẩu trong repo. Quản trị viên chủ có thể dùng chức năng đặt lại mật khẩu trên website với tên `quanly`; liên kết sẽ gửi tới hộp thư chủ. Không cấp vai trò `admin` cho tài khoản này.
+
 ## Phạm vi bảo đảm
 
 Kiểm thử tự động dùng dữ liệu giả, PostgreSQL nhúng PGlite và Chromium desktop/mobile. Không thay thế kiểm chứng Auth, realtime, trigger, backup, hiệu năng và trình duyệt thật của môi trường production. Sổ quỹ hiện có kiểm tra số tiền và lịch sử phiên bản; chưa phải hệ thống kế toán có khóa kỳ/chứng từ/đối soát. Elo cũ đã sai do thao tác trước đây không được tự sửa bằng suy đoán; cần đối chiếu bản sao lịch sử.

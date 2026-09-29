@@ -5,7 +5,7 @@ import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unloc
 
 const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "PICKLEBALL PHỞ";
 
-export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, setIsModalOpen }) {
+export default function Navbar({ activeTab, setActiveTab, isAdmin, isOwner, setIsAdmin, setIsModalOpen }) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const handleLogout = () => {
@@ -24,7 +24,7 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, setIsAdmin, s
     { id: "members", label: "Thành Viên", icon: Users },
     { id: "finance", label: "Thu Chi", icon: CreditCard },
     { id: "backup", label: "CSDL", icon: Database },
-  ];
+  ].filter(item => isOwner || !isAdmin || !['finance','backup'].includes(item.id));
 
   const isMoreActive = ["members", "finance", "backup"].includes(activeTab);
 
@@ -127,6 +127,7 @@ Navbar.propTypes = {
   activeTab: PropTypes.string,
   setActiveTab: PropTypes.func,
   isAdmin: PropTypes.bool,
+  isOwner: PropTypes.bool,
   setIsAdmin: PropTypes.func,
   setIsModalOpen: PropTypes.func,
 };

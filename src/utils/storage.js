@@ -1,11 +1,20 @@
 import { keys } from './config.js';
+import { getAccess } from './access.js';
 import { clone, emptyClub, normalizeClub } from './schema.js';
 export const newId = prefix => `${prefix}_${Date.now()}_${crypto.randomUUID()}`;
 export function announce() { if (typeof window !== 'undefined') window.dispatchEvent(new Event('club-data-change')); }
+export function activeKeys() {
+  const { role, userId } = getAccess();
+  if (role !== 'manager' || !userId) return keys;
+  const suffix = `_manager_${userId}`;
+  return { ...keys, state: keys.state + suffix, snapshots: keys.snapshots + suffix,
+    recovery: keys.recovery + suffix, legacy: null, legacySnapshots: null };
+}
 export function readState() {
-  const raw = localStorage.getItem(keys.state);
-  if (raw) { const state = JSON.parse(raw); state.data = normalizeClub(state.data); return state; }
-  const legacy = localStorage.getItem(keys.legacy);
+  const storage = activeKeys();
+  const raw = localStorage.getItem(storage.state);
+  if (raw) { const state = JSON.parse(raw); state.data = normalizeClub(state.data); if (getAccess().role === 'manager') state.data.transactions = []; return state; }
+  const legacy = storage.legacy ? localStorage.getItem(storage.legacy) : null;
   const data = legacy ? normalizeClub(JSON.parse(legacy)) : emptyClub();
   if (legacy) {
     for (let i = 0; i < localStorage.length; i++) {
@@ -25,11 +34,12 @@ export function snapshot(data, label = 'before_change') {
   const snapshots = readSnapshots();
   const timestamp = new Date().toISOString();
   const entry = { id: newId('snapshot'), timestamp, label, data: clone(data), membersCount: data.members.length, eventsCount: data.events.length, matchesCount: data.matches.length };
-  localStorage.setItem(keys.snapshots, JSON.stringify([entry, ...snapshots].slice(0, 30)));
+  localStorage.setItem(activeKeys().snapshots, JSON.stringify([entry, ...snapshots].slice(0, 30)));
   return entry;
 }
 export function readSnapshots() {
-  const raw = localStorage.getItem(keys.snapshots) || localStorage.getItem(keys.legacySnapshots);
+  const storage = activeKeys();
+  const raw = localStorage.getItem(storage.snapshots) || (storage.legacySnapshots && localStorage.getItem(storage.legacySnapshots));
   if (!raw) return [];
   const result = JSON.parse(raw);
   if (!Array.isArray(result)) throw new Error('Lịch sử sao lưu không đọc được. Dữ liệu gốc vẫn được giữ nguyên.');
@@ -39,9 +49,10 @@ export function commitState(next, expectedGeneration, { label = 'before_change',
   const previous = readState();
   if (previous.generation !== expectedGeneration) throw new Error('Dữ liệu đã đổi ở tab khác. Vui lòng tải lại trước khi lưu.');
   if (backup) snapshot(previous.data, label);
-  if (!localStorage.getItem(keys.recovery)) localStorage.setItem(keys.recovery, JSON.stringify({ createdAt: new Date().toISOString(), legacy: localStorage.getItem(keys.legacy), state: previous }));
+  const storage = activeKeys();
+  if (!localStorage.getItem(storage.recovery)) localStorage.setItem(storage.recovery, JSON.stringify({ createdAt: new Date().toISOString(), legacy: storage.legacy ? localStorage.getItem(storage.legacy) : null, state: previous }));
   const state = { ...next, generation: newId('generation') };
-  localStorage.setItem(keys.state, JSON.stringify(state)); announce(); return state;
+  localStorage.setItem(storage.state, JSON.stringify(state)); announce(); return state;
 }
 export function exportBackup(data, clubId) {
   return { format: 'pickleball-backup', version: 2, clubId, exportedAt: new Date().toISOString(), data: clone(data) };
@@ -52,10 +63,11 @@ export function downloadJson(value, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function recoveryBundle() {
+  const storage = activeKeys();
   const raw = {};
   for (let i=0; i<localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (Object.values(keys).includes(key) || key?.startsWith('draw_')) raw[key] = localStorage.getItem(key);
+    if (Object.values(storage).includes(key) || (getAccess().role !== 'manager' && key?.startsWith('draw_'))) raw[key] = localStorage.getItem(key);
   }
   return { format: 'pickleball-raw-recovery', createdAt: new Date().toISOString(), raw };
 }

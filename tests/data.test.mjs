@@ -4,7 +4,7 @@ import { fixture, setup, matchInput } from './fixtures.mjs';
 import { keys } from '../src/utils/config.js';
 import { setAccess } from '../src/utils/access.js';
 import * as db from '../src/utils/db.js';
-import { readState, commitState, exportBackup } from '../src/utils/storage.js';
+import { activeKeys, readState, commitState, exportBackup } from '../src/utils/storage.js';
 import { parseBackup, isPlayed, scoreFromSets } from '../src/utils/schema.js';
 import { drawMatchId } from '../src/utils/draws.js';
 import { localDate, toInstant } from '../src/utils/dates.js';
@@ -29,6 +29,20 @@ test('soft deletion preserves historical Elo on subsequent replay',()=>{
 });
 test('dashboard initial doubles rating is respected',()=>{
   setup();const data=db.addMember({name:'New',eloDoubles:'1600'});assert.equal(data.members.at(-1).eloDoubles,1600);
+});
+test('manager edits use an isolated cache and cannot use finance or database tools',()=>{
+  const owner=fixture();owner.transactions=[{id:'private',type:'income',amount:500}];setup(owner);
+  const ownerCache=localStorage.getItem(keys.state);
+  setAccess({role:'manager',userId:'manager-test',local:true,writable:true});
+  const managerKeys=activeKeys();
+  assert.notEqual(managerKeys.state,keys.state);
+  localStorage.setItem(managerKeys.state,JSON.stringify({data:{...owner,transactions:[]},generation:'manager-generation',baseRevision:1,acknowledged:true,pending:false}));
+  db.addMember({name:'Manager member'});
+  assert.throws(()=>db.addTransaction({type:'income',amount:1,category:'test'}));
+  assert.throws(()=>db.clearAllData());
+  assert.deepEqual(readState().data.transactions,[]);
+  assert.equal(localStorage.getItem(keys.state),ownerCache);
+  setAccess({role:'admin',userId:'test',local:true,writable:true});
 });
 test('a raw invalid import leaves the previous state byte-for-byte intact',()=>{
   setup();const before=localStorage.getItem(keys.state);

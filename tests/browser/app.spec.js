@@ -57,13 +57,12 @@ test('second tab is read-only and cannot overwrite first tab changes',async({pag
   await page.goto('/#members');await expect(page.getByText('Chế độ thử trên máy — không kết nối dữ liệu CLB.')).toBeVisible();
   const second=await context.newPage();await second.goto('/#members');
   await expect(second.getByText('Tab chỉ đọc: đóng tab quản lý khác rồi tải lại để chỉnh sửa.')).toBeVisible();
-  await second.getByRole('button',{name:'Sửa thành viên',exact:true}).first().click();
-  await second.getByRole('dialog').locator('input[type="text"]').first().fill('Must not save');
-  await second.getByRole('dialog').locator('button[type="submit"]').click();
-  await expect(second.getByRole('dialog').getByRole('alert')).toContainText('tab khác');
+  await expect(second.getByRole('button',{name:'Sửa thành viên',exact:true})).toHaveCount(0);
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('pickleball_state_v2_1')).data.members[0].name)).toBe('Player a');
   await page.close();
   await expect(second.getByText('Chế độ thử trên máy — không kết nối dữ liệu CLB.')).toBeVisible({timeout:10000});
+  await second.getByRole('button',{name:'Sửa thành viên',exact:true}).first().click();
+  await second.getByRole('dialog').locator('input[type="text"]').first().fill('Must not save');
   await second.getByRole('dialog').locator('button[type="submit"]').click();
   await expect(second.getByRole('dialog')).toHaveCount(0);
   expect(await second.evaluate(()=>JSON.parse(localStorage.getItem('pickleball_state_v2_1')).data.members[0].name)).toBe('Must not save');

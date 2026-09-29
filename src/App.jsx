@@ -42,14 +42,15 @@ function ClubApp() {
   }, [activeTab, club.isAdmin]);
   const navigate = tab => { location.hash = tab; };
   const Screen = screens[activeTab];
-  const locked = !club.isAdmin && !['dashboard','leaderboard','h2h'].includes(activeTab);
+  const restricted = club.isAdmin && !club.isOwner && ['finance','backup'].includes(activeTab);
+  const locked = restricted || !club.isAdmin && !['dashboard','leaderboard','h2h'].includes(activeTab);
   return <div className="app-layout">
     <a className="skip-link" href="#main-content" onClick={event=>{ event.preventDefault(); main.current?.focus(); }}>Đến nội dung chính</a>
-    <Navbar activeTab={activeTab} setActiveTab={navigate} isAdmin={club.isAdmin} setIsAdmin={value=>value ? setIsAuthModalOpen(true) : club.logout()} isModalOpen={false} setIsModalOpen={setIsAuthModalOpen} />
+    <Navbar activeTab={activeTab} setActiveTab={navigate} isAdmin={club.isAdmin} isOwner={club.isOwner} setIsAdmin={value=>value ? setIsAuthModalOpen(true) : club.logout()} isModalOpen={false} setIsModalOpen={setIsAuthModalOpen} />
     {club.status.kind !== 'saved' && <div className={`sync-status sync-${club.status.kind}`} role="status" aria-live="polite">
       <span>{club.status.message}</span>
       {club.status.kind === 'error' && <button onClick={club.exportRecovery}>Tải bản cứu hộ trên thiết bị này</button>}
-      {club.isAdmin && <><button onClick={club.exportLocal}>Tải bản sao lưu</button><button onClick={club.retry}>Kiểm tra đồng bộ</button></>}
+      {club.isOwner && <button onClick={club.exportLocal}>Tải bản sao lưu</button>}{club.isAdmin && <button onClick={club.retry}>Kiểm tra đồng bộ</button>}
       {club.isAdmin && club.status.kind === 'conflict' && <><button onClick={club.exportRemote}>Tải bản máy chủ</button><button onClick={club.useRemote}>Chọn bản máy chủ</button></>}
       {club.session && !club.isAdmin && <button onClick={club.logout}>Đăng xuất tài khoản</button>}
     </div>}
@@ -57,7 +58,9 @@ function ClubApp() {
     <main id="main-content" ref={main} tabIndex={-1} className="app-main-content"
       onChangeCapture={e=>{ if (e.target.closest('form')) dirty.current = true; }}
       onSubmitCapture={()=>{ let generation; try { generation = readState().generation; } catch { return; } queueMicrotask(()=>{ if (readState().generation !== generation) dirty.current = false; }); }}>
-      {locked ? <div className="recovery-panel"><h1>Đăng nhập để quản lý CLB</h1><p>Bạn có thể xem Tổng Quan, Xếp Hạng và Đối Đầu mà không cần đăng nhập.</p><button className="btn-neon-green" onClick={()=>setIsAuthModalOpen(true)}>Đăng nhập quản trị</button></div>
+      {locked ? restricted ? <div className="recovery-panel"><h1>Không có quyền truy cập</h1><p>Chỉ quản trị viên chủ được xem mục Thu Chi và CSDL.</p></div>
+        : club.status.kind === 'readonly' ? <div className="recovery-panel"><h1>Đang chờ quyền chỉnh sửa</h1><p>Trang sẽ tự mở quyền khi tab quản lý khác đóng.</p></div>
+        : <div className="recovery-panel"><h1>Đăng nhập để quản lý CLB</h1><p>Bạn có thể xem Tổng Quan, Xếp Hạng và Đối Đầu mà không cần đăng nhập.</p><button className="btn-neon-green" onClick={()=>setIsAuthModalOpen(true)}>Đăng nhập quản trị</button></div>
         : <Suspense fallback={<p className="recovery-panel" role="status">Đang mở màn hình…</p>}><Screen data={club.data} setData={club.setData} isAdmin={club.isAdmin} setIsAdmin={()=>setIsAuthModalOpen(true)} setActiveTab={navigate} setRecorderSubTab={setRecorderSubTab} subTab={recorderSubTab} setSubTab={setRecorderSubTab} /></Suspense>}
     </main>
     <AuthDialog isOpen={isAuthModalOpen} onClose={()=>setIsAuthModalOpen(false)} />
