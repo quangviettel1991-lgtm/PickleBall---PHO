@@ -77,7 +77,13 @@ export function useClub() {
             if (!writable) { setStatus({ kind: 'readonly', message: 'Tab chỉ đọc: đóng tab quản lý khác rồi tải lại để chỉnh sửa.' }); return; }
             engine.current = createSyncEngine({ read: () => remoteRead(false), write: remoteWrite, canWrite: () => alive,
               canApplyRemote: () => !document.querySelector('main form'),
-              status: next => { if (alive) { setStatus(next); failures = next.kind === 'error' ? failures + 1 : 0; } } });
+              status: next => {
+                if (alive) {
+                  setStatus(next);
+                  if (next.kind === 'saved') setError(previous => previous.startsWith('Cần kết nối và đối chiếu dữ liệu máy chủ trước khi chỉnh sửa.') ? '' : previous);
+                  failures = next.kind === 'error' ? failures + 1 : 0;
+                }
+              } });
             if (supabase) channel = supabase.channel(`club-${CLUB_ID}`).on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pickleball_club', filter: `id=eq.${CLUB_ID}` }, schedule).subscribe();
           }
         } catch (e) { if (alive) setError(e.message); }
