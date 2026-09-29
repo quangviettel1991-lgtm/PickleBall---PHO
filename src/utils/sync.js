@@ -8,7 +8,23 @@ export function createSyncEngine({ read, write, status = () => {}, canWrite = ()
     running = true;
     try {
       let current = readState();
-      if (conflict) { notify('conflict', 'Có thay đổi khác trên máy chủ. Cần đối chiếu trước khi lưu tiếp.'); return; }
+      if (conflict) {
+        if (!canApplyRemote()) {
+          notify('deferred', 'Hoàn tất hoặc đóng biểu mẫu để kiểm tra lại dữ liệu máy chủ.'); return;
+        }
+        const generation = current.generation;
+        const latest = await read();
+        if (stopped || readState().generation !== generation) return;
+        if (latest.kind === 'missing') { notify('missing', 'Máy chủ chưa có dữ liệu CLB. Không tự khởi tạo hoặc ghi đè.'); return; }
+        const incoming = normalizeClub(latest.data);
+        if (stableJson(current.data) === stableJson(incoming)) {
+          commitState({ data: incoming, baseRevision: latest.revision, pending: false,
+            operationId: null, acknowledged: true, legacy: false }, generation, { backup: false });
+          conflict = null; notify('saved', 'Đã đồng bộ với máy chủ.'); return;
+        }
+        conflict = { remote: latest, local: current.data };
+        notify('conflict', 'Bản trên máy khác bản máy chủ. Cả hai bản được giữ để đối chiếu.'); return;
+      }
       if (current.pending) {
         if (!canWrite()) return;
         notify('saving', 'Đang lưu lên máy chủ…');

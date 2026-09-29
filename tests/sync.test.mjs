@@ -45,6 +45,23 @@ test('legacy differences require a choice; never auto-upload',async()=>{
   const engine=createSyncEngine({read:async()=>({kind:'found',data:{...fixture(),members:[]},revision:1}),write:async()=>{writes++;}});
   await engine.sync();assert.ok(engine.getConflict());assert.equal(readState().data.members.length,4);assert.equal(writes,0);
 });
+test('a resolved legacy conflict is acknowledged after a fresh server read',async()=>{
+  setup();localStorage.removeItem(keys.state);localStorage.setItem(keys.legacy,JSON.stringify(fixture()));
+  let remote={...fixture(),members:[]}, reads=0, writes=0;
+  const engine=createSyncEngine({read:async()=>{reads++;return {kind:'found',data:remote,revision:reads};},write:async()=>{writes++;}});
+  await engine.sync();assert.ok(engine.getConflict());assert.equal(readState().acknowledged,false);
+  remote=fixture();await engine.sync();
+  assert.equal(engine.getConflict(),null);assert.equal(readState().acknowledged,true);
+  assert.equal(readState().baseRevision,2);assert.equal(readState().data.members.length,4);assert.equal(writes,0);
+});
+test('an unresolved conflict refreshes its server version without replacing local data',async()=>{
+  setup();localStorage.removeItem(keys.state);localStorage.setItem(keys.legacy,JSON.stringify(fixture()));
+  let remote={...fixture(),members:[]};
+  const engine=createSyncEngine({read:async()=>({kind:'found',data:remote,revision:remote.members.length ? 3 : 2})});
+  await engine.sync();remote={...fixture(),members:[{...fixture().members[0],name:'Another server edit'}]};
+  await engine.sync();assert.equal(engine.getConflict().remote.revision,3);
+  assert.equal(readState().data.members.length,4);assert.equal(readState().acknowledged,false);
+});
 test('not-found response never initializes a club automatically',async()=>{
   setup();let writes=0;const engine=createSyncEngine({read:async()=>({kind:'missing'}),write:async()=>{writes++;}});
   await engine.sync();assert.equal(writes,0);
