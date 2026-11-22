@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "node --test tests/data.test.mjs tests/sync.test.mjs tests/database.test.mjs tests/mystery.test.mjs",
+    "verify:season-backup": "node scripts/verify-season-backup.mjs",
     "test:e2e": "playwright test",
     "backup:remote": "node scripts/backup-remote.mjs"
   },
