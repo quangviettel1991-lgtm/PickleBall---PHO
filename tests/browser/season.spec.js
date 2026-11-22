@@ -60,3 +60,11 @@ test('mystery draw records qualifiers then reveals a separate final',async({page
   expect(data.matches).toHaveLength(4);
   expect(data.matches.filter(match=>match.played)).toHaveLength(3);
 });
+
+test('2027 format card opens its selected doubles team mode', async ({page}) => {
+  await page.goto('http://127.0.0.1:4177/#dashboard');
+  await page.getByRole('button', {name: /Cúp Tứ Hùng.*Bốn cặp/}).click();
+  await expect(page).toHaveURL(/#draw$/);
+  await expect(page.getByRole('button', {name: /Cúp Tứ Hùng/})).toHaveClass(/active/);
+  await expect(page.getByText('Bốn cặp tranh vé chung kết.')).toBeVisible();
+});

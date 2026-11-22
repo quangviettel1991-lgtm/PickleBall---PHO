@@ -98,3 +98,155 @@
   .mystery-standings li small { display: none; }
   .season-2027 .scenario-toggle { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* 2027 league identity: high contrast, court markings, and compact scoreboards. */
+.season-2027 {
+  --bg-main: #071015;
+  --bg-card: #101c22;
+  --bg-card-hover: #17272d;
+  --bg-input: #0b171d;
+  --border-color: rgba(211, 239, 231, .13);
+  --border-hover: rgba(216, 255, 67, .43);
+  --accent-neon-green: #d8ff43;
+  --accent-neon-green-glow: rgba(216, 255, 67, .18);
+  --accent-neon-green-glow-strong: rgba(216, 255, 67, .34);
+  --accent-electric-blue: #55dfff;
+  --accent-electric-blue-glow: rgba(85, 223, 255, .2);
+  --text-secondary: #c0ced0;
+  --text-muted: #91a5aa;
+  background: radial-gradient(circle at 86% 11%, rgba(85, 223, 255, .08), transparent 34%),
+    repeating-linear-gradient(90deg, transparent 0 119px, rgba(216, 255, 67, .018) 120px), #071015;
+}
+.season-2027 .navbar-container { background: rgba(5, 14, 18, .96); border-bottom-color: rgba(216, 255, 67, .18); }
+.season-2027 .navbar-content { max-width: 1360px; height: 70px; }
+.season-2027 .navbar-brand-logo,
+.season-2027 .mobile-header-logo { border-radius: 50%; background: #d8ff43; color: #071015; box-shadow: 0 0 0 4px rgba(216, 255, 67, .1); }
+.season-2027 .navbar-brand-text { background: none; -webkit-text-fill-color: #f2f8f4; color: #f2f8f4; letter-spacing: -.04em; }
+.season-2027 .navbar-brand-tag { background: #1d3030; color: #d8ff43; border-color: rgba(216, 255, 67, .26); font-weight: 800; }
+.season-2027 .navbar-item { font-weight: 700; border-radius: 7px; }
+.season-2027 .navbar-item.active { color: #071015; background: #d8ff43; border-color: #d8ff43; }
+.season-2027 .navbar-more-dropdown { border-radius: 12px; background: #102026; }
+.season-2027 .season-switcher { width: min(1280px, calc(100% - 32px)); margin-top: 24px; border-radius: 12px; padding: 14px 20px; border-color: rgba(216, 255, 67, .22); background: linear-gradient(105deg, #182920, #101e23 55%, #152e32); box-shadow: none; }
+.season-2027 .season-switcher-copy { gap: 12px; }
+.season-2027 .season-switcher-copy strong { text-transform: uppercase; font-size: 1rem; letter-spacing: .015em; }
+.season-2027 .season-switcher-copy > span:last-child { color: #c1d0c4; }
+.season-2027 .season-eyebrow { color: #d8ff43; }
+.season-2027 .season-options { border: 1px solid rgba(216, 255, 67, .13); border-radius: 8px; }
+.season-2027 .season-options button { border-radius: 5px; }
+.season-2027 .season-options button.selected { color: #071015; background: #d8ff43; box-shadow: none; }
+.season-2027 .dashboard-container { max-width: 1328px; gap: 20px; padding-top: 24px; }
+.season-2027 .dashboard-main,
+.season-2027 .dashboard-sidebar { gap: 20px; }
+.season-2027 .glass-panel { border-radius: 13px; border-color: var(--border-color); background: #101c22; box-shadow: none; }
+.season-2027 .welcome-banner { display: block; position: relative; min-height: 340px; padding: clamp(26px, 4vw, 42px); border: 1px solid rgba(216, 255, 67, .42); border-radius: 16px; background: radial-gradient(circle at 89% 50%, rgba(216, 255, 67, .17), transparent 28%), linear-gradient(120deg, #1b392f, #10232a 58%, #133237); box-shadow: 0 24px 50px rgba(0, 0, 0, .2); isolation: isolate; }
+.season-2027 .welcome-banner::before { content: '27'; position: absolute; top: -84px; right: 4%; bottom: auto; width: auto; height: auto; color: #d8ff43; opacity: .09; font-size: clamp(180px, 24vw, 330px); font-weight: 900; line-height: 1; letter-spacing: -.12em; filter: none; }
+.season-2027 .welcome-banner::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(120deg, transparent 0 18px, rgba(255,255,255,.018) 19px 20px); pointer-events: none; z-index: -1; }
+.season-2027 .hero-kicker { position: relative; z-index: 2; display: flex; align-items: center; gap: 9px; color: #d8ff43; font-size: .68rem; font-weight: 900; letter-spacing: .14em; }
+.season-2027 .hero-kicker-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 12px currentColor; }
+.season-2027 .hero-kicker-divider { height: 10px; border-left: 1px solid rgba(216, 255, 67, .42); }
+.season-2027 .welcome-title { max-width: 490px; margin: 23px 0 11px; font-size: clamp(2.5rem, 4.8vw, 4.05rem); line-height: .99; letter-spacing: -.064em; text-transform: uppercase; }
+.season-2027 .welcome-title span { display: block; color: #d8ff43; background: none; -webkit-text-fill-color: #d8ff43; }
+.season-2027 .welcome-subtitle { max-width: 410px; color: #d1dfdc; font-size: .9rem; line-height: 1.55; }
+.season-2027 .hero-actions { position: relative; z-index: 2; display: flex; gap: 9px; flex-wrap: wrap; margin-top: 22px; }
+.season-2027 .hero-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 9px 15px; border-radius: 6px; font: 800 .82rem var(--font-primary); cursor: pointer; transition: transform .2s, background .2s; }
+.season-2027 .hero-actions button:hover { transform: translateY(-2px); }
+.season-2027 .hero-primary { border: 1px solid #d8ff43; color: #071015; background: #d8ff43; }
+.season-2027 .hero-secondary { border: 1px solid rgba(229, 246, 240, .3); color: #f2f8f4; background: rgba(5, 17, 20, .3); }
+.season-2027 .hero-court { position: absolute; right: 7%; top: 26%; width: min(31%, 248px); aspect-ratio: 1.5; transform: rotate(-12deg) skew(-4deg); border: 3px solid rgba(216, 255, 67, .75); border-radius: 3px; box-shadow: 14px 18px 0 rgba(1, 15, 18, .38), inset 0 0 0 10px rgba(216, 255, 67, .04); opacity: .88; }
+.season-2027 .hero-court-markings { position: absolute; inset: 0; background: linear-gradient(90deg, transparent calc(50% - 1px), rgba(216,255,67,.7) 50%, transparent calc(50% + 1px)), linear-gradient(0deg, transparent calc(50% - 1px), rgba(216,255,67,.7) 50%, transparent calc(50% + 1px)); }
+.season-2027 .hero-court-markings::before,
+.season-2027 .hero-court-markings::after { content: ''; position: absolute; top: 19%; bottom: 19%; width: 1px; background: rgba(216,255,67,.55); }
+.season-2027 .hero-court-markings::before { left: 23%; }
+.season-2027 .hero-court-markings::after { right: 23%; }
+.season-2027 .hero-court > span { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(240, 255, 226, .7); font-size: clamp(1rem, 2.2vw, 1.7rem); font-weight: 900; font-style: italic; line-height: .9; letter-spacing: -.05em; text-align: center; transform: rotate(12deg); }
+.season-2027 .hero-ball { position: absolute; right: -10%; top: -23%; width: 54px; height: 54px; border-radius: 50%; background: #d8ff43; box-shadow: 0 0 0 8px rgba(216, 255, 67, .09), 0 10px 25px rgba(0, 0, 0, .35); }
+.season-2027 .hero-ball::after { content: ''; position: absolute; inset: 13px; border-radius: 50%; background: radial-gradient(circle at 20% 20%, #51751f 0 2px, transparent 3px), radial-gradient(circle at 75% 30%, #51751f 0 2px, transparent 3px), radial-gradient(circle at 45% 75%, #51751f 0 2px, transparent 3px); }
+.season-2027 .hero-bottomline { position: absolute; left: clamp(26px, 4vw, 42px); right: clamp(26px, 4vw, 42px); bottom: 16px; display: flex; justify-content: space-between; color: rgba(224, 242, 232, .48); font-size: .63rem; font-weight: 800; letter-spacing: .18em; }
+.season-2027 .season-formats { scroll-margin-top: 90px; }
+.season-2027 .season-formats-heading { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 14px; }
+.season-2027 .season-formats-heading h2 { margin-top: 4px; font-size: clamp(1.4rem, 2.7vw, 2rem); font-weight: 900; line-height: 1.08; letter-spacing: -.05em; text-transform: uppercase; }
+.season-2027 .season-formats-heading > span { color: #819ba0; font-size: .65rem; font-weight: 900; letter-spacing: .12em; text-align: right; }
+.season-2027 .format-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.season-2027 .format-card { min-width: 0; min-height: 178px; padding: 18px; display: flex; flex-direction: column; align-items: stretch; text-align: left; color: #f2f8f4; border: 1px solid rgba(211, 239, 231, .16); border-radius: 12px; background: linear-gradient(150deg, #17282e, #101c22); cursor: pointer; transition: transform .2s, border-color .2s, background .2s; font: inherit; }
+.season-2027 .format-card:hover { transform: translateY(-3px); border-color: #d8ff43; background: #1b3234; }
+.season-2027 .format-card:focus-visible,
+.season-2027 .hero-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.season-2027 .format-card-featured { border-color: rgba(216, 255, 67, .55); background: linear-gradient(145deg, #273e24, #172c29); }
+.season-2027 .format-card-top { display: flex; justify-content: space-between; align-items: start; color: #d8ff43; }
+.season-2027 .format-card-top > span { font-size: .64rem; font-weight: 900; letter-spacing: .14em; }
+.season-2027 .format-card strong { margin: 12px 0 5px; font-size: 1.22rem; font-weight: 900; letter-spacing: -.035em; text-transform: uppercase; }
+.season-2027 .format-card small { max-width: 32ch; color: #b7c9c9; font-size: .78rem; line-height: 1.45; }
+.season-2027 .format-card-link { display: inline-flex; align-items: center; gap: 5px; margin-top: auto; padding-top: 13px; color: #d8ff43; font-size: .7rem; font-weight: 800; }
+.season-2027 .stat-card { min-height: 112px; border-top: 3px solid #d8ff43; border-radius: 10px; }
+.season-2027 .stat-card:nth-child(2) { border-top-color: #55dfff; }
+.season-2027 .stat-card:nth-child(3) { border-top-color: #ff8d67; }
+.season-2027 .stat-icon { border-radius: 9px; }
+.season-2027 .stat-card:nth-child(1) .stat-icon { color: #d8ff43; background: rgba(216,255,67,.1); border-color: rgba(216,255,67,.2); }
+.season-2027 .stat-card:nth-child(2) .stat-icon { color: #55dfff; background: rgba(85,223,255,.1); border-color: rgba(85,223,255,.2); }
+.season-2027 .stat-card:nth-child(3) .stat-icon { color: #ff8d67; background: rgba(255,141,103,.1); border-color: rgba(255,141,103,.2); }
+.season-2027 .stat-value { font-size: 2rem; letter-spacing: -.06em; }
+.season-2027 .stat-label { font-size: .72rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+.season-2027 .podium-container { border-top: 3px solid #d8ff43; }
+.season-2027 .podium-header-title,
+.season-2027 .panel-title { font-weight: 900; letter-spacing: -.035em; text-transform: uppercase; }
+.season-2027 .podium-block { border-radius: 7px 7px 0 0; background: linear-gradient(180deg, rgba(216,255,67,.11), rgba(255,255,255,.02)) !important; }
+.season-2027 .recent-matches-panel,
+.season-2027 .shortcuts-panel { border-top: 3px solid #55dfff; }
+.season-2027 .match-row,
+.season-2027 .shortcut-btn { border-radius: 8px; background: #15252a; }
+.season-2027 .shortcut-btn:hover { border-color: #d8ff43; }
+.season-2027 .draw-title,
+.season-2027 .leaderboard-title { font-weight: 900; letter-spacing: -.05em; text-transform: uppercase; }
+.season-2027 .scenario-toggle { padding: 0; gap: 9px; border: 0; background: transparent; }
+.season-2027 .scenario-btn { position: relative; min-height: 72px; border: 1px solid rgba(211,239,231,.15); border-radius: 9px; background: #13242a; font-size: .85rem; line-height: 1.25; }
+.season-2027 .scenario-btn:hover { border-color: rgba(216,255,67,.5); background: #1d3435; }
+.season-2027 .scenario-btn.active,
+.season-2027 .scenario-mystery.active { border: 1px solid #d8ff43; color: #071015; background: #d8ff43; box-shadow: 0 8px 22px rgba(216,255,67,.13); }
+.season-2027 .mystery-rules { border-color: rgba(216,255,67,.28); background: #1b2e2a; }
+.season-2027 .mystery-rules > span,
+.season-2027 .mystery-rules.team-rules > span { color: #d8ff43; }
+.season-2027 .mystery-rules.team-rules { border-color: rgba(85,223,255,.3); background: #172b31; }
+.season-2027 .round-box { border-left: 3px solid #d8ff43; }
+.season-2027 .match-draw-card { border-radius: 8px; background: #15262b; }
+.season-2027 .team-match-label { color: #d8ff43; }
+.season-2027 .mystery-standings li { border-radius: 6px; }
+.season-2027 .app-footer { border-top-color: rgba(216,255,67,.16); }
+@media (max-width: 1024px) {
+  .season-2027 .hero-court { right: 5%; width: 28%; opacity: .48; }
+}
+@media (max-width: 768px) {
+  .season-2027 .mobile-only-header { background: #09191d; border-bottom-color: rgba(216,255,67,.22); }
+  .season-2027 .navbar-container { background: rgba(7,17,20,.97); border-top: 1px solid rgba(216,255,67,.2); }
+  .season-2027 .season-switcher { margin-top: 14px; }
+  .season-2027 .welcome-subtitle { display: block !important; max-width: 100%; font-size: .82rem; }
+  .season-2027 .welcome-banner { min-height: 330px; padding: 25px; }
+  .season-2027 .welcome-title { max-width: 100%; font-size: clamp(2.1rem, 8vw, 3.3rem); }
+  .season-2027 .hero-court { top: auto; bottom: 35px; right: 22px; width: 130px; opacity: .16; }
+  .season-2027 .hero-ball { width: 35px; height: 35px; }
+  .season-2027 .hero-actions { margin-top: 19px; }
+  .season-2027 .dashboard-container { padding: 18px 16px; }
+  .season-2027 .format-cards { gap: 8px; }
+  .season-2027 .format-card { min-height: 167px; padding: 14px; }
+  .season-2027 .format-card strong { font-size: 1.04rem; }
+  .season-2027 .stat-card { min-height: 97px; }
+  .season-2027 .scenario-btn { min-height: 64px; font-size: .77rem; }
+}
+@media (max-width: 520px) {
+  .season-2027 .season-switcher { padding: 12px 14px; }
+  .season-2027 .season-switcher-copy { gap: 5px 8px; }
+  .season-2027 .season-switcher-copy > span:last-child { width: 100%; }
+  .season-2027 .welcome-banner { min-height: 340px; padding: 22px; }
+  .season-2027 .welcome-title { font-size: clamp(2rem, 10.5vw, 2.8rem); }
+  .season-2027 .hero-bottomline { left: 22px; right: 22px; }
+  .season-2027 .hero-actions button { font-size: .75rem; padding: 8px 10px; }
+  .season-2027 .season-formats-heading > span { display: none; }
+  .season-2027 .format-cards { grid-template-columns: 1fr; }
+  .season-2027 .format-card { min-height: 133px; }
+  .season-2027 .format-card strong { margin-top: 5px; }
+  .season-2027 .format-card-link { padding-top: 7px; }
+  .season-2027 .stat-card { border-top-width: 2px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .season-2027 .format-card,
+  .season-2027 .hero-actions button { transition: none; }
+}

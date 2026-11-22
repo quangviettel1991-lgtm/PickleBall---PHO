@@ -2,7 +2,7 @@ import PropTypes from 'prop-types';
 import './Dashboard.css';
 
 import { useState } from "react";
-import { Users, Swords, Calendar, Trophy, ChevronRight, UserPlus, Play } from "lucide-react";
+import { Users, Swords, Calendar, Trophy, ChevronRight, UserPlus, Play, ArrowUpRight, Zap, Crown } from "lucide-react";
 import Modal from "./Modal";
 import { addMember } from "../utils/db";
 import { ACTIVE_SEASON, DEFAULT_MEMBER_ELO } from '../utils/config';
@@ -15,6 +15,7 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
   const [memberPhone, setMemberPhone] = useState("");
   const [memberGender, setMemberGender] = useState("Nam");
   const [memberElo, setMemberElo] = useState(String(DEFAULT_MEMBER_ELO));
+  const openSeasonFormat = mode => { sessionStorage.setItem('pickleball_draw_preselect_2027', mode); setActiveTab('draw'); };
 
   const { matches, events } = data;
   const members = data.members.filter(m=>!m.archivedAt && !m.isGuest);
@@ -90,16 +91,26 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
       <div className="dashboard-main">
         {/* Banner chào mừng */}
         <div className="welcome-banner">
+          {ACTIVE_SEASON.year === '2027' && <div className="hero-kicker"><span className="hero-kicker-dot" /> PHỞ LEAGUE <span className="hero-kicker-divider" /> MÙA GIẢI 2027</div>}
           <h1 className="welcome-title">{ACTIVE_SEASON.year === '2027' ? <>Sân đấu mới. <span>Huyền thoại mới.</span></> : <>Xin chào, <span>{CLUB_NAME}!</span></>}</h1>
           <p className="welcome-subtitle">
-            {ACTIVE_SEASON.year === '2027' ? `Mùa 2027 của ${CLUB_NAME}: mọi thành viên bắt đầu với Elo đơn và đôi là 1.000. Kết quả mùa trước vẫn ở mục chọn mùa phía trên.` : 'Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.'}
+            {ACTIVE_SEASON.year === '2027' ? `Mỗi trận là một cơ hội bứt phá. ${CLUB_NAME} mở mùa với Elo 1.000 cho tất cả thành viên; kết quả mùa trước vẫn được lưu riêng.` : 'Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.'}
           </p>
+          {ACTIVE_SEASON.year === '2027' && <>
+            <div className="hero-actions"><button type="button" className="hero-primary" onClick={() => document.getElementById('season-formats')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Khám phá thể thức <ArrowUpRight size={18} /></button><button type="button" className="hero-secondary" onClick={() => setActiveTab('leaderboard')}>Xem bảng xếp hạng <ChevronRight size={17} /></button></div>
+            <div className="hero-court" aria-hidden="true"><div className="hero-court-markings" /><div className="hero-ball" /><span>PHỞ<br />OPEN</span></div>
+            <div className="hero-bottomline"><span>THE GAME STARTS HERE</span><span>01 / 27</span></div>
+          </>}
         </div>
-        {ACTIVE_SEASON.year === '2027' && <button type="button" className="mystery-spotlight" onClick={()=>setActiveTab('draw')}>
-          <span className="mystery-spotlight-icon" aria-hidden="true">✦</span>
-          <span><small>THỂ THỨC MỚI · 2027</small><strong>Đấu Đôi Bí Ẩn</strong><span>3 vòng đổi đồng đội, rồi bốc vòng lật kèo dựa trên kết quả thực tế.</span></span>
-          <ChevronRight size={22} aria-hidden="true" />
-        </button>}
+        {ACTIVE_SEASON.year === '2027' && <section id="season-formats" className="season-formats" aria-labelledby="season-formats-title">
+          <div className="season-formats-heading"><div><span className="season-eyebrow">CHỌN CUỘC CHƠI</span><h2 id="season-formats-title">Đánh đôi. Đấu hết mình.</h2></div><span>04 THỂ THỨC / 01 MÙA GIẢI</span></div>
+          <div className="format-cards">
+            <button type="button" className="format-card format-card-featured" onClick={() => openSeasonFormat('mystery')}><span className="format-card-top"><span>01 / ĐỔI CẶP</span><Zap size={21} /></span><strong>Đấu Đôi Bí Ẩn</strong><small>Ba vòng xoay, một vòng lật kèo. Bạn đồng đội tiếp theo luôn là bất ngờ.</small><span className="format-card-link">Xem thể thức <ArrowUpRight size={16} /></span></button>
+            <button type="button" className="format-card" onClick={() => openSeasonFormat('teamclash')}><span className="format-card-top"><span>02 / ĐẤU TEAM</span><Swords size={21} /></span><strong>Đại Chiến Team</strong><small>Hai đội cân sức, đổi cặp trong team. Lượt cuối nhân đôi điểm giải.</small><span className="format-card-link">Xem thể thức <ArrowUpRight size={16} /></span></button>
+            <button type="button" className="format-card" onClick={() => openSeasonFormat('teamcup')}><span className="format-card-top"><span>03 / TRANH CÚP</span><Trophy size={21} /></span><strong>Cúp Tứ Hùng</strong><small>Bốn cặp, vòng bảng và chung kết. Mỗi điểm số đều có thể đổi thứ hạng.</small><span className="format-card-link">Xem thể thức <ArrowUpRight size={16} /></span></button>
+            <button type="button" className="format-card" onClick={() => openSeasonFormat('kingcourt')}><span className="format-card-top"><span>04 / THĂNG HẠNG</span><Crown size={21} /></span><strong>Vua Sân Team</strong><small>Thắng lên sân 1, thua xuống sân 2. Giữ vị trí đến lượt cuối.</small><span className="format-card-link">Xem thể thức <ArrowUpRight size={16} /></span></button>
+          </div>
+        </section>}
 
         {/* Các chỉ số thống kê tổng quan */}
         <div className="stats-grid">

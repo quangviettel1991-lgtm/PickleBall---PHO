@@ -16,7 +16,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   const [selectedEventId, setSelectedEventId] = useState(() => localStorage.getItem(keys.drawEvent) || localStorage.getItem('draw_selected_event_id') || '');
   const selectedEventObj = events.find(e=>e.id===selectedEventId);
   const isEventLocked = selectedEventObj?.isLocked || false;
-  const [scenario, setScenario] = useState('mixer');
+  const [scenario, setScenario] = useState(() => {
+    if (ACTIVE_SEASON.year !== '2027') return 'mixer';
+    const next = sessionStorage.getItem('pickleball_draw_preselect_2027');
+    return ['mystery', 'teamclash', 'teamcup', 'kingcourt'].includes(next) ? next : 'mixer';
+  });
+  useEffect(() => { sessionStorage.removeItem('pickleball_draw_preselect_2027'); }, []);
   const savedDraw = data.draws?.[selectedEventId];
   const activeScenario = savedDraw?.scenario || scenario;
   const setActiveScenario = next => { if (savedDraw?.data) { alert('Hủy lịch hiện tại có xác nhận trước khi đổi thể thức.'); return; } setScenario(next); };
