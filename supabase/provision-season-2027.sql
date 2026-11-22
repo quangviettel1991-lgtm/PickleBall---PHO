@@ -1,6 +1,7 @@
 -- Run once on the chosen project after verifying club id 3 is unused.
 -- Creates a separate 2027 sports dataset. Club 1 (2026) remains unchanged.
--- The finance ledger is copied forward, while Elo, matches, events and draws start fresh.
+-- The finance ledger is copied forward. Guests and Nam tay phải stay in 2026 only.
+-- Elo, matches, events and draws start fresh.
 begin;
 do $$
 declare old_data jsonb; next_data jsonb; owner_id uuid;
@@ -14,10 +15,11 @@ begin
   insert into club_private.pre_migration_backup(original_row)
     select to_jsonb(c) from public.pickleball_club c where c.id=1;
 
-  select old_data || jsonb_build_object(
+  select (old_data - 'legacyDrawStorage') || jsonb_build_object(
     'members',coalesce(jsonb_agg(member || jsonb_build_object(
-      'elo',1200,'eloSingles',1000,'eloDoubles',1200,
-    'initialElo',1200,'initialEloSingles',1000,'initialEloDoubles',1200) order by ordinal), '[]'::jsonb),
+      'elo',1000,'eloSingles',1000,'eloDoubles',1000,
+    'initialElo',1000,'initialEloSingles',1000,'initialEloDoubles',1000) order by ordinal)
+    filter (where member->>'isGuest' is distinct from 'true' and member->>'name'<>'Nam tay phải'), '[]'::jsonb),
     'events','[]'::jsonb,'matches','[]'::jsonb,'draws','{}'::jsonb,
     'season','2027') into next_data
   from jsonb_array_elements(old_data->'members') with ordinality as source(member, ordinal);

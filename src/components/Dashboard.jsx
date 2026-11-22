@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Users, Swords, Calendar, Trophy, ChevronRight, UserPlus, Play } from "lucide-react";
 import Modal from "./Modal";
 import { addMember } from "../utils/db";
-import { ACTIVE_SEASON } from '../utils/config';
+import { ACTIVE_SEASON, DEFAULT_MEMBER_ELO } from '../utils/config';
 
 const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "Pickleball Phở";
 
@@ -14,7 +14,7 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
   const [memberName, setMemberName] = useState("");
   const [memberPhone, setMemberPhone] = useState("");
   const [memberGender, setMemberGender] = useState("Nam");
-  const [memberElo, setMemberElo] = useState("1200");
+  const [memberElo, setMemberElo] = useState(String(DEFAULT_MEMBER_ELO));
 
   const { matches, events } = data;
   const members = data.members.filter(m=>!m.archivedAt && !m.isGuest);
@@ -47,7 +47,7 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
     setMemberName("");
     setMemberPhone("");
     setMemberGender("Nam");
-    setMemberElo("1200");
+    setMemberElo(String(DEFAULT_MEMBER_ELO));
   };
 
   // Định nghĩa thứ tự hiển thị bục Podium: Hạng 2 -> Hạng 1 -> Hạng 3
@@ -92,7 +92,7 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
         <div className="welcome-banner">
           <h1 className="welcome-title">{ACTIVE_SEASON.year === '2027' ? <>Sân đấu mới. <span>Huyền thoại mới.</span></> : <>Xin chào, <span>{CLUB_NAME}!</span></>}</h1>
           <p className="welcome-subtitle">
-            {ACTIVE_SEASON.year === '2027' ? `Mùa 2027 của ${CLUB_NAME}: Elo đơn bắt đầu từ 1.000, Elo đôi từ 1.200. Kết quả mùa trước vẫn ở mục chọn mùa phía trên.` : 'Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.'}
+            {ACTIVE_SEASON.year === '2027' ? `Mùa 2027 của ${CLUB_NAME}: mọi thành viên bắt đầu với Elo đơn và đôi là 1.000. Kết quả mùa trước vẫn ở mục chọn mùa phía trên.` : 'Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.'}
           </p>
         </div>
         {ACTIVE_SEASON.year === '2027' && <button type="button" className="mystery-spotlight" onClick={()=>setActiveTab('draw')}>

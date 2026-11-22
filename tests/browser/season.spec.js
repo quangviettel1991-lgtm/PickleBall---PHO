@@ -5,8 +5,8 @@ test.beforeEach(async ({ page }) => {
   const old = fixture();
   const current = structuredClone(old);
   current.members.forEach(member => {
-    member.elo = 1200; member.eloDoubles = 1200; member.eloSingles = 1000;
-    member.initialElo = 1200; member.initialEloDoubles = 1200; member.initialEloSingles = 1000;
+    member.elo = 1000; member.eloDoubles = 1000; member.eloSingles = 1000;
+    member.initialElo = 1000; member.initialEloDoubles = 1000; member.initialEloSingles = 1000;
   });
   current.matches = []; current.events = [{id:'event',name:'Khai mùa 2027',date:'2027-01-01'}]; current.draws = {};
   await page.addInitScript(({old,current}) => {
@@ -35,7 +35,7 @@ test('newest season opens by default and switching seasons preserves separate da
   await page.getByRole('button',{name:'2027',exact:true}).click();
   await expect(page).toHaveURL(/season=2027/);
   const data=await page.evaluate(()=>JSON.parse(localStorage.getItem('pickleball_state_v2_3')).data);
-  expect(data.members[0].eloDoubles).toBe(1200);
+  expect(data.members[0].eloDoubles).toBe(1000);
 });
 
 test('mystery draw records qualifiers then reveals a separate final',async({page},info)=>{

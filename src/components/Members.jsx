@@ -4,6 +4,7 @@ import PropTypes from 'prop-types';
 import './Members.css';
 import { isPlayed } from '../utils/schema.js';
 import { localDate } from '../utils/dates.js';
+import { DEFAULT_MEMBER_ELO } from '../utils/config.js';
 import { useState, useMemo } from "react";
 import { Users, Search, UserPlus, Edit2, Trash2, Calendar, Phone, Shield, Flame, UserCheck, UserX } from "lucide-react";
 import Modal from "./Modal";
@@ -29,7 +30,7 @@ export default function Members({ data, setData, isAdmin }) {
   const [phone, setPhone] = useState("");
   const [gender, setGender] = useState("Nam");
   const [eloSingles, setEloSingles] = useState("1000");
-  const [eloDoubles, setEloDoubles] = useState("1200");
+  const [eloDoubles, setEloDoubles] = useState(String(DEFAULT_MEMBER_ELO));
   const [isGuest, setIsGuest] = useState(false);
   const [joinDate, setJoinDate] = useState("");
   const [adjustInitialElo, setAdjustInitialElo] = useState(false);
@@ -172,7 +173,7 @@ export default function Members({ data, setData, isAdmin }) {
     setPhone("");
     setGender("Nam");
     setEloSingles("1000");
-    setEloDoubles("1200");
+    setEloDoubles(String(DEFAULT_MEMBER_ELO));
     setIsGuest(false);
     setJoinDate(localDate());
     setIsAddOpen(true);

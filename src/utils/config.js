@@ -5,6 +5,7 @@ export const SEASONS = [
 ];
 const requestedSeason = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('season');
 export const ACTIVE_SEASON = SEASONS.find(season => season.year === requestedSeason) || SEASONS.at(-1);
+export const DEFAULT_MEMBER_ELO = ACTIVE_SEASON.year === '2027' ? 1000 : 1200;
 export const IS_ARCHIVED_SEASON = SEASONS.length > 1 && ACTIVE_SEASON.year !== SEASONS.at(-1).year;
 export const CLUB_ID = ACTIVE_SEASON.clubId;
 export const CLUB_NAME = env.VITE_CLUB_NAME || 'PICKLEBALL PHỞ';

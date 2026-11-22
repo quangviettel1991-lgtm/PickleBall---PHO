@@ -1,6 +1,6 @@
 import { initialMembers, initialEvents, initialMatches, initialTransactions } from './mockData.js';
 import { calculateSinglesElo, calculateDoublesElo } from './elo.js';
-import { keys, LOCAL_MODE } from './config.js';
+import { keys, LOCAL_MODE, DEFAULT_MEMBER_ELO } from './config.js';
 import { getAccess, requireWrite, requireOwner } from './access.js';
 import { readState, commitState, readSnapshots, snapshot, newId } from './storage.js';
 import { clone, emptyClub, normalizeClub, integer, requiredText, validateMatch, isPlayed, stableJson } from './schema.js';
@@ -56,7 +56,7 @@ export function clearAllData() { return replaceClubData(emptyClub(), 'before_cle
 export function addMember(input) {
   return change('before_add_member', data => {
     const singles = integer(input.eloSingles ?? 1000, 'Elo đơn', 100, 3000);
-    const doubles = integer(input.eloDoubles ?? input.elo ?? (input.isGuest ? 1000 : 1200), 'Elo đôi', 100, 3000);
+    const doubles = integer(input.eloDoubles ?? input.elo ?? (input.isGuest ? 1000 : DEFAULT_MEMBER_ELO), 'Elo đôi', 100, 3000);
     data.members.push({ id: newId('m'), name: requiredText(input.name, 'Tên thành viên'), phone: input.phone || '',
       gender: input.gender || 'Nam', joinDate: input.joinDate || localDate(), isGuest: Boolean(input.isGuest),
       elo: doubles, eloSingles: singles, eloDoubles: doubles, initialElo: doubles, initialEloSingles: singles, initialEloDoubles: doubles,
