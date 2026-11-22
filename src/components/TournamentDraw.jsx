@@ -3,11 +3,12 @@ import './TournamentDraw.css';
 import Modal from './Modal';
 import { useState, useEffect, useMemo } from "react";
 import { Shuffle, Check, Plus, Minus, Trash2, Swords, Award } from "lucide-react";
-import { saveDraw, clearDraw, updateMatch, deleteMatch, adoptLegacyDraw, revealMysteryFinal } from "../utils/db";
+import { saveDraw, clearDraw, updateMatch, deleteMatch, adoptLegacyDraw, revealMysteryFinal, advanceTeamDraw } from "../utils/db";
 import { ACTIVE_SEASON, keys } from "../utils/config";
 import { drawMatchId } from "../utils/draws";
 import { isPlayed, scoreFromSets } from "../utils/schema";
 import { generateMysteryQualifiers, mysteryStandings } from '../utils/mystery';
+import { generateTeamClash, generateTeamCup, generateKingCourt, roundScored, teamStandings } from '../utils/teamModes';
 
 export default function TournamentDraw({ data, setData, isAdmin }) {
   const { events } = data;
@@ -25,6 +26,16 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   const mysteryQualifierNodes = activeScenario === 'mystery' && Array.isArray(drawData) && drawData.length === 3 ? drawData.flatMap(round => round.matches) : [];
   const mysteryQualifierScored = mysteryQualifierNodes.filter(node => isPlayed(data.matches.find(match => match.id === drawMatchId(node.matchId)) || {})).length;
   const mysteryFinalReady = mysteryQualifierNodes.length > 0 && mysteryQualifierScored === mysteryQualifierNodes.length;
+  const isTeamMode = ['teamclash', 'teamcup', 'kingcourt'].includes(activeScenario);
+  const teamRows = isTeamMode && Array.isArray(drawData) ? teamStandings(drawData, data.matches, activeScenario) : [];
+  const teamNextReady = activeScenario === 'teamcup' && Array.isArray(drawData) && drawData.length === 3
+    ? drawData.every(round => roundScored(round, data.matches))
+    : activeScenario === 'kingcourt' && Array.isArray(drawData) && drawData.length < 3
+      ? roundScored(drawData.at(-1), data.matches) : false;
+  const getTeamName = id => Array.isArray(drawData) ? drawData[0]?.teams?.find(team => team.id === id)?.name || 'Đội' : 'Đội';
+  const cupFinalNode = activeScenario === 'teamcup' && Array.isArray(drawData) ? drawData[3]?.matches?.[0] : null;
+  const cupFinalMatch = cupFinalNode && data.matches.find(match => match.id === drawMatchId(cupFinalNode.matchId));
+  const cupChampion = isPlayed(cupFinalMatch || {}) ? getTeamName(cupFinalMatch.scoreA > cupFinalMatch.scoreB ? cupFinalNode.teamIdA : cupFinalNode.teamIdB) : null;
   const setDrawData = next => setData(saveDraw(selectedEventId, activeScenario, next));
   useEffect(()=>{ localStorage.setItem(keys.drawEvent, selectedEventId); }, [selectedEventId]);
   // Trạng thái cấu hình phụ cho từng kịch bản
@@ -631,11 +642,21 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
     } else if (activeScenario === "mystery") {
       try { setDrawData(generateMysteryQualifiers(selectedMemberIds)); }
       catch (error) { alert(error.message); }
+    } else if (isTeamMode) {
+      try {
+        const next = activeScenario === 'teamclash' ? generateTeamClash(selectedMemberIds, members)
+          : activeScenario === 'teamcup' ? generateTeamCup(selectedMemberIds) : generateKingCourt(selectedMemberIds);
+        setDrawData(next);
+      } catch (error) { alert(error.message); }
     }
   };
 
   const handleRevealMysteryFinal = () => {
     try { setData(revealMysteryFinal(selectedEventId)); }
+    catch (error) { alert(error.message); }
+  };
+  const handleAdvanceTeam = () => {
+    try { setData(advanceTeamDraw(selectedEventId)); }
     catch (error) { alert(error.message); }
   };
 
@@ -713,6 +734,15 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
           onClick={() => setActiveScenario('mystery')}
         >
           ✦ Đấu Đôi Bí Ẩn
+        </button>}
+        {ACTIVE_SEASON.year === '2027' && <button className={`scenario-btn ${activeScenario === 'teamclash' ? 'active' : ''}`} onClick={() => setActiveScenario('teamclash')}>
+          ⚡ Đại Chiến Team
+        </button>}
+        {ACTIVE_SEASON.year === '2027' && <button className={`scenario-btn ${activeScenario === 'teamcup' ? 'active' : ''}`} onClick={() => setActiveScenario('teamcup')}>
+          🏆 Cúp Tứ Hùng
+        </button>}
+        {ACTIVE_SEASON.year === '2027' && <button className={`scenario-btn ${activeScenario === 'kingcourt' ? 'active' : ''}`} onClick={() => setActiveScenario('kingcourt')}>
+          👑 Vua Sân Team
         </button>}
       </div>
 
@@ -802,6 +832,21 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               <h4>Ba vòng xoay. Một vòng lật kèo.</h4>
               <p>Chọn 4, 8, 12… tối đa 24 người. Mỗi người thi đấu đủ 3 vòng loại; hệ thống ưu tiên không lặp đồng đội. Sau khi ghi xong điểm, bốc vòng cuối với cặp mạnh + yếu theo bảng tạm thời.</p>
               <p>Thắng vòng loại được 1 điểm giải; thắng vòng cuối được 2 điểm giải. Elo vẫn tính như trận đôi bình thường, không nhân đôi.</p>
+            </div>}
+            {activeScenario === 'teamclash' && <div className="mystery-rules team-rules">
+              <span>ĐÁNH ĐÔI THEO ĐỘI · 2027</span><h4>Hai team. Ba lượt. Vòng cuối nhân đôi điểm giải.</h4>
+              <p>Chọn 8, 12, 16… tối đa 24 người. Hệ thống chia hai team cân bằng Elo, rồi đổi đồng đội trong mỗi team qua 3 lượt để ai cũng được ra sân.</p>
+              <p>Mỗi trận thắng được 1 điểm cho team; lượt 3 được 2 điểm. Elo cá nhân vẫn tính theo kết quả từng trận, không nhân đôi.</p>
+            </div>}
+            {activeScenario === 'teamcup' && <div className="mystery-rules team-rules">
+              <span>CÚP ĐÔI CỐ ĐỊNH · 2027</span><h4>Bốn cặp tranh vé chung kết.</h4>
+              <p>Chọn đúng 8 người. Bốc thành 4 cặp cố định, đấu vòng tròn 3 lượt. Khi ghi đủ 6 trận, hai đội đứng đầu tranh cúp; hai đội còn lại tranh hạng ba.</p>
+              <p>Thắng được 1 điểm vòng bảng, hòa điểm xét số trận thắng rồi hiệu số. Chung kết là trận riêng; Elo mỗi trận tính bình thường.</p>
+            </div>}
+            {activeScenario === 'kingcourt' && <div className="mystery-rules team-rules">
+              <span>THĂNG HẠNG SÂN · 2027</span><h4>Thắng lên sân 1. Thua xuống sân 2.</h4>
+              <p>Chọn đúng 8 người để bốc 4 cặp cố định. Sau mỗi lượt có đủ kết quả, bốc lượt tiếp: hai đội thắng gặp nhau ở sân 1, hai đội thua gặp nhau ở sân 2.</p>
+              <p>Thi đấu tối đa 3 lượt. Thắng sân 1 được 2 điểm giải, sân 2 được 1 điểm; Elo không nhận điểm thưởng.</p>
             </div>}
 
             {/* --- Cấu hình Vòng tròn (Kịch bản 2) --- */}
@@ -1018,6 +1063,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   {activeScenario === "roundrobin" && "Kịch bản 2 - Vòng Tròn"}
                   {activeScenario === "elimination" && "Kịch bản 3 - Loại Trực Tiếp"}
                   {activeScenario === "mystery" && "Đấu Đôi Bí Ẩn - Vòng Lật Kèo"}
+                  {activeScenario === "teamclash" && "Đại Chiến Team - Xoay Cặp"}
+                  {activeScenario === "teamcup" && "Cúp Tứ Hùng - Vòng Bảng & Chung Kết"}
+                  {activeScenario === "kingcourt" && "Vua Sân Team - Thăng Hạng"}
                 </strong>
               </span>
               <span style={{ fontStyle: "italic", fontSize: "0.85rem", color: "var(--text-muted)" }}>
@@ -1028,6 +1076,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
               {activeScenario === 'mystery' && drawData.length === 3 && isAdmin && <button type="button" className="btn-electric-blue" onClick={handleRevealMysteryFinal} disabled={isEventLocked || !mysteryFinalReady} title={mysteryFinalReady ? 'Bốc cặp vòng cuối theo bảng điểm tạm thời' : `Đã ghi ${mysteryQualifierScored}/${mysteryQualifierNodes.length} trận vòng loại`}>
                 ✦ Bốc vòng lật kèo {mysteryFinalReady ? '' : `(${mysteryQualifierScored}/${mysteryQualifierNodes.length})`}
+              </button>}
+              {isAdmin && ((activeScenario === 'teamcup' && drawData.length === 3) || (activeScenario === 'kingcourt' && drawData.length < 3)) && <button type="button" className="btn-electric-blue" onClick={handleAdvanceTeam} disabled={isEventLocked || !teamNextReady} title={teamNextReady ? 'Bốc lượt tiếp theo từ kết quả đã ghi' : 'Ghi đủ kết quả lượt hiện tại trước'}>
+                {activeScenario === 'teamcup' ? '🏆 Bốc chung kết' : `👑 Đổi sân lượt ${drawData.length + 1}`}
               </button>}
               {isAdmin ? (
                 <button
@@ -1059,14 +1110,20 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             <div><span className="season-eyebrow">BẢNG ĐIỂM GIẢI</span><h3>Xếp hạng Đấu Đôi Bí Ẩn</h3><p>Vòng cuối được bốc sau khi 3 vòng loại có đủ kết quả. Thắng vòng cuối nhận 2 điểm giải; Elo trận đấu giữ nguyên cách tính.</p></div>
             <ol>{mysteryStandings(drawData, data.matches).map((entry, index)=><li key={entry.id}><span>{String(index+1).padStart(2,'0')}</span><strong>{getPlayerName(entry.id)}</strong><small>{entry.wins} thắng · hiệu số {entry.difference >= 0 ? '+' : ''}{entry.difference}</small><b>{entry.points} điểm</b></li>)}</ol>
           </div>}
+          {isTeamMode && <div className="mystery-standings team-standings glass-panel">
+            <div><span className="season-eyebrow">ĐIỂM ĐỘI · ĐÁNH ĐÔI</span><h3>{cupChampion ? `🏆 ${cupChampion} vô địch` : 'Bảng điểm đội'}</h3>
+              <p>{activeScenario === 'teamclash' ? 'Lượt cuối thắng được 2 điểm giải.' : activeScenario === 'teamcup' ? 'Bảng điểm vòng tròn quyết định hai đội vào chung kết.' : 'Thắng ở sân 1 được 2 điểm, sân 2 được 1 điểm.'} Elo cá nhân tính bình thường.</p>
+            </div>
+            <ol>{teamRows.map((team, index) => <li key={team.id}><span>{String(index + 1).padStart(2, '0')}</span><strong>{team.name}</strong><small>{team.players.map(getPlayerNameShort).join(' + ')} · {team.wins} thắng</small><b>{team.points} điểm</b></li>)}</ol>
+          </div>}
 
           {/* =======================================================
               HIỂN THỊ KỊCH BẢN 1: XOAY TUA (DANH SÁCH CÁC LƯỢT ĐẤU)
               ======================================================= */}
-          {(activeScenario === "mixer" || activeScenario === 'mystery') && drawData.map((round) => (
+          {(activeScenario === "mixer" || activeScenario === 'mystery' || isTeamMode) && drawData.map((round) => (
             <div key={round.roundIndex} className="glass-panel round-box animate-fade-in">
               <div className="round-title">
-                <span>{round.phase === 'final' ? '✦ Vòng lật kèo · 2 điểm giải' : `Lượt Trận Thứ ${round.roundIndex}`}</span>
+                <span>{round.phase === 'final' ? '✦ Vòng lật kèo · 2 điểm giải' : round.phase === 'cup-final' ? '🏆 Chung kết & tranh hạng ba' : round.phase === 'king' ? `👑 Vua Sân · lượt ${round.roundIndex}` : round.phase === 'teamclash' ? `⚡ Đại Chiến · lượt ${round.roundIndex}${round.roundIndex === 3 ? ' · nhân đôi điểm giải' : ''}` : `Lượt Trận Thứ ${round.roundIndex}`}</span>
                 {(round.sittingOut?.length || 0) > 0 && (
                   <span className="mixer-sitout-badge">
                     Nghỉ lượt này: {round.sittingOut.map(p => getPlayerNameShort(p)).join(", ")}
@@ -1078,7 +1135,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 {round.matches.map((match) => (
                   <div key={match.matchId} className="match-draw-card">
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(255,255,255,0.03)", paddingBottom: "3px", marginBottom: "2px" }}>
-                      <div className="match-court-header" style={{ marginBottom: 0 }}>Sân thi đấu {match.courtIndex}</div>
+                      <div className="match-court-header" style={{ marginBottom: 0 }}>{match.label || `Sân thi đấu ${match.courtIndex}`}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {match.played ? (
                           <span className="match-badge-played" style={{ alignSelf: "auto", margin: 0, padding: "2px 6px", fontSize: "0.68rem" }}><Check size={10} /> Đã ghi điểm</span>
@@ -1092,7 +1149,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                             <Swords size={10} /> Nhập kết quả
                           </button>
                         )}
-                        {isAdmin && (
+                        {isAdmin && !isTeamMode && (
                           <button
                             onClick={() => handleDeleteMatch(match.matchId)}
                             style={{
@@ -1121,6 +1178,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                     <div className="match-teams-score-row">
                       {/* Đội A */}
                       <div className="draw-team-box" style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                        {isTeamMode && <span className="team-match-label">{getTeamName(match.teamIdA)}</span>}
                         <div className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff", display: "flex", flexWrap: "wrap", gap: "4px" }}>
                           {match.teamA.map((p, idx) => {
                             const player = members.find(m => m.id === p);
@@ -1151,6 +1209,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
 
                       {/* Đội B */}
                       <div className="draw-team-box" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", textAlign: "right" }}>
+                        {isTeamMode && <span className="team-match-label">{getTeamName(match.teamIdB)}</span>}
                         <div className="draw-team-members" style={{ fontSize: "0.85rem", fontWeight: "600", color: "#fff", display: "flex", flexWrap: "wrap", gap: "4px", justifyContent: "flex-end" }}>
                           {match.teamB.map((p, idx) => {
                             const player = members.find(m => m.id === p);

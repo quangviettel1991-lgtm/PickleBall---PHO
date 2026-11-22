@@ -60,6 +60,14 @@ Trước khi chạy migration với bản sao thực, kiểm tra ngoại tuyến
 
 Thể thức **Đấu Đôi Bí Ẩn** dành riêng cho 2027: 4–24 người chia hết cho 4, ba vòng đổi cặp ưu tiên không lặp đồng đội; chỉ khi ghi đủ kết quả mới bốc vòng cuối ghép người xếp cao với người xếp thấp. Mỗi trận thắng vòng loại được 1 điểm giải, vòng cuối được 2 điểm giải; Elo của mỗi trận vẫn tính như đấu đôi thông thường. Kết quả và sơ đồ đều lưu vào lịch sử trận chuẩn để có thể sửa điểm và đối chiếu.
 
+Ba thể thức đánh đôi theo đội dành cho 2027:
+
+- **Đại Chiến Team:** 8–24 người (chia hết cho 4), chia hai team cân bằng theo Elo đôi; mỗi người đánh ba lượt và đổi bạn cùng team. Trận thắng được 1 điểm đội, lượt cuối được 2 điểm.
+- **Cúp Tứ Hùng:** đúng 8 người bốc thành bốn cặp cố định; vòng bảng có sáu trận, sau khi ghi đủ kết quả mới bốc chung kết và trận tranh hạng ba. Xếp vòng bảng theo điểm thắng, số trận thắng rồi hiệu số.
+- **Vua Sân Team:** đúng 8 người bốc thành bốn cặp cố định; hai sân chơi tối đa ba lượt. Sau mỗi lượt, hai đội thắng lên sân 1, hai đội thua xuống sân 2. Thắng sân 1 được 2 điểm đội, sân 2 được 1 điểm.
+
+Điểm đội chỉ dùng để xếp hạng giải, không nhân hệ số Elo. Kết quả vẫn lưu thành trận đôi chuẩn. Khi đã bốc lượt tiếp theo, kết quả lượt trước được khóa để lịch đấu không tự đổi đội; nếu cần làm lại, quản trị viên hủy cả lịch sau khi tải bản sao lưu.
+
 ## Phạm vi bảo đảm
 
 Kiểm thử tự động dùng dữ liệu giả, PostgreSQL nhúng PGlite và Chromium desktop/mobile. Không thay thế kiểm chứng Auth, realtime, trigger, backup, hiệu năng và trình duyệt thật của môi trường production. Sổ quỹ hiện có kiểm tra số tiền và lịch sử phiên bản; chưa phải hệ thống kế toán có khóa kỳ/chứng từ/đối soát. Elo cũ đã sai do thao tác trước đây không được tự sửa bằng suy đoán; cần đối chiếu bản sao lịch sử.

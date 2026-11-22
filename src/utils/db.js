@@ -7,6 +7,7 @@ import { clone, emptyClub, normalizeClub, integer, requiredText, validateMatch, 
 import { localDate, toInstant } from './dates.js';
 import { drawMatchId, drawNodes, syncDraws, removeDrawNodes } from './draws.js';
 import { generateMysteryFinal } from './mystery.js';
+import { advanceTeamRound } from './teamModes.js';
 
 export function getClubData() { return readState().data; }
 function unlocked(data, eventId) {
@@ -163,8 +164,13 @@ export function updateMatch(input) {
   return change('before_update_match', data => {
     const index = data.matches.findIndex(m => m.id === input.id);
     if (index < 0) throw new Error('Trận đấu không còn tồn tại.');
-    const old = data.matches[index]; unlocked(data, old.eventId); unlocked(data, input.eventId ?? old.eventId); establishBaselines(data);
+    const old = data.matches[index]; unlocked(data, old.eventId); unlocked(data, input.eventId ?? old.eventId);
+    requireCurrentTeamRound(data, old); establishBaselines(data);
     const match = { ...old, ...input, date: toInstant(input.date || old.date), played: input.played ?? true };
+    if (['teamclash','teamcup','kingcourt'].includes(data.draws?.[old.eventId]?.scenario) &&
+      (stableJson(match.teamA) !== stableJson(old.teamA) || stableJson(match.teamB) !== stableJson(old.teamB))) {
+      throw new Error('Không đổi người chơi của trận theo đội sau khi đã bốc lịch.');
+    }
     if (input.sets === undefined && (input.scoreA !== undefined || input.scoreB !== undefined) && (old.sets?.length || 0) <= 1) match.sets = [{ a: match.scoreA, b: match.scoreB }];
     if (old.id.startsWith('match_draw_') && input.eventId !== undefined && input.eventId !== old.eventId) throw new Error('Không chuyển trận bốc thăm sang sự kiện khác.');
     validateMatch(match, data); data.matches[index] = match; syncDraws(data); recalculateAllElos(data);
@@ -173,9 +179,22 @@ export function updateMatch(input) {
 export function deleteMatch(id) { return deleteMatches([id]); }
 export function deleteMatches(ids) {
   return change('before_delete_matches', data => {
-    data.matches.filter(m=>ids.includes(m.id)).forEach(m=>unlocked(data,m.eventId)); establishBaselines(data);
+    data.matches.filter(m=>ids.includes(m.id)).forEach(m=>{
+      unlocked(data,m.eventId);requireCurrentTeamRound(data,m);
+      if (['teamclash','teamcup','kingcourt'].includes(data.draws?.[m.eventId]?.scenario)) {
+        throw new Error('Không xóa riêng trận của lịch đội. Hãy hủy cả lịch có xác nhận để bốc lại.');
+      }
+    }); establishBaselines(data);
     data.matches = data.matches.filter(m=>!ids.includes(m.id)); removeDrawNodes(data, ids); recalculateAllElos(data);
   });
+}
+function requireCurrentTeamRound(data, match) {
+  const draw = data.draws?.[match.eventId];
+  if (!['teamcup','kingcourt'].includes(draw?.scenario) || !Array.isArray(draw.data)) return;
+  const earlier = draw.scenario === 'teamcup' ? draw.data.length === 4 && draw.data.slice(0, 3) : draw.data.slice(0, -1);
+  if (earlier && earlier.some(round => round.matches.some(node => drawMatchId(node.matchId) === match.id))) {
+    throw new Error('Vòng tiếp theo đã bốc. Hãy giữ kết quả vòng trước hoặc hủy cả lịch với bản sao lưu trước khi bốc lại.');
+  }
 }
 export function saveDraw(eventId, scenario, drawData) {
   return change('before_generate_draw', data => {
@@ -202,6 +221,21 @@ export function revealMysteryFinal(eventId) {
     for (const node of final.matches) data.matches.push({
       id: drawMatchId(node.matchId), eventId, type: 'doubles', date: new Date().toISOString(),
       teamA: clone(node.teamA), teamB: clone(node.teamB), scoreA: 0, scoreB: 0,
+      played: false, sets: [], eloChanges: {},
+    });
+    syncDraws(data);
+  });
+}
+export function advanceTeamDraw(eventId) {
+  return change('before_advance_team_draw', data => {
+    unlocked(data, eventId);
+    const draw = data.draws[eventId];
+    if (!['teamcup','kingcourt'].includes(draw?.scenario) || !Array.isArray(draw.data)) throw new Error('Lịch đội không hợp lệ.');
+    const next = advanceTeamRound(draw.scenario, draw.data, data.matches);
+    draw.data.push(next);
+    for (const match of next.matches) data.matches.push({
+      id: drawMatchId(match.matchId), eventId, type: 'doubles', date: new Date().toISOString(),
+      teamA: clone(match.teamA), teamB: clone(match.teamB), scoreA: 0, scoreB: 0,
       played: false, sets: [], eloChanges: {},
     });
     syncDraws(data);
