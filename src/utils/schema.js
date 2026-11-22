@@ -96,7 +96,7 @@ export function normalizeClub(input, { strict = false } = {}) {
     if (![t.description,t.category,t.performedBy].every(v=>typeof v === 'string')) fail('Nội dung giao dịch không hợp lệ.');
   }
   for (const [eventId, draw] of Object.entries(data.draws)) {
-    if (!object(draw) || !['mixer','roundrobin','elimination'].includes(draw.scenario)) fail(`Lịch đấu ${eventId} không hợp lệ.`);
+    if (!object(draw) || !['mixer','roundrobin','elimination','mystery'].includes(draw.scenario)) fail(`Lịch đấu ${eventId} không hợp lệ.`);
     const rounds = Array.isArray(draw.data) ? draw.data : draw.data?.rounds;
     if (draw.data && (!Array.isArray(rounds) || rounds.some(r=>!Array.isArray(r.matches) || r.matches.some(m=>!m.matchId || !Array.isArray(m.teamA) || !Array.isArray(m.teamB))))) fail(`Cấu trúc vòng đấu ${eventId} không hợp lệ.`);
   }

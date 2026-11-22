@@ -1,0 +1,93 @@
+.season-switcher {
+  width: min(1240px, calc(100% - 32px));
+  margin: 20px auto 0;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid rgba(129, 229, 232, .19);
+  border-radius: 20px;
+  background: linear-gradient(110deg, rgba(18, 42, 55, .96), rgba(15, 24, 38, .94));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .16);
+}
+.season-switcher-copy { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.season-switcher-copy strong { color: #f6f6e8; font-size: 1.15rem; letter-spacing: -.02em; }
+.season-switcher-copy > span:last-child { color: #a7bcc6; font-size: .82rem; }
+.season-eyebrow { color: #63dad6; font-size: .66rem; font-weight: 800; letter-spacing: .16em; }
+.season-options { display: inline-flex; padding: 4px; gap: 4px; border-radius: 12px; background: rgba(1, 10, 18, .55); }
+.season-options button { border: 0; color: #a9bcc2; background: transparent; padding: 8px 18px; border-radius: 9px; font: 700 .85rem var(--font-primary); cursor: pointer; }
+.season-options button.selected { color: #092026; background: #a5f4dd; box-shadow: 0 3px 14px rgba(109, 235, 205, .23); }
+.season-options button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.season-archive-note { width: min(1240px, calc(100% - 32px)); margin: 12px auto 0; padding: 11px 16px; border: 1px solid rgba(231, 212, 157, .3); border-radius: 12px; background: rgba(84, 68, 37, .18); color: #e7d49d; font-size: .84rem; }
+.season-archive-note button { margin-left: 12px; padding: 5px 10px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.season-2027 {
+  --bg-main: #08131d;
+  --bg-card: rgba(16, 34, 46, .86);
+  --bg-card-hover: rgba(22, 49, 61, .92);
+  --bg-input: rgba(5, 18, 27, .78);
+  --border-color: rgba(142, 222, 221, .13);
+  --border-hover: rgba(164, 244, 221, .28);
+  --accent-neon-green: #a5f4dd;
+  --accent-neon-green-glow: rgba(105, 233, 198, .22);
+  --accent-neon-green-glow-strong: rgba(105, 233, 198, .42);
+  --accent-electric-blue: #7bdbed;
+  --accent-electric-blue-glow: rgba(123, 219, 237, .22);
+  --text-secondary: #aac0c9;
+  --text-muted: #7893a0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 85% 8%, rgba(59, 137, 144, .16), transparent 42%), radial-gradient(ellipse at 2% 45%, rgba(154, 126, 74, .11), transparent 40%), #08131d;
+}
+.season-2027 .navbar-container { background: rgba(7, 20, 29, .91); border-bottom: 1px solid rgba(142, 222, 221, .14); }
+.season-2027 .navbar-brand-tag { color: #0c232a; background: #e7d49d; }
+.season-2027 .dashboard-container { max-width: 1320px; }
+.season-2027 .welcome-banner {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(30px, 5vw, 54px);
+  border-radius: 26px;
+  border-color: rgba(165, 244, 221, .2);
+  background: radial-gradient(circle at 89% 13%, rgba(218, 177, 109, .3), transparent 25%), linear-gradient(120deg, #163849, #0b2634 59%, #173a3d);
+  box-shadow: 0 22px 58px rgba(0, 8, 13, .3);
+}
+.season-2027 .welcome-banner::before { content: '2027'; top: auto; bottom: -54px; right: 15px; width: auto; height: auto; background: none; filter: none; opacity: .085; color: #fff; font-size: clamp(110px, 18vw, 220px); font-weight: 800; line-height: 1; letter-spacing: -.09em; }
+.season-2027 .welcome-title { position: relative; z-index: 1; font-size: clamp(2rem, 4vw, 3.35rem); line-height: 1.1; max-width: 580px; }
+.season-2027 .welcome-title span { background: linear-gradient(90deg, #e7d49d, #a5f4dd); -webkit-background-clip: text; background-clip: text; }
+.season-2027 .welcome-subtitle { position: relative; z-index: 1; color: #c7d8d9; }
+.season-2027 .glass-panel { border-color: rgba(165, 244, 221, .12); box-shadow: 0 12px 40px rgba(1, 11, 18, .18); }
+.season-2027 .stat-card { border-radius: 18px; }
+.season-2027 .stat-value { font-variant-numeric: tabular-nums; }
+.mystery-spotlight { width: 100%; display: flex; align-items: center; gap: 20px; text-align: left; padding: 20px 24px; color: #e8f7f2; border: 1px solid rgba(231, 212, 157, .35); border-radius: 18px; background: linear-gradient(110deg, rgba(118, 91, 55, .35), rgba(24, 60, 67, .92)); cursor: pointer; transition: transform .2s, border-color .2s; }
+.mystery-spotlight:hover { transform: translateY(-2px); border-color: #e7d49d; }
+.mystery-spotlight > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 2px; }
+.mystery-spotlight small { color: #e7d49d; font-size: .68rem; font-weight: 800; letter-spacing: .13em; }
+.mystery-spotlight strong { font-size: 1.25rem; letter-spacing: -.02em; }
+.mystery-spotlight span span { color: #bcd0ce; font-size: .82rem; }
+.mystery-spotlight-icon { display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 52px; border-radius: 14px; background: rgba(231, 212, 157, .16); color: #e7d49d; font-size: 1.8rem; }
+.season-2027 .scenario-mystery { border-color: rgba(231, 212, 157, .46); color: #e7d49d; }
+.season-2027 .scenario-mystery.active { color: #0b2730; background: #e7d49d; }
+.mystery-rules { padding: 20px; border-radius: 15px; border: 1px solid rgba(231, 212, 157, .3); background: linear-gradient(120deg, rgba(113, 91, 58, .26), rgba(24, 57, 64, .45)); }
+.mystery-rules > span { color: #e7d49d; font-size: .68rem; letter-spacing: .13em; font-weight: 800; }
+.mystery-rules h4 { margin: 8px 0 10px; font-size: 1.18rem; }
+.mystery-rules p { color: #bdd1d1; font-size: .82rem; line-height: 1.55; margin-top: 7px; }
+.mystery-standings { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.5fr); gap: 24px; padding: 24px; margin-bottom: 18px; }
+.mystery-standings h3 { margin: 6px 0; }
+.mystery-standings p { font-size: .82rem; line-height: 1.55; color: var(--text-secondary); }
+.mystery-standings ol { list-style: none; display: grid; gap: 5px; max-height: 300px; overflow: auto; }
+.mystery-standings li { display: grid; align-items: center; grid-template-columns: 32px minmax(90px, 1fr) minmax(110px, auto) 70px; gap: 8px; padding: 7px 9px; border-radius: 8px; background: rgba(255,255,255,.035); font-size: .8rem; }
+.mystery-standings li > span { color: #e7d49d; font-weight: 800; }
+.mystery-standings li strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mystery-standings li small { color: var(--text-secondary); }
+.mystery-standings li b { color: var(--accent-neon-green); text-align: right; }
+@media (max-width: 640px) {
+  .season-switcher { align-items: stretch; flex-direction: column; padding: 14px; margin-top: 12px; }
+  .season-switcher-copy { gap: 5px 10px; }
+  .season-eyebrow { width: 100%; }
+  .season-options { align-self: flex-start; }
+  .season-2027 .welcome-banner { min-height: 205px; }
+  .mystery-standings { grid-template-columns: 1fr; }
+  .mystery-standings li { grid-template-columns: 24px minmax(80px,1fr) 65px; }
+  .mystery-standings li small { display: none; }
+}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CLUB_ID, LOCAL_MODE } from '../utils/config.js';
+import { CLUB_ID, IS_ARCHIVED_SEASON, LOCAL_MODE } from '../utils/config.js';
 import { supabase, remoteRead, remoteWrite, getRole } from '../utils/supabase.js';
 import { setAccess } from '../utils/access.js';
 import { emptyClub, normalizeClub } from '../utils/schema.js';
@@ -79,20 +79,32 @@ export function useClub() {
       clearTimeout(timeout);
       if (!alive) return;
       if (!document.hidden && navigator.onLine !== false) {
-        if (LOCAL_MODE && !localWritable) await startLocal();
-        if (editorRole && !engine.current) await startEditorSync();
-        if (engine.current) await engine.current.sync();
-        else if (!LOCAL_MODE && !editorRole) {
+        if (IS_ARCHIVED_SEASON && !LOCAL_MODE) {
           try {
-            const remote = await remoteRead(true);
-            if (alive) { setData(remote.kind === 'found' ? normalizeClub(remote.data) : emptyClub()); setStatus({ kind: 'public', message: 'Chế độ xem công khai.' }); failures = 0; }
+            const remote = await remoteRead(editorRole !== 'admin');
+            if (alive) {
+              setData(remote.kind === 'found' ? normalizeClub(remote.data) : emptyClub());
+              setStatus({ kind: 'archive', message: 'Mùa giải đã lưu trữ · chỉ xem.' });
+              failures = 0;
+            }
           } catch (e) { if (alive) { failures++; setStatus({ kind: 'error', message: e.message }); } }
+        }
+        else {
+          if (LOCAL_MODE && !localWritable) await startLocal();
+          if (editorRole && !engine.current) await startEditorSync();
+          if (engine.current) await engine.current.sync();
+          else if (!LOCAL_MODE && !editorRole) {
+            try {
+              const remote = await remoteRead(true);
+              if (alive) { setData(remote.kind === 'found' ? normalizeClub(remote.data) : emptyClub()); setStatus({ kind: 'public', message: 'Chế độ xem công khai.' }); failures = 0; }
+            } catch (e) { if (alive) { failures++; setStatus({ kind: 'error', message: e.message }); } }
+          }
         }
       }
       if (alive && (LOCAL_MODE ? !localWritable : true)) timeout = setTimeout(tick, LOCAL_MODE || editorRole && !engine.current ? 2500 : Math.min(300000, 60000 * 2 ** failures));
     };
     const schedule = () => { clearTimeout(timeout); timeout = setTimeout(tick, 400); };
-    const changed = () => { if (editorRole || LOCAL_MODE) loadLocal(); schedule(); };
+    const changed = () => { if (!IS_ARCHIVED_SEASON && (editorRole || LOCAL_MODE)) loadLocal(); schedule(); };
     const storageChanged = e => { if (e.key === activeKeys().state) changed(); };
     setAccess(LOCAL_MODE ? { role: 'admin', local: true, userId: 'local', writable: false } : {});
     setRole(null); setData(emptyClub());
@@ -105,7 +117,10 @@ export function useClub() {
           const nextRole = await getRole();
           if (!alive) return;
           setAccess({ role: nextRole, userId: session.user.id, writable: false });
-          if (nextRole === 'admin' || nextRole === 'manager') {
+          if (IS_ARCHIVED_SEASON) {
+            editorRole = nextRole === 'admin' ? 'admin' : null;
+            setRole(nextRole);
+          } else if (nextRole === 'admin' || nextRole === 'manager') {
             editorRole = nextRole;
             await startEditorSync(); if (!alive) return;
           } else setRole(nextRole);
@@ -135,6 +150,7 @@ export function useClub() {
   return { data, setData, isAdmin: role === 'admin' || role === 'manager', isOwner: role === 'admin', session, status, error, clearError: () => setError(''),
     retry: () => engine.current?.sync(),
     exportLocal: () => downloadJson(exportBackup(readState().data, CLUB_ID), 'pickleball-local-backup.json'),
+    exportArchive: () => downloadJson(exportBackup(data, CLUB_ID), `pickleball-${CLUB_ID}-archive.json`),
     exportRecovery: () => downloadJson(recoveryBundle(), 'pickleball-device-recovery.json'),
     exportRemote: () => { const remote = engine.current?.getConflict()?.remote; if (remote) downloadJson(exportBackup(remote.data, CLUB_ID), 'pickleball-server-backup.json'); },
     useRemote: () => { if (window.confirm('Chọn bản máy chủ? Bản trên máy sẽ được giữ trong lịch sử sao lưu để đối chiếu.')) engine.current?.resolveRemote(); },

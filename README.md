@@ -15,7 +15,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright chạy hai máy chủ thử localhost với dữ liệu giả và chặn kết nối HTTPS. Đóng các tiến trình đang chiếm cổng 4175/4176 trước khi chạy. Trên Windows, nếu dùng máy chủ thử đã mở riêng, đặt `PW_EXTERNAL_SERVER=1`; máy chủ 4175 phải dùng `VITE_LOCAL_MODE=true`, máy chủ 4176 dùng URL/key giả được mô tả trong `playwright.config.js`. Không dùng máy chủ production làm đích kiểm thử.
+Playwright chạy ba máy chủ thử localhost với dữ liệu giả và chặn kết nối HTTPS. Đóng các tiến trình đang chiếm cổng 4175/4176/4177 trước khi chạy. Trên Windows, nếu dùng máy chủ thử đã mở riêng, đặt `PW_EXTERNAL_SERVER=1`; máy chủ 4175 phải dùng `VITE_LOCAL_MODE=true`, máy chủ 4176 dùng URL/key giả, máy chủ 4177 bật chế độ hai mùa như `playwright.config.js`. Nếu máy đã có Chrome nhưng thiếu Chromium của Playwright, đặt `PW_CHROME_PATH` tới `chrome.exe`. Không dùng máy chủ production làm đích kiểm thử.
 
 `VITE_LOCAL_MODE=true` chỉ cho phép chỉnh sửa trên localhost, không kết nối dữ liệu CLB. Chế độ này phải tắt trên Vercel. Mã không tự chọn Supabase mặc định khi thiếu cấu hình.
 
@@ -47,6 +47,16 @@ Playwright chạy hai máy chủ thử localhost với dữ liệu giả và ch�
 Migration `supabase/migrations/202609290001_manager_role.sql` thêm vai trò `manager`, chụp bản dữ liệu hiện tại vào `club_private.pre_migration_backup` và không sửa JSON CLB. Vai trò này được đọc dữ liệu CLB không có `transactions`; khi lưu thay đổi thành viên, trận hoặc sự kiện, máy chủ ghép lại nguyên giao dịch hiện có. Xung đột phiên bản cũng chỉ trả về bản đã loại giao dịch. Trang Thu Chi và CSDL bị ẩn/chặn; bản lưu trên trình duyệt của tài khoản phụ dùng khóa riêng theo user ID.
 
 Đăng nhập tài khoản phụ bằng tên `quanly`. Ứng dụng ánh xạ tên này tới tài khoản Auth kỹ thuật `amaquangvp+phoquanly@gmail.com`, nhận thư ở hộp thư Gmail của quản trị viên chủ. Tạo tài khoản Auth riêng với mật khẩu mạnh tối thiểu 8 ký tự và xác nhận email trước khi chạy `supabase/grant-manager.sql`. Không dùng mã PIN bốn số, không hạ chính sách mật khẩu của dự án và không lưu mật khẩu trong repo. Quản trị viên chủ có thể dùng chức năng đặt lại mật khẩu trên website với tên `quanly`; liên kết sẽ gửi tới hộp thư chủ. Không cấp vai trò `admin` cho tài khoản này.
+
+## Mùa giải 2027
+
+Website có bộ chọn mùa trên cùng một địa chỉ. Khi Vercel được cấu hình thêm `VITE_CLUB_ID_2027=3`, trang mở mặc định mùa 2027; `?season=2026` mở mùa cũ. Mỗi mùa dùng một dòng Supabase và khóa localStorage riêng nên thao tác mùa mới không ghi vào bản thi đấu mùa cũ. Không bật biến môi trường này trước khi dòng 3 được tạo và kiểm tra.
+
+`supabase/provision-season-2027.sql` là bước tạo mùa một lần trên project đã chọn. Trước khi chạy, cần có **bản sao lưu mới nhất** từ website đang dùng, xác nhận dòng id 1 đúng CLB Phở, dòng id 3 chưa được dùng, rồi đối chiếu số thành viên, trận, sự kiện và giao dịch. Nếu dùng project Supabase mới, trước tiên tạo tài khoản Auth của chủ, nhập bản sao 2026 vào dòng id 1, áp dụng `supabase/migrations/202609230001_safe_club.sql` và `supabase/migrations/202609290001_manager_role.sql`, sau đó mới tạo mùa 2027. Không dùng bản sao tháng 9 làm dữ liệu hiện tại nếu chưa đối chiếu. Script chụp dòng 2026 vào `club_private.pre_migration_backup`, rồi tạo dòng id 3 với danh sách thành viên giữ nguyên, Elo đơn khởi điểm 1.000, Elo đôi khởi điểm 1.200, trận/sự kiện/sơ đồ rỗng và toàn bộ sổ Thu Chi được mang sang. Dòng id 1 không bị cập nhật hoặc xóa. Nếu dòng id 3 đã tồn tại, script dừng và cần chọn ID khác sau khi kiểm tra.
+
+Sau khi đối chiếu hai mùa, áp dụng `supabase/migrations/202611220001_archive_2026.sql` để khóa mọi cập nhật/xóa dòng 2026 ở cơ sở dữ liệu mới. Giao diện 2026 chỉ hiển thị dữ liệu, xếp hạng và cho chủ xem Thu Chi, tải bản lưu trữ. Project Supabase cũ giữ nguyên cho đến khi xác nhận chuyển đổi xong. Việc tạo project mới và bật `VITE_CLUB_ID_2027` trên Vercel chưa được thực hiện.
+
+Thể thức **Đấu Đôi Bí Ẩn** dành riêng cho 2027: 4–24 người chia hết cho 4, ba vòng đổi cặp ưu tiên không lặp đồng đội; chỉ khi ghi đủ kết quả mới bốc vòng cuối ghép người xếp cao với người xếp thấp. Mỗi trận thắng vòng loại được 1 điểm giải, vòng cuối được 2 điểm giải; Elo của mỗi trận vẫn tính như đấu đôi thông thường. Kết quả và sơ đồ đều lưu vào lịch sử trận chuẩn để có thể sửa điểm và đối chiếu.
 
 ## Phạm vi bảo đảm
 

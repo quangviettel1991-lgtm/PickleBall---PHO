@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Users, Swords, Calendar, Trophy, ChevronRight, UserPlus, Play } from "lucide-react";
 import Modal from "./Modal";
 import { addMember } from "../utils/db";
+import { ACTIVE_SEASON } from '../utils/config';
 
 const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "Pickleball Phở";
 
@@ -89,11 +90,16 @@ export default function Dashboard({ data, setData, setActiveTab, setRecorderSubT
       <div className="dashboard-main">
         {/* Banner chào mừng */}
         <div className="welcome-banner">
-          <h1 className="welcome-title">Xin chào, <span>{CLUB_NAME}!</span></h1>
+          <h1 className="welcome-title">{ACTIVE_SEASON.year === '2027' ? <>Sân đấu mới. <span>Huyền thoại mới.</span></> : <>Xin chào, <span>{CLUB_NAME}!</span></>}</h1>
           <p className="welcome-subtitle">
-            Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.
+            {ACTIVE_SEASON.year === '2027' ? `Mùa 2027 của ${CLUB_NAME}: Elo đơn bắt đầu từ 1.000, Elo đôi từ 1.200. Kết quả mùa trước vẫn ở mục chọn mùa phía trên.` : 'Hệ thống theo dõi kết quả, ghi điểm thông minh và cập nhật bảng xếp hạng Elo cá nhân. Tự động tính toán điểm số cho từng sự kiện và khoảng thời gian lựa chọn.'}
           </p>
         </div>
+        {ACTIVE_SEASON.year === '2027' && <button type="button" className="mystery-spotlight" onClick={()=>setActiveTab('draw')}>
+          <span className="mystery-spotlight-icon" aria-hidden="true">✦</span>
+          <span><small>THỂ THỨC MỚI · 2027</small><strong>Đấu Đôi Bí Ẩn</strong><span>3 vòng đổi đồng đội, rồi bốc vòng lật kèo dựa trên kết quả thực tế.</span></span>
+          <ChevronRight size={22} aria-hidden="true" />
+        </button>}
 
         {/* Các chỉ số thống kê tổng quan */}
         <div className="stats-grid">

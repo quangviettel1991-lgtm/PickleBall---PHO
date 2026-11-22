@@ -3,10 +3,11 @@ import './TournamentDraw.css';
 import Modal from './Modal';
 import { useState, useEffect, useMemo } from "react";
 import { Shuffle, Check, Plus, Minus, Trash2, Swords, Award } from "lucide-react";
-import { saveDraw, clearDraw, updateMatch, deleteMatch, adoptLegacyDraw } from "../utils/db";
-import { keys } from "../utils/config";
+import { saveDraw, clearDraw, updateMatch, deleteMatch, adoptLegacyDraw, revealMysteryFinal } from "../utils/db";
+import { ACTIVE_SEASON, keys } from "../utils/config";
 import { drawMatchId } from "../utils/draws";
-import { scoreFromSets } from "../utils/schema";
+import { isPlayed, scoreFromSets } from "../utils/schema";
+import { generateMysteryQualifiers, mysteryStandings } from '../utils/mystery';
 
 export default function TournamentDraw({ data, setData, isAdmin }) {
   const { events } = data;
@@ -21,6 +22,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
   const [selectedMemberIds, setSelectedMemberIds] = useState([]);
   const drawData = savedDraw?.data || null;
   const drawGenerated = Boolean(drawData);
+  const mysteryQualifierNodes = activeScenario === 'mystery' && Array.isArray(drawData) && drawData.length === 3 ? drawData.flatMap(round => round.matches) : [];
+  const mysteryQualifierScored = mysteryQualifierNodes.filter(node => isPlayed(data.matches.find(match => match.id === drawMatchId(node.matchId)) || {})).length;
+  const mysteryFinalReady = mysteryQualifierNodes.length > 0 && mysteryQualifierScored === mysteryQualifierNodes.length;
   const setDrawData = next => setData(saveDraw(selectedEventId, activeScenario, next));
   useEffect(()=>{ localStorage.setItem(keys.drawEvent, selectedEventId); }, [selectedEventId]);
   // Trạng thái cấu hình phụ cho từng kịch bản
@@ -624,7 +628,15 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
       generateRoundRobinDraw();
     } else if (activeScenario === "elimination") {
       generateEliminationDraw();
+    } else if (activeScenario === "mystery") {
+      try { setDrawData(generateMysteryQualifiers(selectedMemberIds)); }
+      catch (error) { alert(error.message); }
     }
+  };
+
+  const handleRevealMysteryFinal = () => {
+    try { setData(revealMysteryFinal(selectedEventId)); }
+    catch (error) { alert(error.message); }
   };
 
   const handleClearDraw = () => {
@@ -696,6 +708,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
         >
           Kịch bản 3: Loại Trực Tiếp
         </button>
+        {ACTIVE_SEASON.year === '2027' && <button
+          className={`scenario-btn scenario-mystery ${activeScenario === 'mystery' ? 'active' : ''}`}
+          onClick={() => setActiveScenario('mystery')}
+        >
+          ✦ Đấu Đôi Bí Ẩn
+        </button>}
       </div>
 
       {/* --- GIAO DIỆN THIẾT LẬP (KHI CHƯA PHÁT SINH LỊCH ĐẤU) --- */}
@@ -779,6 +797,12 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                 </div>
               </div>
             )}
+            {activeScenario === 'mystery' && <div className="mystery-rules">
+              <span>THỂ THỨC ĐẶC BIỆT · MÙA 2027</span>
+              <h4>Ba vòng xoay. Một vòng lật kèo.</h4>
+              <p>Chọn 4, 8, 12… tối đa 24 người. Mỗi người thi đấu đủ 3 vòng loại; hệ thống ưu tiên không lặp đồng đội. Sau khi ghi xong điểm, bốc vòng cuối với cặp mạnh + yếu theo bảng tạm thời.</p>
+              <p>Thắng vòng loại được 1 điểm giải; thắng vòng cuối được 2 điểm giải. Elo vẫn tính như trận đôi bình thường, không nhân đôi.</p>
+            </div>}
 
             {/* --- Cấu hình Vòng tròn (Kịch bản 2) --- */}
             {activeScenario === "roundrobin" && (
@@ -993,6 +1017,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
                   {activeScenario === "mixer" && "Kịch bản 1 - Xoay Tua"}
                   {activeScenario === "roundrobin" && "Kịch bản 2 - Vòng Tròn"}
                   {activeScenario === "elimination" && "Kịch bản 3 - Loại Trực Tiếp"}
+                  {activeScenario === "mystery" && "Đấu Đôi Bí Ẩn - Vòng Lật Kèo"}
                 </strong>
               </span>
               <span style={{ fontStyle: "italic", fontSize: "0.85rem", color: "var(--text-muted)" }}>
@@ -1001,6 +1026,9 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             </div>
 
             <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+              {activeScenario === 'mystery' && drawData.length === 3 && isAdmin && <button type="button" className="btn-electric-blue" onClick={handleRevealMysteryFinal} disabled={isEventLocked || !mysteryFinalReady} title={mysteryFinalReady ? 'Bốc cặp vòng cuối theo bảng điểm tạm thời' : `Đã ghi ${mysteryQualifierScored}/${mysteryQualifierNodes.length} trận vòng loại`}>
+                ✦ Bốc vòng lật kèo {mysteryFinalReady ? '' : `(${mysteryQualifierScored}/${mysteryQualifierNodes.length})`}
+              </button>}
               {isAdmin ? (
                 <button
                   className="btn-neon-green"
@@ -1027,14 +1055,19 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
             </div>
           </div>
 
+          {activeScenario === 'mystery' && <div className="mystery-standings glass-panel">
+            <div><span className="season-eyebrow">BẢNG ĐIỂM GIẢI</span><h3>Xếp hạng Đấu Đôi Bí Ẩn</h3><p>Vòng cuối được bốc sau khi 3 vòng loại có đủ kết quả. Thắng vòng cuối nhận 2 điểm giải; Elo trận đấu giữ nguyên cách tính.</p></div>
+            <ol>{mysteryStandings(drawData, data.matches).map((entry, index)=><li key={entry.id}><span>{String(index+1).padStart(2,'0')}</span><strong>{getPlayerName(entry.id)}</strong><small>{entry.wins} thắng · hiệu số {entry.difference >= 0 ? '+' : ''}{entry.difference}</small><b>{entry.points} điểm</b></li>)}</ol>
+          </div>}
+
           {/* =======================================================
               HIỂN THỊ KỊCH BẢN 1: XOAY TUA (DANH SÁCH CÁC LƯỢT ĐẤU)
               ======================================================= */}
-          {activeScenario === "mixer" && drawData.map((round) => (
+          {(activeScenario === "mixer" || activeScenario === 'mystery') && drawData.map((round) => (
             <div key={round.roundIndex} className="glass-panel round-box animate-fade-in">
               <div className="round-title">
-                <span>Lượt Trận Thứ {round.roundIndex}</span>
-                {round.sittingOut.length > 0 && (
+                <span>{round.phase === 'final' ? '✦ Vòng lật kèo · 2 điểm giải' : `Lượt Trận Thứ ${round.roundIndex}`}</span>
+                {(round.sittingOut?.length || 0) > 0 && (
                   <span className="mixer-sitout-badge">
                     Nghỉ lượt này: {round.sittingOut.map(p => getPlayerNameShort(p)).join(", ")}
                   </span>
@@ -1358,7 +1391,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               {/* Đội A */}
               <div className="score-team-panel">
                 <span style={{ fontSize: "0.9rem", fontWeight: "700", textAlign: "center", color: "var(--accent-electric-blue)", display: "block", maxHeight: "40px", overflow: "hidden" }}>
-                  {activeScoringMatch.teamAName}
+                  {activeScoringMatch.teamAName || activeScoringMatch.teamA.map(getPlayerNameShort).join(' + ')}
                 </span>
                 <span className="score-num-display">{set1A}</span>
                 <div style={{ display: "flex", gap: "6px" }}>
@@ -1372,7 +1405,7 @@ export default function TournamentDraw({ data, setData, isAdmin }) {
               {/* Đội B */}
               <div className="score-team-panel">
                 <span style={{ fontSize: "0.9rem", fontWeight: "700", textAlign: "center", color: "var(--accent-neon-green)", display: "block", maxHeight: "40px", overflow: "hidden" }}>
-                  {activeScoringMatch.teamBName}
+                  {activeScoringMatch.teamBName || activeScoringMatch.teamB.map(getPlayerNameShort).join(' + ')}
                 </span>
                 <span className="score-num-display">{set1B}</span>
                 <div style={{ display: "flex", gap: "6px" }}>

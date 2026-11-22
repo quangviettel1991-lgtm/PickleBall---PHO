@@ -6,6 +6,7 @@ import { readState, commitState, readSnapshots, snapshot, newId } from './storag
 import { clone, emptyClub, normalizeClub, integer, requiredText, validateMatch, isPlayed, stableJson } from './schema.js';
 import { localDate, toInstant } from './dates.js';
 import { drawMatchId, drawNodes, syncDraws, removeDrawNodes } from './draws.js';
+import { generateMysteryFinal } from './mystery.js';
 
 export function getClubData() { return readState().data; }
 function unlocked(data, eventId) {
@@ -188,6 +189,21 @@ export function saveDraw(eventId, scenario, drawData) {
       if (n.isByeMatch) continue;
       data.matches.push({ id: drawMatchId(n.matchId), eventId, type: format, date: n.date || new Date().toISOString(), teamA: clone(n.teamA), teamB: clone(n.teamB), scoreA: n.scoreA ?? 0, scoreB: n.scoreB ?? 0, played: Boolean(n.played), sets: [], eloChanges: {} });
     }
+    syncDraws(data);
+  });
+}
+export function revealMysteryFinal(eventId) {
+  return change('before_mystery_final', data => {
+    unlocked(data, eventId);
+    const draw = data.draws[eventId];
+    if (draw?.scenario !== 'mystery' || !Array.isArray(draw.data) || draw.data.length !== 3) throw new Error('Vòng lật kèo đã được bốc hoặc lịch không hợp lệ.');
+    const final = generateMysteryFinal(draw.data, data.matches);
+    draw.data.push(final);
+    for (const node of final.matches) data.matches.push({
+      id: drawMatchId(node.matchId), eventId, type: 'doubles', date: new Date().toISOString(),
+      teamA: clone(node.teamA), teamB: clone(node.teamB), scoreA: 0, scoreB: 0,
+      played: false, sets: [], eloChanges: {},
+    });
     syncDraws(data);
   });
 }
