@@ -71,3 +71,27 @@ test('manager username opens club tools but never finance or database screens',a
   await expect(page.getByRole('button',{name:'CSDL'})).toHaveCount(0);
   expect(calls.some(url=>url.endsWith('/rest/v1/rpc/club_save'))).toBe(false);
 });
+
+test('pho username uses its own Auth account and receives full application admin access',async({page})=>{
+  let loginBody;
+  const user={id:'00000000-0000-0000-0000-000000000004',email:'vanquanghc+pho@gmail.com',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email',providers:['email']},user_metadata:{},created_at:new Date().toISOString()};
+  const token=`${Buffer.from('{}').toString('base64url')}.${Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url')}.sig`;
+  await page.route(/^https:/,route=>{
+    const url=route.request().url();
+    if(url.includes('/auth/v1/token')) { loginBody=route.request().postDataJSON(); return route.fulfill({json:{access_token:token,refresh_token:'test-refresh',expires_in:3600,token_type:'bearer',user}}); }
+    if(url.includes('/auth/v1/user')) return route.fulfill({json:user});
+    if(url.endsWith('/rest/v1/rpc/club_my_role')) return route.fulfill({json:'admin'});
+    if(url.endsWith('/rest/v1/rpc/club_read')) return route.fulfill({json:{revision:1,data:fixture()}});
+    if(url.endsWith('/rest/v1/rpc/club_public_read')) return route.fulfill({json:{revision:1,data:fixture()}});
+    return route.abort();
+  });
+  await page.goto('/#finance');
+  await page.getByRole('button',{name:'Đăng nhập quản trị',exact:true}).click();
+  await page.getByLabel('Email hoặc tên đăng nhập').fill('pho');
+  await page.getByLabel('Mật khẩu').fill('example-password');
+  await page.getByRole('button',{name:'Đăng nhập',exact:true}).click();
+  await expect(page.getByRole('heading',{name:/Quỹ Câu Lạc Bộ/})).toBeVisible();
+  expect(loginBody.email).toBe('vanquanghc+pho@gmail.com');
+  await page.getByRole('button',{name:'Xem Thêm'}).click();
+  await expect(page.getByRole('button',{name:'CSDL',exact:true})).toBeVisible();
+});

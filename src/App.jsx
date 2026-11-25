@@ -60,7 +60,7 @@ function ClubApp() {
         {SEASONS.map(season=><button key={season.year} type="button" aria-pressed={season.year === ACTIVE_SEASON.year} className={season.year === ACTIVE_SEASON.year ? 'selected' : ''} onClick={()=>selectSeason(season.year)}>{season.year}</button>)}
       </div>
     </div>}
-    {IS_ARCHIVED_SEASON && <div className="season-archive-note" role="status">Mùa {ACTIVE_SEASON.year} đã lưu trữ · chỉ xem dữ liệu và xếp hạng. Thu Chi chỉ quản trị viên chủ được xem. {club.isOwner && club.status.kind === 'archive' && <button type="button" onClick={club.exportArchive}>Tải dữ liệu mùa này</button>}</div>}
+    {IS_ARCHIVED_SEASON && <div className="season-archive-note" role="status">Mùa {ACTIVE_SEASON.year} đã lưu trữ · chỉ xem dữ liệu và xếp hạng. Thu Chi chỉ quản trị viên toàn quyền được xem. {club.isOwner && club.status.kind === 'archive' && <button type="button" onClick={club.exportArchive}>Tải dữ liệu mùa này</button>}</div>}
     {club.status.kind !== 'saved' && <div className={`sync-status sync-${club.status.kind}`} role="status" aria-live="polite">
       <span>{club.status.message}</span>
       {club.status.kind === 'error' && !IS_ARCHIVED_SEASON && <button onClick={club.exportRecovery}>Tải bản cứu hộ trên thiết bị này</button>}
@@ -72,7 +72,7 @@ function ClubApp() {
     <main id="main-content" ref={main} tabIndex={-1} className="app-main-content"
       onChangeCapture={e=>{ if (e.target.closest('form')) dirty.current = true; }}
       onSubmitCapture={()=>{ let generation; try { generation = readState().generation; } catch { return; } queueMicrotask(()=>{ if (readState().generation !== generation) dirty.current = false; }); }}>
-      {locked ? restricted ? <div className="recovery-panel"><h1>Không có quyền truy cập</h1><p>Chỉ quản trị viên chủ được xem mục Thu Chi và CSDL.</p></div>
+      {locked ? restricted ? <div className="recovery-panel"><h1>Không có quyền truy cập</h1><p>Chỉ quản trị viên toàn quyền được xem mục Thu Chi và CSDL.</p></div>
         : archivePage ? <div className="recovery-panel"><h1>Mùa giải đã lưu trữ</h1><p>Chọn mùa mới nhất để ghi điểm hoặc thay đổi dữ liệu.</p></div>
         : club.status.kind === 'readonly' ? <div className="recovery-panel"><h1>Đang chờ quyền chỉnh sửa</h1><p>Trang sẽ tự mở quyền khi tab quản lý khác đóng.</p></div>
         : <div className="recovery-panel"><h1>Đăng nhập để quản lý CLB</h1><p>Bạn có thể xem Tổng Quan, Xếp Hạng và Đối Đầu mà không cần đăng nhập.</p><button className="btn-neon-green" onClick={()=>setIsAuthModalOpen(true)}>Đăng nhập quản trị</button></div>

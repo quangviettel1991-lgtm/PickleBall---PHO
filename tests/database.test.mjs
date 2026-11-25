@@ -112,6 +112,37 @@ test('manager role can edit club play data without reading or changing finances'
   await pg.close();
 });
 
+test('pho admin grant requires a confirmed separate Auth user and preserves both seasons',async()=>{
+  const pg=new PGlite();
+  const owner='00000000-0000-0000-0000-000000000001';
+  const pho='00000000-0000-0000-0000-000000000004';
+  await pg.exec(`create role anon; create role authenticated; create schema auth;
+    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+    grant usage on schema auth to anon,authenticated; grant execute on function auth.uid() to anon,authenticated;
+    create table public.pickleball_club(id bigint primary key,data jsonb,updated_at timestamptz);
+    insert into auth.users values('${owner}','amaquangvp@gmail.com',now()),('${pho}','vanquanghc+pho@gmail.com',null);`);
+  const original=fixture();original.transactions=[{id:'tx',type:'income',amount:500,description:'private',category:'fund',date:'2026-09-23'}];
+  await pg.query('insert into pickleball_club values(1,$1,now())',[original]);
+  await pg.exec(await fs.readFile('supabase/migrations/202609230001_safe_club.sql','utf8'));
+  await pg.exec(await fs.readFile('supabase/migrations/202609290001_manager_role.sql','utf8'));
+  await pg.exec(await fs.readFile('supabase/provision-season-2027.sql','utf8'));
+  await pg.exec(await fs.readFile('supabase/migrations/202611220001_archive_2026.sql','utf8'));
+  const before=(await pg.query('select id,data from pickleball_club order by id')).rows;
+  const grant=await fs.readFile('supabase/grant-pho-admin.sql','utf8');
+  await assert.rejects(()=>pg.exec(grant),/Confirmed pho Auth account not found/);
+  await pg.exec('rollback');
+  await pg.exec(`update auth.users set email_confirmed_at=now() where id='${pho}'`);
+  await pg.exec(grant);await pg.exec(grant);
+  assert.deepEqual((await pg.query('select id,data from pickleball_club order by id')).rows,before);
+  await pg.exec(`set role authenticated;set request.jwt.claim.sub='${pho}'`);
+  for(const id of [1,3]) {
+    assert.equal((await pg.query(`select club_my_role(${id}) as role`)).rows[0].role,'admin');
+    assert.deepEqual((await pg.query(`select club_read(${id}) as result`)).rows[0].result.data.transactions,original.transactions);
+  }
+  await pg.close();
+});
+
 test('2027 provisioning keeps the 2026 row intact and restarts only sports ratings',async()=>{
   const pg=new PGlite();
   const admin='00000000-0000-0000-0000-000000000001';

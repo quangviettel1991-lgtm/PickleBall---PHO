@@ -2,8 +2,14 @@ import PropTypes from 'prop-types';
 import { useState } from 'react';
 import Modal from './Modal';
 import { supabase } from '../utils/supabase.js';
-import { MANAGER_USERNAME, MANAGER_AUTH_EMAIL } from '../utils/config.js';
-const loginEmail = value => value.trim().toLowerCase() === MANAGER_USERNAME ? MANAGER_AUTH_EMAIL : value.trim();
+import { MANAGER_USERNAME, MANAGER_AUTH_EMAIL, SECOND_ADMIN_USERNAME, SECOND_ADMIN_AUTH_EMAIL } from '../utils/config.js';
+const loginEmail = value => {
+  const entered = value.trim();
+  const name = entered.toLowerCase();
+  if (name === MANAGER_USERNAME) return MANAGER_AUTH_EMAIL;
+  if (name === SECOND_ADMIN_USERNAME) return SECOND_ADMIN_AUTH_EMAIL;
+  return entered;
+};
 export default function AuthDialog({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,7 +47,7 @@ export default function AuthDialog({ isOpen, onClose }) {
         <input id="login-password" className="form-input" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required /></>}
       {error && <p role="alert" className="operation-error">{error}</p>}
       {requestReset ? <>
-        <p>Nhập email quản trị hoặc tên đăng nhập quanly. Với quanly, liên kết sẽ gửi tới hộp thư của quản trị viên chủ.</p>
+        <p>Nhập email quản trị hoặc tên đăng nhập quanly / pho. Liên kết sẽ gửi tới hộp thư tương ứng của quản trị viên.</p>
         {resetSent && <p role="status">Nếu email này có tài khoản, hãy kiểm tra hộp thư và thư rác để mở liên kết đặt mật khẩu.</p>}
         <div className="auth-actions"><button className="btn-neon-green" type="submit" disabled={busy || resetSent}>{busy ? 'Đang gửi…' : 'Gửi liên kết đặt mật khẩu'}</button>
           <button className="btn-secondary" type="button" onClick={backToLogin}>Quay lại đăng nhập</button></div>

@@ -48,6 +48,8 @@ Migration `supabase/migrations/202609290001_manager_role.sql` thêm vai trò `ma
 
 Đăng nhập tài khoản phụ bằng tên `quanly`. Ứng dụng ánh xạ tên này tới tài khoản Auth kỹ thuật `amaquangvp+phoquanly@gmail.com`, nhận thư ở hộp thư Gmail của quản trị viên chủ. Tạo tài khoản Auth riêng với mật khẩu mạnh tối thiểu 8 ký tự và xác nhận email trước khi chạy `supabase/grant-manager.sql` để cấp quyền quản lý mùa 2027 (CLB id 3). Không dùng mã PIN bốn số, không hạ chính sách mật khẩu của dự án và không lưu mật khẩu trong repo. Quản trị viên chủ có thể dùng chức năng đặt lại mật khẩu trên website với tên `quanly`; liên kết sẽ gửi tới hộp thư chủ. Không cấp vai trò `admin` cho tài khoản này.
 
+Tài khoản phụ có quyền đầy đủ dùng tên đăng nhập `pho`, ánh xạ tới Auth email kỹ thuật `vanquanghc+pho@gmail.com`. Sau khi người sở hữu tự tạo và xác nhận Auth user, chạy `supabase/grant-pho-admin.sql` để cấp vai trò ứng dụng `admin` cho hai mùa. Đây là quyền quản trị website, gồm Thu Chi và CSDL; không phải quyền PostgreSQL `superuser`. Mùa 2026 vẫn chỉ đọc do trigger lưu trữ. Không ghi mật khẩu vào mã nguồn, SQL hoặc tài liệu và không hạ chính sách mật khẩu Supabase để tạo tài khoản này.
+
 ## Mùa giải 2027
 
 Website có bộ chọn mùa trên cùng một địa chỉ. Khi Vercel được cấu hình thêm `VITE_CLUB_ID_2027=3`, trang mở mặc định mùa 2027; `?season=2026` mở mùa cũ. Mỗi mùa dùng một dòng Supabase và khóa localStorage riêng nên thao tác mùa mới không ghi vào bản thi đấu mùa cũ. Không bật biến môi trường này trước khi dòng 3 được tạo và kiểm tra.

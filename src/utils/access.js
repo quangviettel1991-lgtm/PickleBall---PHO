@@ -10,5 +10,5 @@ export function requireWrite() {
 }
 export function requireOwner() {
   requireWrite();
-  if (access.role !== 'admin') throw new Error('Chỉ quản trị viên chủ được truy cập CSDL và Thu Chi.');
+  if (access.role !== 'admin') throw new Error('Chỉ quản trị viên toàn quyền được truy cập CSDL và Thu Chi.');
 }
