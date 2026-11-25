@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 import './Navbar.css';
 import { useState } from "react";
-import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, Shuffle, MoreHorizontal, CreditCard } from "lucide-react";
+import { LayoutDashboard, Trophy, Swords, Users, Calendar, Database, Lock, Unlock, Shuffle, MoreHorizontal, CreditCard, UserCog } from "lucide-react";
+import { ACTIVE_SEASON } from '../utils/config.js';
 
 const CLUB_NAME = import.meta.env.VITE_CLUB_NAME || "PICKLEBALL PHỞ";
 
@@ -24,9 +25,10 @@ export default function Navbar({ activeTab, setActiveTab, isAdmin, isOwner, setI
     { id: "members", label: "Thành Viên", icon: Users },
     { id: "finance", label: "Thu Chi", icon: CreditCard },
     { id: "backup", label: "CSDL", icon: Database },
+    ...(isOwner && ACTIVE_SEASON.year === '2027' ? [{ id: "accounts", label: "Tài Khoản", icon: UserCog }] : []),
   ].filter(item => isOwner || !isAdmin || !['finance','backup'].includes(item.id));
 
-  const isMoreActive = ["members", "finance", "backup"].includes(activeTab);
+  const isMoreActive = ["members", "finance", "backup", "accounts"].includes(activeTab);
 
   return (
     <nav className="navbar-container">

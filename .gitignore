@@ -39,3 +39,4 @@ backups/
 playwright-report/
 test-results/
 .vercel/
+supabase/.temp/

@@ -10,5 +10,7 @@ export default defineConfig({
       env: { VITE_LOCAL_MODE: 'false', VITE_SUPABASE_URL: 'https://test-project.supabase.co', VITE_SUPABASE_ANON_KEY: 'test-public-key', VITE_CLUB_ID: '1' } },
     { command: 'npm run dev -- --host 127.0.0.1 --port 4177 --strictPort', url: 'http://127.0.0.1:4177', reuseExistingServer: false,
       env: { VITE_LOCAL_MODE: 'true', VITE_SUPABASE_URL: '', VITE_SUPABASE_ANON_KEY: '', VITE_CLUB_ID: '1', VITE_CLUB_ID_2027: '3' } },
+    { command: 'npm run dev -- --host 127.0.0.1 --port 4178 --strictPort', url: 'http://127.0.0.1:4178', reuseExistingServer: false,
+      env: { VITE_LOCAL_MODE: 'false', VITE_SUPABASE_URL: 'https://test-project.supabase.co', VITE_SUPABASE_ANON_KEY: 'test-public-key', VITE_CLUB_ID: '1', VITE_CLUB_ID_2027: '3' } },
   ],
 });

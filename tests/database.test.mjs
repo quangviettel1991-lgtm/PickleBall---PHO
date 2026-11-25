@@ -143,6 +143,38 @@ test('pho admin grant requires a confirmed separate Auth user and preserves both
   await pg.close();
 });
 
+test('account creation RPC is service-only and grants the selected application role',async()=>{
+  const pg=new PGlite();
+  const owner='00000000-0000-0000-0000-000000000001';
+  const pho='00000000-0000-0000-0000-000000000004';
+  const helper='00000000-0000-0000-0000-000000000005';
+  await pg.exec(`create role anon; create role authenticated; create role service_role; create schema auth;
+    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+    grant usage on schema auth to anon,authenticated; grant execute on function auth.uid() to anon,authenticated;
+    create table public.pickleball_club(id bigint primary key,data jsonb,updated_at timestamptz);
+    insert into auth.users values('${owner}','amaquangvp@gmail.com',now()),('${pho}','vanquanghc+pho@gmail.com',now()),('${helper}','vanquanghc+team1@gmail.com',now());`);
+  const original=fixture();
+  await pg.query('insert into pickleball_club values(1,$1,now())',[original]);
+  await pg.exec(await fs.readFile('supabase/migrations/202609230001_safe_club.sql','utf8'));
+  await pg.exec(await fs.readFile('supabase/migrations/202609290001_manager_role.sql','utf8'));
+  await pg.exec(await fs.readFile('supabase/provision-season-2027.sql','utf8'));
+  const before=(await pg.query('select id,data from pickleball_club order by id')).rows;
+  await pg.exec(await fs.readFile('supabase/migrations/20261125043318_account_creation.sql','utf8'));
+  const privileges=(await pg.query("select has_function_privilege('anon','public.club_admin_create_memberships(uuid,text)','EXECUTE') as anonymous,has_function_privilege('authenticated','public.club_admin_create_memberships(uuid,text)','EXECUTE') as signed_in,has_function_privilege('service_role','public.club_admin_create_memberships(uuid,text)','EXECUTE') as server")).rows[0];
+  assert.deepEqual(privileges,{anonymous:false,signed_in:false,server:true});
+  await pg.exec(`set role authenticated;set request.jwt.claim.sub='${owner}'`);
+  await assert.rejects(()=>pg.query('select club_admin_create_memberships($1,$2)',[pho,'admin']));
+  await pg.exec('reset role;set role service_role');
+  await pg.query('select club_admin_create_memberships($1,$2)',[pho,'admin']);
+  await pg.query('select club_admin_create_memberships($1,$2)',[helper,'manager']);
+  await pg.exec('reset role');
+  assert.deepEqual((await pg.query('select id,data from pickleball_club order by id')).rows,before);
+  assert.deepEqual((await pg.query(`select club_id,role from club_private.memberships where user_id='${pho}' order by club_id`)).rows,[{club_id:1,role:'admin'},{club_id:3,role:'admin'}]);
+  assert.deepEqual((await pg.query(`select club_id,role from club_private.memberships where user_id='${helper}'`)).rows,[{club_id:3,role:'manager'}]);
+  await pg.close();
+});
+
 test('2027 provisioning keeps the 2026 row intact and restarts only sports ratings',async()=>{
   const pg=new PGlite();
   const admin='00000000-0000-0000-0000-000000000001';

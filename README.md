@@ -15,7 +15,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright chạy ba máy chủ thử localhost với dữ liệu giả và chặn kết nối HTTPS. Đóng các tiến trình đang chiếm cổng 4175/4176/4177 trước khi chạy. Trên Windows, nếu dùng máy chủ thử đã mở riêng, đặt `PW_EXTERNAL_SERVER=1`; máy chủ 4175 phải dùng `VITE_LOCAL_MODE=true`, máy chủ 4176 dùng URL/key giả, máy chủ 4177 bật chế độ hai mùa như `playwright.config.js`. Nếu máy đã có Chrome nhưng thiếu Chromium của Playwright, đặt `PW_CHROME_PATH` tới `chrome.exe`. Không dùng máy chủ production làm đích kiểm thử.
+Playwright chạy các máy chủ thử localhost với dữ liệu giả và chặn kết nối HTTPS. Đóng các tiến trình đang chiếm cổng 4175–4178 trước khi chạy. Trên Windows, nếu dùng máy chủ thử đã mở riêng, đặt `PW_EXTERNAL_SERVER=1`; máy chủ 4175 dùng `VITE_LOCAL_MODE=true`, máy chủ 4176 dùng URL/key giả, máy chủ 4177 bật chế độ hai mùa trên máy, máy chủ 4178 bật hai mùa với URL/key giả như `playwright.config.js`. Nếu máy đã có Chrome nhưng thiếu Chromium của Playwright, đặt `PW_CHROME_PATH` tới `chrome.exe`. Không dùng máy chủ production làm đích kiểm thử.
 
 `VITE_LOCAL_MODE=true` chỉ cho phép chỉnh sửa trên localhost, không kết nối dữ liệu CLB. Chế độ này phải tắt trên Vercel. Mã không tự chọn Supabase mặc định khi thiếu cấu hình.
 
@@ -48,7 +48,7 @@ Migration `supabase/migrations/202609290001_manager_role.sql` thêm vai trò `ma
 
 Đăng nhập tài khoản phụ bằng tên `quanly`. Ứng dụng ánh xạ tên này tới tài khoản Auth kỹ thuật `amaquangvp+phoquanly@gmail.com`, nhận thư ở hộp thư Gmail của quản trị viên chủ. Tạo tài khoản Auth riêng với mật khẩu mạnh tối thiểu 8 ký tự và xác nhận email trước khi chạy `supabase/grant-manager.sql` để cấp quyền quản lý mùa 2027 (CLB id 3). Không dùng mã PIN bốn số, không hạ chính sách mật khẩu của dự án và không lưu mật khẩu trong repo. Quản trị viên chủ có thể dùng chức năng đặt lại mật khẩu trên website với tên `quanly`; liên kết sẽ gửi tới hộp thư chủ. Không cấp vai trò `admin` cho tài khoản này.
 
-Tài khoản phụ có quyền đầy đủ dùng tên đăng nhập `pho`, ánh xạ tới Auth email kỹ thuật `vanquanghc+pho@gmail.com`. Sau khi người sở hữu tự tạo và xác nhận Auth user, chạy `supabase/grant-pho-admin.sql` để cấp vai trò ứng dụng `admin` cho hai mùa. Đây là quyền quản trị website, gồm Thu Chi và CSDL; không phải quyền PostgreSQL `superuser`. Mùa 2026 vẫn chỉ đọc do trigger lưu trữ. Không ghi mật khẩu vào mã nguồn, SQL hoặc tài liệu và không hạ chính sách mật khẩu Supabase để tạo tài khoản này.
+Tài khoản phụ có quyền đầy đủ dùng tên đăng nhập `pho`, ánh xạ tới Auth email kỹ thuật `vanquanghc+pho@gmail.com`. Quản trị viên có thể mở **Xem Thêm → Tài Khoản** để tạo tên đăng nhập, mật khẩu và chọn vai trò. Edge Function `create-club-account` xác minh JWT và quyền `admin` mùa 2027 trước khi dùng khóa máy chủ tạo Auth user; RPC `club_admin_create_memberships` chỉ cấp quyền cho user đã xác nhận và chỉ cho service role gọi. Vai trò `admin` có Thu Chi và CSDL ở mùa 2027, xem mùa 2026 nhưng không sửa được vì trigger lưu trữ; `manager` chỉ sửa dữ liệu thi đấu mùa 2027. Đây là quyền quản trị website, không phải quyền PostgreSQL `superuser`. Mật khẩu không được ghi vào mã nguồn, SQL hoặc tài liệu; chính sách mật khẩu Supabase không bị hạ. `supabase/grant-pho-admin.sql` chỉ là cách khôi phục thủ công nếu Auth user `pho` đã được tạo trước khi có công cụ này.
 
 ## Mùa giải 2027
 
